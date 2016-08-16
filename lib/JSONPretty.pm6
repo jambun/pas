@@ -41,6 +41,7 @@ class Actions {
     	my Int $indent = 0;
 	my Str $out = '';
 	for $json.split("\n")>>.trim -> $line {
+	    next unless $line ~~ /./;
 	    $indent -= $!step if $line ~~ /^<[ \} \] ]>/;
             $out ~= ' ' x $indent ~ $line ~ "\n";
 	    $indent += $!step if $line ~~ /^<[ \{ \[ ]>/;
@@ -49,7 +50,7 @@ class Actions {
     }
 
     method TOP ($/)        { make self.indent($<value>.made)                  }
-    method object($/)      { make '{' ~ "\n" ~ $<pairlist>.made ~ '}'         }
+    method object($/)      { make "\n" ~ '{' ~ "\n" ~ $<pairlist>.made ~ '}'         }
     method pairlist($/)    { make $<pair>>>.made.join(",\n") ~ "\n"           }
     method pair($/)        { make $<string> ~ ': ' ~ $<value>.made            }
     method emptyarray($/)  { make '[]'                                        }
