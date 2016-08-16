@@ -120,8 +120,8 @@ sub MAIN(Str  $uri = '/',
 		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
 	    }
 
-	    when ('edit') {
-            	 save_tmp(pretty get($ruri));
+	    when (/edit(.last)?/) {
+            	 save_tmp(pretty get($ruri)) unless $0;
 		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
 	    }
 
@@ -304,6 +304,7 @@ pas - a commandline client for ArchivesSpace
     show               Get the uri.
     new                Build a record using the pairs and post it.
     edit               Get the uri and present the json in an editor, then post if any changes are made.
+    edit.last          Present the last edited json file in an editor, then post if any changes are made.
     update             Get the uri, update it using the pairs and post the resulting json.
     stub               Get a stub record expected by uri, present it in an editor and post if any changes were made.
 
