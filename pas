@@ -13,6 +13,7 @@ my %config =
    user => 'admin',
    pass => 'admin';
 
+
 my %prompts =
    url  => 'ArchivesSpace backend URL',
    user => 'Username',
@@ -34,6 +35,7 @@ sub MAIN(Str  $uri = '/',
          Str  :$url?,
          Str  :$session?,
          Str  :$post?,
+         Str  :$alias?,
          Bool :$help=False,
          Bool :$h=False,
          Bool :$compact=False,
@@ -59,6 +61,26 @@ sub MAIN(Str  $uri = '/',
 
     load_config($url, $user, $pass, $session, $prompt || $p);
 
+    if $alias {
+       %config<alias> ||= {};
+       my ($from, $to) = $alias.split(':', 2);
+       my ($cmd, $als) = $alias.split('!', 2);
+       if $cmd && $als {
+       	  %config<alias>{$als}:delete if $cmd eq 'delete';
+	  save_config;
+	  say "Alias .$als. deleted.";
+       } elsif $to {
+       	  %config<alias>{$from} = $to;
+	  save_config;
+	  say "Alias .$from. added.";
+       } else {
+       	  my %aliases = %config<alias>;
+	  for %aliases.keys.sort -> $k { say ".$k. {%aliases{$k}}" };
+       }
+       exit;
+    }
+
+
     login if $url || $user || $pass || !%config<session> || $force-login || $f;
 
     my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
@@ -73,17 +95,20 @@ sub MAIN(Str  $uri = '/',
        }
     }
 
+    my $ruri = $uri;
+    $ruri ~~ s:g/\. (\w+) \./%config<alias>{$0}/;
+
     if $post_file {
 
-	say pretty post($uri, @pairs, slurp($post_file));
+	say pretty post($ruri, @pairs, slurp($post_file));
 
     } else {
 
       	given ($command) {
-      	    when ('new') { say pretty update_uri($uri, '{}', @pairs); }
+      	    when ('new') { say pretty update_uri($ruri, '{}', @pairs); }
 
       	    when ('stub') {
-	    	 my $puri = $uri;
+	    	 my $puri = $ruri;
 		 $puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
 		 $puri ~~ s:g/\d+/:id/;
 	    	 my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
@@ -92,17 +117,17 @@ sub MAIN(Str  $uri = '/',
 		 $model ~~ s/\w+\(\:(\w+)\)/$0/;
 
             	 save_tmp(pretty get('/stub/' ~ $model, @pairs));
-		 say edit(tmp_file) ?? pretty post($uri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
+		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
 	    }
 
 	    when ('edit') {
-            	 save_tmp(pretty get($uri));
-		 say edit(tmp_file) ?? pretty post($uri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
+            	 save_tmp(pretty get($ruri));
+		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
 	    }
 
-	    when ('update') { say pretty update_uri($uri, get($uri), @pairs); }
+	    when ('update') { say pretty update_uri($ruri, get($uri), @pairs); }
 
-	    when ('show') { say pretty get($uri, @pairs); }
+	    when ('show') { say pretty get($ruri, @pairs); }
 
 	    default { say 'Unknown command: ' ~ $_; }
 	}
