@@ -91,7 +91,7 @@ sub MAIN(Str  $uri = '/',
 		 my $model = $e.first{'params'}[0][1];
 		 $model ~~ s/\w+\(\:(\w+)\)/$0/;
 
-            	 save_tmp(pretty get('/stub/' ~ $model));
+            	 save_tmp(pretty get('/stub/' ~ $model, @pairs));
 		 say edit(tmp_file) ?? pretty post($uri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
 	    }
 
