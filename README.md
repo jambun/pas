@@ -1,7 +1,7 @@
 # pas
 An ArchivesSpace commandline client
 
-Needs Perl6 and Net::HTTP, and an ArchivesSpace plugin to make `stub` work.
+Needs Perl6 and Net::HTTP, and an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints) to make `stub` work.
 
 
     pas - a commandline client for ArchivesSpace
