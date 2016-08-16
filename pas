@@ -292,6 +292,9 @@ pas - a commandline client for ArchivesSpace
     --pass=password    Set the password.
     --sess=token       Set the session token.
     --post=file        Post file to uri. Same as `pas uri file`
+    --alias=from:to    Alias 'from' to a uri fragment 'to'
+    --alias=list       List aliases
+    --alias=delete!als Delete alias 'als'
     -h/--help          This.
     -v/--verbose       Be noisy.
     -f/--force-login   Login to ArchivesSpace even if we have a good session.
@@ -316,5 +319,7 @@ pas - a commandline client for ArchivesSpace
     pas /schemas/resource
     pas /endpoints
     pas /endpoints uri=/repositories method=post
+    pas --alias=e:/endpoints
+    pas .e.
 END
 }
