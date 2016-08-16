@@ -5,7 +5,7 @@ use Net::HTTP::POST;
 use JSON::Tiny;
 use MONKEY-SEE-NO-EVAL;
 
-use lib '.';
+use lib './lib';
 use JSONPretty;
 
 my %config = 
