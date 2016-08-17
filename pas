@@ -7,10 +7,15 @@ use JSONPretty;
 use Net::HTTP::GET;
 use Net::HTTP::POST;
 use JSON::Tiny;
+use Linenoise;
+
 use MONKEY-SEE-NO-EVAL;
 
 my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
-my $TMP_FILE = 'last.json';
+my constant TMP_FILE = 'last.json';
+my constant HIST_FILE = 'history';
+my constant HIST_LENGTH = 100;
+my constant ENDPOINTS_URI = '/endpoints';
 
 my Bool $LOUD;
 my Bool $COMPACT;
@@ -18,6 +23,95 @@ my Int $INDENT-STEP;
 
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
+
+class Command {
+    has Str $.action;
+    has     @.args;
+    has Str $.qualifier = '';
+
+    my %state = verbose => False,
+       	        compact => False;
+		
+    my constant ACTIONS = <show update create edit stub post login endpoints config alias compact verbose help quit>;
+
+    method actions { ACTIONS }
+
+    method execute { self."$!action"() }
+
+    method show {
+    	my $uri = @!args.shift;
+        pretty get($uri, @!args);
+    }
+
+    method update {
+    	my $uri = @!args.shift;
+	pretty update_uri($uri, get($uri), @!args);
+    }
+
+    method create {
+    	my $uri = @!args.shift;
+      	pretty update_uri($uri, '{}', @!args);
+    }
+
+    method edit {
+    	my $uri = @!args.shift;
+        save_tmp(pretty get($uri)) unless $!qualifier eq 'last';
+	edit(tmp_file) ?? pretty post($uri, @!args, slurp(tmp_file)) !! 'No changes to post.';
+    }
+
+    method stub {
+    	my $uri = @!args.shift;
+	my $puri = $uri;
+	$puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
+	$puri ~~ s:g/\d+/:id/;
+	my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
+	return "Couldn't find endpoint definition" if @($e).elems == 0;
+	my $model = $e.first{'params'}[0][1];
+	$model ~~ s/\w+\(\:(\w+)\)/$0/;
+
+        save_tmp(pretty get('/stub/' ~ $model, @!args));
+	edit(tmp_file) ?? pretty post($uri, @!args, slurp(tmp_file)) !! 'No changes to post.';
+    }
+
+    method post {
+    	my $uri = @!args.shift;
+	my $post_file = @!args.pop;
+	pretty post($uri, @!args, slurp($post_file));
+    }
+
+    method login {
+    	login;
+    }
+
+    method endpoints {
+    	endpoints.join("\n");
+    }
+
+    method config {
+    	config.json;
+    }
+
+    method alias {
+    	my $alias = @!args.shift;
+    	alias_cmd($alias);
+    }
+
+    method compact {
+    	%state<compact> = @!args.shift;
+    }
+
+    method verbose {
+    	%state<verbose> = @!args.shift;
+    }
+
+    method help {
+        self.actions.join("\n");
+    }
+
+    method quit {
+    	'Goodbye';    	
+    }
+}
 
 
 sub MAIN(Str  $uri = '/',
@@ -33,6 +127,8 @@ sub MAIN(Str  $uri = '/',
          Bool :$h=False,
          Bool :$compact=False,
          Bool :$c=False,
+         Bool :$shell=False,
+         Bool :$s=False,
          Int  :$indent-step?,
          Bool :$verbose=False,
          Bool :$v=False,
@@ -40,6 +136,7 @@ sub MAIN(Str  $uri = '/',
          Bool :$p=False,
 	 Bool :$force-login=False,
 	 Bool :$f=False) {
+
 
     if $help || $h {
        help;
@@ -59,55 +156,92 @@ sub MAIN(Str  $uri = '/',
 
     login if $url || $user || $pass || !config.attr<session> || $force-login || $f;
 
-    my $command = $cmd;
-    my $post_file = $post;
-    my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
 
-    if $trailing_non_pair {
-       if $trailing_non_pair.IO.e {
-       	  $post_file ||= $trailing_non_pair;
-       } else {
-       	  $command = $trailing_non_pair;
+    if $shell || $s {
+       linenoiseHistoryLoad(pas_path HIST_FILE);
+       linenoiseHistorySetMaxLen(HIST_LENGTH);
+
+       my @tab_targets = |Command.actions, |endpoints;
+       linenoiseSetCompletionCallback(-> $line, $c {
+       	   my $prefix  = '';
+	   my $last = $line;
+	   if $line ~~ /(.* \s+) (<[\S]>+ $)/ {
+	      $prefix = $0;
+	      $last = $1;
+	   }
+	   for @tab_targets.grep(/^ "$last" /).sort -> $cmd {
+       	        linenoiseAddCompletion($c, $prefix ~ $cmd);
+    	   }
+       });
+
+
+       while (my $line = linenoise 'pas> ').defined {
+       	     next unless $line.trim;
+       	     linenoiseHistoryAdd($line);
+	     my %cmd = parse_cmd($line);
+
+    	     say Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+
+	     last if %cmd<action> eq 'quit';
        }
-    }
 
-    my $ruri = $uri.subst: /\. (\w+) \./, -> { config.attr<alias>{$0} }, :g;
-
-    if $post_file {
-
-	say pretty post($ruri, @pairs, slurp($post_file));
+       linenoiseHistorySave(pas_path HIST_FILE);
 
     } else {
 
-      	given ($command) {
-      	    when ('new') { say pretty update_uri($ruri, '{}', @pairs); }
+        my $command = $cmd;
+    	my $post_file = $post;
+    	my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
 
-      	    when ('stub') {
-	    	 my $puri = $ruri;
-		 $puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
-		 $puri ~~ s:g/\d+/:id/;
-	    	 my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
-		 adieu "Couldn't find endpoint definition" if @($e).elems == 0;
-		 my $model = $e.first{'params'}[0][1];
-		 $model ~~ s/\w+\(\:(\w+)\)/$0/;
+    	if $trailing_non_pair {
+       	   if $trailing_non_pair.IO.e {
+       	      $post_file ||= $trailing_non_pair;
+	      $command ||= 'post';
+           } else {
+       	      $command = $trailing_non_pair;
+       	   }
+    	}
 
-            	 save_tmp(pretty get('/stub/' ~ $model, @pairs));
-		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
-	    }
+    	my @args = @pairs;
+    	@args.unshift(resolve_aliases($uri)) if $uri;
 
-	    when (/edit(.last)?/) {
-            	 save_tmp(pretty get($ruri)) unless $0;
-		 say edit(tmp_file) ?? pretty post($ruri, @pairs, slurp(tmp_file)) !! 'No changes to post.';
-	    }
-
-	    when ('update') { say pretty update_uri($ruri, get($uri), @pairs); }
-
-	    when ('show') { say pretty get($ruri, @pairs); }
-
-	    default { say 'Unknown command: ' ~ $_; }
-	}
-
+    	say Command.new(action => $command, args => @args.list).execute;
     }
+}
+
+
+sub parse_cmd(Str $cmd) {
+    my %out;
+    my $c = $cmd.trim;
+    if $c ~~ /^<[./]>/ { # a uri
+       my ($uri, @args) = $c.split(/\s+/);
+       %out<uri> = resolve_aliases($uri);
+       my $action = 'show';
+       my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
+
+       if $trailing_non_pair {
+       	  if $trailing_non_pair.IO.e {
+	     $action = 'post';
+       	     @args.push($trailing_non_pair);
+          } else {
+       	     $action = $trailing_non_pair;
+          }
+       }
+
+       %out<action> = $action;
+       @args.unshift(%out<uri>);
+       %out<args> = @args;
+    } else {
+       my ($action, @args) = $c.split(/\s+/);
+       %out<action> = $action;
+       %out<args> = @args;
+    }
+    %out;
+}
+
+
+sub resolve_aliases(Str $text) {
+    $text.subst: /\. (\w+) \./, -> { config.attr<alias>{$0} }, :g;
 }
 
 
@@ -186,17 +320,21 @@ sub alias_cmd($alias) {
     if $cmd && $als {
         config.attr<alias>{$als}:delete if $cmd eq 'delete';
         config.save;
-        say "Alias .$als. deleted.";
+        "Alias .$als. deleted.";
     } elsif $to {
        	config.attr<alias>{$from} = $to;
 	config.save;
-	say "Alias .$from. added.";
+	"Alias .$from. added.";
     } else {
        	my %aliases = config.attr<alias>;
-	for %aliases.keys.sort -> $k { say ".$k.\t{%aliases{$k}}" };
+	(%aliases.keys.sort.map({ ".$_.\t{%aliases{$_}}" })).join("\n");
     }
 }
 
+
+sub endpoints {
+    from-json(get(ENDPOINTS_URI)).unique;
+}
 
 sub login {
     blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
@@ -227,12 +365,12 @@ sub save_pas_file($file, $data) {
 
 
 sub tmp_file {
-    pas_path $TMP_FILE;
+    pas_path TMP_FILE;
 }
 
 
 sub save_tmp($data) {
-    save_pas_file($TMP_FILE, $data);
+    save_pas_file(TMP_FILE, $data);
 }
 
 
@@ -267,10 +405,11 @@ pas - a commandline client for ArchivesSpace
     --user=username    Set the username.
     --pass=password    Set the password.
     --sess=token       Set the session token.
-    --post=file        Post file to uri. Same as `pas uri file`
-    --alias=from:to    Alias 'from' to a uri fragment 'to'
-    --alias=list       List aliases
-    --alias=delete!als Delete alias 'als'
+    --post=file        Post file to uri. Same as `pas uri file`.
+    --alias=from:to    Alias 'from' to a uri fragment 'to'.
+    --alias=list       List aliases.
+    --alias=delete!als Delete alias 'als'.
+    -s/--shell         Enter interactive shell.
     -h/--help          This.
     -v/--verbose       Be noisy.
     -f/--force-login   Login to ArchivesSpace even if we have a good session.
