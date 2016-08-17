@@ -6,26 +6,19 @@ use JSON::Tiny;
 use MONKEY-SEE-NO-EVAL;
 
 use lib './lib';
+use Config;
 use JSONPretty;
 
-my %config = 
-   url  => 'http://localhost:4567',
-   user => 'admin',
-   pass => 'admin';
-
-
-my %prompts =
-   url  => 'ArchivesSpace backend URL',
-   user => 'Username',
-   pass => 'Password';
-
 my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
-my $CFG_FILE = 'config.json';
 my $TMP_FILE = 'last.json';
 
 my Bool $LOUD;
 my Bool $COMPACT;
 my Int $INDENT-STEP;
+
+my Config $CFG;
+sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
+
 
 sub MAIN(Str  $uri = '/',
               *@pairs,
@@ -53,35 +46,34 @@ sub MAIN(Str  $uri = '/',
        exit;
     }
 
+    config.load($url, $user, $pass, $session, $prompt || $p);
+
     $LOUD = $verbose || $v;
     $COMPACT = $compact || $c;
     $INDENT-STEP = $indent-step || 2;
 
     my $command = $cmd;
 
-    load_config($url, $user, $pass, $session, $prompt || $p);
-
     if $alias {
-       %config<alias> ||= {};
+       config.attr<alias> ||= {};
        my ($from, $to) = $alias.split(':', 2);
        my ($cmd, $als) = $alias.split('!', 2);
        if $cmd && $als {
-       	  %config<alias>{$als}:delete if $cmd eq 'delete';
-	  save_config;
+       	  config.attr<alias>{$als}:delete if $cmd eq 'delete';
+	  config.save;
 	  say "Alias .$als. deleted.";
        } elsif $to {
-       	  %config<alias>{$from} = $to;
-	  save_config;
+       	  config.attr<alias>{$from} = $to;
+	  config.save;
 	  say "Alias .$from. added.";
        } else {
-       	  my %aliases = %config<alias>;
+       	  my %aliases = config.attr<alias>;
 	  for %aliases.keys.sort -> $k { say ".$k. {%aliases{$k}}" };
        }
        exit;
     }
 
-
-    login if $url || $user || $pass || !%config<session> || $force-login || $f;
+    login if $url || $user || $pass || !config.attr<session> || $force-login || $f;
 
     my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
 
@@ -95,8 +87,7 @@ sub MAIN(Str  $uri = '/',
        }
     }
 
-    my $ruri = $uri;
-    $ruri ~~ s:g/\. (\w+) \./%config<alias>{$0}/;
+    my $ruri = $uri.subst: /\. (\w+) \./, -> { config.attr<alias>{$0} }, :g;
 
     if $post_file {
 
@@ -152,7 +143,7 @@ sub edit($file) {
 
 sub request($uri, @pairs, $body?) {
     my $url = build_url($uri, @pairs);
-    my %header = 'X-Archivesspace-Session' => %config<session>;
+    my %header = 'X-Archivesspace-Session' => config.attr<session>;
 
     my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
 		
@@ -194,7 +185,7 @@ sub get($uri, @pairs = []) {
 
 
 sub build_url($uri, @pairs) {
-    my $url = %config<url> ~ $uri;
+    my $url = config.attr<url> ~ $uri;
     $url ~= '?' ~ @pairs.join('&') if @pairs;
     # FIXME: escape this properly
     $url ~~ s:g/\s/\%20/;
@@ -202,27 +193,17 @@ sub build_url($uri, @pairs) {
 }
 
 
-sub load_config($url, $user, $pass, $session, $prompt) {
-    if !$prompt && config_file.IO.e {
-        %config = from-json slurp(config_file);
-	for <url user pass session> { %config{$_} = $::($_) if $::($_) }
-    } else {
-        for <url user pass> { %config{$_} = $::($_) || prompt_default(%prompts{$_}, %config{$_}) }
-    }
-}
-
-
 sub login {
-    blurt 'Logging in to ' ~ %config<url> ~ ' with: ' ~ %config<user> ~ '/' ~ %config<pass>;
+    blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
 
-    my $uri      = '/users/' ~ %config<user> ~ '/login';
-    my @pairs    = ["password={%config<pass>}", 'expiring=false'];
-    my $body     = Buf.new("password={%config<pass>}".ords);
+    my $uri      = '/users/' ~ config.attr<user> ~ '/login';
+    my @pairs    = ["password={config.attr<pass>}", 'expiring=false'];
+    my $body     = Buf.new("password={config.attr<pass>}".ords);
     my $resp     = Net::HTTP::POST(build_url($uri, @pairs), :$body);
 
     if $resp.status-line ~~ /200/ {
-        %config<session> = (from-json $resp.body.decode('utf-8'))<session>;
-	save_config;
+        config.attr<session> = (from-json $resp.body.decode('utf-8'))<session>;
+	config.save;
     } else {
         adieu 'Log in failed!';
     }
@@ -237,16 +218,6 @@ sub pas_path($file) {
 sub save_pas_file($file, $data) {
     mkdir($PAS_DIR);
     spurt $PAS_DIR ~ '/' ~ $file, $data;
-}
-
-
-sub config_file {
-    pas_path $CFG_FILE;
-}
-
-
-sub save_config {
-    save_pas_file($CFG_FILE, to-json %config);
 }
 
 
