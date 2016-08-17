@@ -52,32 +52,16 @@ sub MAIN(Str  $uri = '/',
     $COMPACT = $compact || $c;
     $INDENT-STEP = $indent-step || 2;
 
-    my $command = $cmd;
-
     if $alias {
-       config.attr<alias> ||= {};
-       my ($from, $to) = $alias.split(':', 2);
-       my ($cmd, $als) = $alias.split('!', 2);
-       if $cmd && $als {
-       	  config.attr<alias>{$als}:delete if $cmd eq 'delete';
-	  config.save;
-	  say "Alias .$als. deleted.";
-       } elsif $to {
-       	  config.attr<alias>{$from} = $to;
-	  config.save;
-	  say "Alias .$from. added.";
-       } else {
-       	  my %aliases = config.attr<alias>;
-	  for %aliases.keys.sort -> $k { say ".$k. {%aliases{$k}}" };
-       }
-       exit;
+        alias_cmd($alias);
+        exit;
     }
 
     login if $url || $user || $pass || !config.attr<session> || $force-login || $f;
 
-    my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
-
+    my $command = $cmd;
     my $post_file = $post;
+    my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
 
     if $trailing_non_pair {
        if $trailing_non_pair.IO.e {
@@ -126,6 +110,7 @@ sub MAIN(Str  $uri = '/',
     }
 }
 
+
 sub pretty($json) {
     if $COMPACT {
        $json;
@@ -133,6 +118,7 @@ sub pretty($json) {
        JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => $INDENT-STEP))).made;
     }
 }
+
 
 sub edit($file) {
     my $mtime = $file.IO.modified;
@@ -190,6 +176,25 @@ sub build_url($uri, @pairs) {
     # FIXME: escape this properly
     $url ~~ s:g/\s/\%20/;
     $url;
+}
+
+
+sub alias_cmd($alias) {
+    config.attr<alias> ||= {};
+    my ($from, $to) = $alias.split(':', 2);
+    my ($cmd, $als) = $alias.split('!', 2);
+    if $cmd && $als {
+        config.attr<alias>{$als}:delete if $cmd eq 'delete';
+        config.save;
+        say "Alias .$als. deleted.";
+    } elsif $to {
+       	config.attr<alias>{$from} = $to;
+	config.save;
+	say "Alias .$from. added.";
+    } else {
+       	my %aliases = config.attr<alias>;
+	for %aliases.keys.sort -> $k { say ".$k.\t{%aliases{$k}}" };
+    }
 }
 
 
