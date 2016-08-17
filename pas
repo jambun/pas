@@ -112,7 +112,7 @@ sub MAIN(Str  $uri = '/',
 
 
 sub pretty($json) {
-    if $COMPACT {
+    if $COMPACT || $json !~~ /^<[\{\[]>/ {
        $json;
     } else {
        JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => $INDENT-STEP))).made;
