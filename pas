@@ -1,13 +1,13 @@
 #!/usr/bin/env perl6
 
+use lib './lib';
+use Config;
+use JSONPretty;
+
 use Net::HTTP::GET;
 use Net::HTTP::POST;
 use JSON::Tiny;
 use MONKEY-SEE-NO-EVAL;
-
-use lib './lib';
-use Config;
-use JSONPretty;
 
 my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
 my $TMP_FILE = 'last.json';
