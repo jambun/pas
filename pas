@@ -36,7 +36,7 @@ class Command {
 
     method actions { ACTIONS }
 
-    method execute { (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action" }
+    method execute { @!args ||= ['']; (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action" }
 
     method show {
     	my $uri = @!args.shift;
@@ -97,11 +97,29 @@ class Command {
     }
 
     method compact {
-    	%state<compact> = @!args.shift;
+        my $a = @!args.shift;
+	if $a eq '0' | 'off' | 'false' {
+	   $COMPACT = False;
+	   'Compact off';
+	} elsif $a ~~ /./ {
+	   $COMPACT = True;
+	   'Compact on';
+	} else {
+	   $COMPACT ?? 'Compact on' !! 'Compact off';
+	}
     }
 
     method verbose {
-    	%state<verbose> = @!args.shift;
+        my $a = @!args.shift;
+	if $a eq '0' | 'off' | 'false' {
+	   $LOUD = False;
+	   'Verbose off';
+	} elsif $a ~~ /./ {
+	   $LOUD = True;
+	   'Verbose on';
+	} else {
+	   $LOUD ?? 'Verbose on' !! 'Verbose off';
+	}
     }
 
     method help {
@@ -381,8 +399,9 @@ sub login {
     if $resp.status-line ~~ /200/ {
         config.attr<session> = (from-json $resp.body.decode('utf-8'))<session>;
 	config.save;
+	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
-        adieu 'Log in failed!';
+        say 'Log in failed!';
     }
 }
 
