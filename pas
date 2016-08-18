@@ -169,9 +169,32 @@ sub MAIN(Str  $uri = '/',
 	      $prefix = $0;
 	      $last = $1;
 	   }
-	   for @tab_targets.grep(/^ "$last" /).sort -> $cmd {
-       	        linenoiseAddCompletion($c, $prefix ~ $cmd);
-    	   }
+
+	   # FIXME: this is pretty worky, but totally gruesome
+	   my @m = $last.split('/');
+	   my $mf = @m.pop;
+	   for @tab_targets.map({
+	       my @t = .split('/');
+	       if @m.elems >= @t.elems {
+	       	  '';
+	       } else {
+	       my @out;
+	       for zip @m, @t -> ($m, $t) {
+	       	   @out.push($m) if $t ~~ /^ ':' / || $t eq $m;
+	       }
+	       if @out.elems == @m.elems && @t[@m.elems] ~~ /^ "$mf" / {
+	       	  (|@m, |@t[@m.elems .. @t.end]).join('/');
+	       } else {
+	       	  '';
+	       }
+	       }
+	   }).grep(/./).sort -> $m {
+       	        linenoiseAddCompletion($c, $prefix ~ $m);
+	   }
+
+#	   for @tab_targets.grep(/^ "$last" /).sort -> $cmd {
+#       	        linenoiseAddCompletion($c, $prefix ~ $cmd);
+#    	   }
        });
 
 
@@ -268,7 +291,8 @@ sub request($uri, @pairs, $body?) {
     try {
         CATCH {
             default {
-	    	 'Something bad happened';
+	    	 say 'Something bad happened: ' ~ .WHAT.perl;
+		 return '';
 #                .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
             }
         }
