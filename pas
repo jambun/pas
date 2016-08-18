@@ -36,7 +36,7 @@ class Command {
 
     method actions { ACTIONS }
 
-    method execute { self."$!action"() }
+    method execute { (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action" }
 
     method show {
     	my $uri = @!args.shift;
@@ -265,14 +265,23 @@ sub request($uri, @pairs, $body?) {
     my $url = build_url($uri, @pairs);
     my %header = 'X-Archivesspace-Session' => config.attr<session>;
 
-    my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
-		
-    if $response.status-line ~~ /412/ {
-       login;
-       $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
-    }
-    $response.body.decode('utf-8');
+    try {
+        CATCH {
+            default {
+	    	 'Something bad happened';
+#                .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
+            }
+        }
 
+        my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+
+    	if $response.status-line ~~ /412/ {
+       	    login;
+       	    $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+    	}
+
+        $response.body.decode('utf-8');
+    }
 }
 
 
@@ -335,6 +344,7 @@ sub alias_cmd($alias) {
 sub endpoints {
     from-json(get(ENDPOINTS_URI)).unique;
 }
+
 
 sub login {
     blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
