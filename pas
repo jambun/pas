@@ -304,26 +304,17 @@ sub edit($file) {
 
 sub request($uri, @pairs, $body?) {
     my $url = build_url($uri, @pairs);
-    my %header = 'X-Archivesspace-Session' => config.attr<session>;
+    my %header = 'X-Archivesspace-Session' => config.attr<session>,
+       	       	 'Connection'              => 'close';   # << this works around a bug in Net::HTTP
 
-    try {
-        CATCH {
-            default {
-	    	 say 'Something bad happened: ' ~ .WHAT.perl;
-		 return '';
-#                .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
-            }
-        }
+    my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
 
-        my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
-
-    	if $response.status-line ~~ /412/ {
-       	    login;
-       	    $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
-    	}
-
-        $response.body.decode('utf-8');
+    if $response.status-line ~~ /412/ {
+        login;
+       	$response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
     }
+
+    $response.body.decode('utf-8');
 }
 
 
