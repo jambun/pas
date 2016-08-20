@@ -28,6 +28,7 @@ class Command {
     has Str $.action;
     has     @.args;
     has Str $.qualifier = '';
+    has     $!first;
 
     my %state = verbose => False,
        	        compact => False;
@@ -36,32 +37,31 @@ class Command {
 
     method actions { ACTIONS }
 
-    method execute { @!args ||= ['']; (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action" }
+    method execute {
+    	   @!args ||= [''];
+	   $!first = @!args.shift;
+	   (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
+    }
 
     method show {
-    	my $uri = @!args.shift;
-        pretty get($uri, @!args);
+        pretty get($!first, @!args);
     }
 
     method update {
-    	my $uri = @!args.shift;
-	pretty update_uri($uri, get($uri), @!args);
+	pretty update_uri($!first, get($!first), @!args);
     }
 
     method create {
-    	my $uri = @!args.shift;
-      	pretty update_uri($uri, '{}', @!args);
+      	pretty update_uri($!first, '{}', @!args);
     }
 
     method edit {
-    	my $uri = @!args.shift;
-        save_tmp(pretty get($uri)) unless $!qualifier eq 'last';
-	edit(tmp_file) ?? pretty post($uri, @!args, slurp(tmp_file)) !! 'No changes to post.';
+        save_tmp(pretty get($!first)) unless $!qualifier eq 'last';
+	edit(tmp_file) ?? pretty post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
     }
 
     method stub {
-    	my $uri = @!args.shift;
-	my $puri = $uri;
+	my $puri = $!first;
 	$puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
 	$puri ~~ s:g/\d+/:id/;
 	my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
@@ -70,13 +70,12 @@ class Command {
 	$model ~~ s/\w+\(\:(\w+)\)/$0/;
 
         save_tmp(pretty get('/stub/' ~ $model, @!args));
-	edit(tmp_file) ?? pretty post($uri, @!args, slurp(tmp_file)) !! 'No changes to post.';
+	edit(tmp_file) ?? pretty post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
     }
 
     method post {
-    	my $uri = @!args.shift;
 	my $post_file = @!args.pop;
-	pretty post($uri, @!args, slurp($post_file));
+	pretty post($!first, @!args, slurp($post_file));
     }
 
     method login {
@@ -92,16 +91,14 @@ class Command {
     }
 
     method alias {
-    	my $alias = @!args.shift;
-    	alias_cmd($alias);
+    	alias_cmd($!first);
     }
 
     method compact {
-        my $a = @!args.shift;
-	if $a eq '0' | 'off' | 'false' {
+	if $!first eq '0' | 'off' | 'false' {
 	   $COMPACT = False;
 	   'Compact off';
-	} elsif $a ~~ /./ {
+	} elsif $!first ~~ /./ {
 	   $COMPACT = True;
 	   'Compact on';
 	} else {
@@ -110,11 +107,10 @@ class Command {
     }
 
     method verbose {
-        my $a = @!args.shift;
-	if $a eq '0' | 'off' | 'false' {
+	if $!first eq '0' | 'off' | 'false' {
 	   $LOUD = False;
 	   'Verbose off';
-	} elsif $a ~~ /./ {
+	} elsif $!first ~~ /./ {
 	   $LOUD = True;
 	   'Verbose on';
 	} else {
