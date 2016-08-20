@@ -38,6 +38,7 @@ class Command {
     method actions { ACTIONS }
 
     method execute {
+    	   ($!action, $!qualifier) = $!action.split('.', 2);
     	   @!args ||= [''];
 	   $!first = @!args.shift;
 	   (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
@@ -318,6 +319,18 @@ sub update_uri($uri, $json, @pairs) {
     my %hash = from-json $json;
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
+
+#	my @binder;
+#	@binder[0] = %hash;
+#        for $k.split('.').kv -> $ix, $t {
+#	    if $t ~~ /^ \d+ $/ {
+#	       @binder[$ix + 1] := @binder[$ix][$t];       
+#	    } else {
+#	       @binder[$ix + 1] := @binder[$ix]{$t};
+#	    }
+#	}
+# doesn't work :( - says Str is immutable
+#	@binder.tail.first = $v;
 
 	# pure dodginess
 	# terms.0.term > %hash{'terms'}[0]{'term'}
