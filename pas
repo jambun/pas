@@ -38,10 +38,11 @@ class Command {
     method actions { ACTIONS }
 
     method execute {
-    	   ($!action, $!qualifier) = $!action.split('.', 2);
-    	   @!args ||= [''];
-	   $!first = @!args.shift;
-	   (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
+    	($!action, $!qualifier) = $!action.split('.', 2);
+    	@!args ||= [''];
+	$!first = @!args.shift;
+	$!qualifier ||= '';
+	(ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
     }
 
     method show {
@@ -97,25 +98,25 @@ class Command {
 
     method compact {
 	if $!first eq '0' | 'off' | 'false' {
-	   $COMPACT = False;
-	   'Compact off';
+	    $COMPACT = False;
+	    'Compact off';
 	} elsif $!first ~~ /./ {
-	   $COMPACT = True;
-	   'Compact on';
+	    $COMPACT = True;
+	    'Compact on';
 	} else {
-	   $COMPACT ?? 'Compact on' !! 'Compact off';
+	    $COMPACT ?? 'Compact on' !! 'Compact off';
 	}
     }
 
     method verbose {
 	if $!first eq '0' | 'off' | 'false' {
-	   $LOUD = False;
-	   'Verbose off';
+	    $LOUD = False;
+	    'Verbose off';
 	} elsif $!first ~~ /./ {
-	   $LOUD = True;
-	   'Verbose on';
+	    $LOUD = True;
+	    'Verbose on';
 	} else {
-	   $LOUD ?? 'Verbose on' !! 'Verbose off';
+	    $LOUD ?? 'Verbose on' !! 'Verbose off';
 	}
     }
 
@@ -154,8 +155,8 @@ sub MAIN(Str  $uri = '/',
 
 
     if $help || $h {
-       help;
-       exit;
+	help;
+	exit;
     }
 
     config.load($url, $user, $pass, $session, $prompt || $p);
@@ -214,13 +215,13 @@ sub MAIN(Str  $uri = '/',
 
 
        while (my $line = linenoise 'pas> ').defined {
-       	     next unless $line.trim;
-       	     linenoiseHistoryAdd($line);
-	     my %cmd = parse_cmd($line);
+       	   next unless $line.trim;
+       	   linenoiseHistoryAdd($line);
+	   my %cmd = parse_cmd($line);
 
-    	     say Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+    	   say Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
 
-	     last if %cmd<action> eq 'quit';
+	   last if %cmd<action> eq 'quit';
        }
 
        linenoiseHistorySave(pas_path HIST_FILE);
@@ -232,12 +233,12 @@ sub MAIN(Str  $uri = '/',
     	my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
 
     	if $trailing_non_pair {
-       	   if $trailing_non_pair.IO.e {
-       	      $post_file ||= $trailing_non_pair;
-	      $command ||= 'post';
-           } else {
-       	      $command = $trailing_non_pair;
-       	   }
+       	    if $trailing_non_pair.IO.e {
+       		$post_file ||= $trailing_non_pair;
+		$command ||= 'post';
+            } else {
+       		$command = $trailing_non_pair;
+       	    }
     	}
 
     	my @args = @pairs;
@@ -252,27 +253,27 @@ sub parse_cmd(Str $cmd) {
     my %out;
     my $c = $cmd.trim;
     if $c ~~ /^<[./]>/ { # a uri
-       my ($uri, @args) = $c.split(/\s+/);
-       %out<uri> = resolve_aliases($uri);
-       my $action = 'show';
-       my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
+	my ($uri, @args) = $c.split(/\s+/);
+	%out<uri> = resolve_aliases($uri);
+	my $action = 'show';
+	my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
 
-       if $trailing_non_pair {
-       	  if $trailing_non_pair.IO.e {
-	     $action = 'post';
-       	     @args.push($trailing_non_pair);
-          } else {
-       	     $action = $trailing_non_pair;
-          }
-       }
+	if $trailing_non_pair {
+       	    if $trailing_non_pair.IO.e {
+		$action = 'post';
+       		@args.push($trailing_non_pair);
+            } else {
+       		$action = $trailing_non_pair;
+            }
+	}
 
-       %out<action> = $action;
-       @args.unshift(%out<uri>);
-       %out<args> = @args;
+	%out<action> = $action;
+	@args.unshift(%out<uri>);
+	%out<args> = @args;
     } else {
-       my ($action, @args) = $c.split(/\s+/);
-       %out<action> = $action;
-       %out<args> = @args;
+	my ($action, @args) = $c.split(/\s+/);
+	%out<action> = $action;
+	%out<args> = @args;
     }
     %out;
 }
@@ -285,9 +286,9 @@ sub resolve_aliases(Str $text) {
 
 sub pretty($json) {
     if $COMPACT || $json !~~ /^<[\{\[]>/ {
-       $json;
+	$json;
     } else {
-       JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => $INDENT-STEP))).made;
+	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => $INDENT-STEP))).made;
     }
 }
 
@@ -315,7 +316,7 @@ sub request($uri, @pairs, $body?) {
 }
 
 
-sub update_uri($uri, $json, @pairs) {
+sub modify_json($json, @pairs) {
     my %hash = from-json $json;
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
@@ -334,13 +335,18 @@ sub update_uri($uri, $json, @pairs) {
 
 	# pure dodginess
 	# terms.0.term > %hash{'terms'}[0]{'term'}
-	$k ~~ s:g/<[\w_]>+/\{'{$/}'\}/;
-	$k ~~ s:g/\{\'(\d+)\'\}/\[$0\]/;
-	$k ~~ s:g/\.//;
+	$k ~~ s:g/<:L><[\w_]>*/\{'{$/}'\}/;
+	$k ~~ s:g/ \. (\d+) \. /\[$0\]/;
 	$k = '%hash' ~ $k;
 	EVAL $k ~ ' = $v';
     }
-    post($uri, @pairs, to-json(%hash));
+    to-json(%hash);
+}
+
+
+sub update_uri($uri, $json, @pairs) {
+    post($uri, @pairs, modify_json($json, @pairs));
+
 }
 
 

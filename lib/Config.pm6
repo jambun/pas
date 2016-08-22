@@ -5,13 +5,13 @@ use JSONPretty;
 class Config {
     has %.attr =
         url  => 'http://localhost:4567',
-   	user => 'admin',
-   	pass => 'admin';
+        user => 'admin',
+        pass => 'admin';
 
     has %!prompts =
         url  => 'ArchivesSpace backend URL',
-   	user => 'Username',
-   	pass => 'Password';
+        user => 'Username',
+        pass => 'Password';
 
     has $!file = 'config.json';
 
