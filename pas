@@ -19,6 +19,7 @@ my constant ENDPOINTS_URI = '/endpoints';
 
 my Bool $LOUD;
 my Bool $COMPACT;
+my Bool $PAGE;
 my Int $INDENT-STEP;
 
 my Config $CFG;
@@ -33,7 +34,7 @@ class Command {
     my %state = verbose => False,
        	        compact => False;
 		
-    my constant ACTIONS = <show update create edit stub post login endpoints config alias compact verbose help quit>;
+    my constant ACTIONS = <show update create edit stub post login endpoints config alias set help quit>;
 
     method actions { ACTIONS }
 
@@ -97,27 +98,19 @@ class Command {
     	alias_cmd($!first);
     }
 
-    method compact {
-	if $!first eq '0' | 'off' | 'false' {
-	    $COMPACT = False;
-	    'Compact off';
-	} elsif $!first ~~ /./ {
-	    $COMPACT = True;
-	    'Compact on';
-	} else {
-	    $COMPACT ?? 'Compact on' !! 'Compact off';
+    method set {
+        unless $!qualifier eq 'loud' | 'compact' | 'page' {
+	    return 'Unknown property: ' ~ $!qualifier;
 	}
-    }
 
-    method verbose {
 	if $!first eq '0' | 'off' | 'false' {
-	    $LOUD = False;
-	    'Verbose off';
+	    $::($!qualifier.uc) = False;
+	    $!qualifier.wordcase ~ ' off';
 	} elsif $!first ~~ /./ {
-	    $LOUD = True;
-	    'Verbose on';
+	    $::($!qualifier.uc) = True;
+	    $!qualifier.wordcase ~ ' on';
 	} else {
-	    $LOUD ?? 'Verbose on' !! 'Verbose off';
+	    $!qualifier.wordcase ~ ($::($!qualifier.uc) ?? ' on' !! ' off');
 	}
     }
 
@@ -151,6 +144,8 @@ sub MAIN(Str  $uri = '/',
          Bool :$v=False,
          Bool :$prompt=False,
          Bool :$p=False,
+         Bool :$no-page=False,
+         Bool :$n=False,
 	 Bool :$force-login=False,
 	 Bool :$f=False) {
 
@@ -165,6 +160,7 @@ sub MAIN(Str  $uri = '/',
     $LOUD = $verbose || $v;
     $COMPACT = $compact || $c;
     $INDENT-STEP = $indent-step || 2;
+    $PAGE = !($no-page || $n);
 
     if $alias {
         alias_cmd($alias);
@@ -220,7 +216,7 @@ sub MAIN(Str  $uri = '/',
        	   linenoiseHistoryAdd($line);
 	   my %cmd = parse_cmd($line);
 
-    	   say Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+    	   display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
 
 	   last if %cmd<action> eq 'quit';
        }
@@ -245,7 +241,7 @@ sub MAIN(Str  $uri = '/',
     	my @args = @pairs;
     	@args.unshift(resolve_aliases($uri)) if $uri;
 
-    	say Command.new(action => $command, args => @args.list).execute;
+    	display Command.new(action => $command, args => @args.list).execute;
     }
 }
 
@@ -298,6 +294,23 @@ sub edit($file) {
     my $mtime = $file.IO.modified;
     shell (%*ENV<EDITOR> || 'emacs') ~ ' ' ~ $file;
     $mtime != $file.IO.modified;
+}
+
+
+sub display($text) {
+    return unless $text ~~ /./;
+
+    if $PAGE && q:x/tput lines/.chomp.Int < $text.lines {
+        page($text);
+    } else {
+        say $text;
+    }
+}
+
+
+sub page($text) {
+    save_tmp($text);
+    shell (%*ENV<PAGER> || 'less') ~ ' ' ~ tmp_file;
 }
 
 
@@ -472,6 +485,7 @@ pas - a commandline client for ArchivesSpace
     -s/--shell         Enter interactive shell.
     -h/--help          This.
     -v/--verbose       Be noisy.
+    -n/--no-page       Disable paging long results.
     -f/--force-login   Login to ArchivesSpace even if we have a good session.
     -p/--prompt        Prompt for ArchivesSpace connection info even if we already have it.
 
