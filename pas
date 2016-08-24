@@ -73,7 +73,15 @@ class Command {
 	$model ~~ s/\w+\(\:(\w+)\)/$0/;
 
         save_tmp(pretty get('/stub/' ~ $model, @!args));
-	edit(tmp_file) ?? pretty post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
+
+	my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
+	if edit(tmp_file) {
+	    my $out = '';
+	    for ^$times { $out ~= pretty post($!first, @!args, slurp(tmp_file)) }
+	    $out;
+	} else {
+	    'No changes to post.';
+	}
     }
 
     method post {
