@@ -23,8 +23,13 @@ class Config {
             %!attr = from-json slurp(self.path);
             for <url user pass session> { %!attr{$_} = $::($_) if $::($_) }
         } else {
-            for <url user pass> { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+	    self.prompt;
         }
+    }
+
+
+    method prompt {
+	for <url user pass> { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
     }
 
 

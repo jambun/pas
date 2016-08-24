@@ -81,6 +81,7 @@ class Command {
     }
 
     method login {
+	config.prompt if $!qualifier eq 'prompt';
     	login;
     }
 
@@ -407,7 +408,7 @@ sub login {
 	config.save;
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
-        say 'Log in failed!';
+        'Log in failed!';
     }
 }
 
