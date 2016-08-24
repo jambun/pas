@@ -249,9 +249,9 @@ sub MAIN(Str  $uri = '/',
 sub parse_cmd(Str $cmd) {
     my %out;
     my $c = $cmd.trim;
-    if $c ~~ /^<[./]>/ { # a uri
-	my ($uri, @args) = $c.split(/\s+/);
-	%out<uri> = resolve_aliases($uri);
+    my ($first, @args) = $c.split(/\s+/);
+    if $first ~~ /^<[./]>/ { # a uri
+	%out<uri> = resolve_aliases($first);
 	my $action = 'show';
 	my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
 
@@ -268,8 +268,7 @@ sub parse_cmd(Str $cmd) {
 	@args.unshift(%out<uri>);
 	%out<args> = @args;
     } else {
-	my ($action, @args) = $c.split(/\s+/);
-	%out<action> = $action;
+	%out<action> = $first;
 	%out<args> = @args;
     }
     %out;
