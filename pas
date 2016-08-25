@@ -335,6 +335,8 @@ sub request($uri, @pairs, $body?) {
         login;
        	$response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
     }
+    
+    blurt $response.status-line;
 
     $response.body.decode('utf-8');
 }
