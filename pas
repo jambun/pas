@@ -389,8 +389,7 @@ sub modify_json($json, @pairs) {
 sub interpolate($text, $count) {
     my $out = $text;
     $out ~~ s:g/'{n}'/$count/;
-    # FIXME: $0 isn't playing nice in this context
-    $out ~~ s:g/'{h' \s* (\d*) \s* '}'/{random_hex($0[0].Int || 7)}/;
+    $out ~~ s:g/'{h' \s* (\d*) \s* '}'/{random_hex($0.Int || 7)}/;
     $out;
 }
 
