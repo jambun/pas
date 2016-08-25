@@ -14,15 +14,16 @@ use Crypt::Random;
 use MONKEY-SEE-NO-EVAL;
 
 my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
-my constant TMP_FILE = 'last.json';
-my constant HIST_FILE = 'history';
-my constant HIST_LENGTH = 100;
+
+my constant TMP_FILE      = 'last.json';
+my constant HIST_FILE     = 'history';
+my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 
-my Bool $LOUD;
-my Bool $COMPACT;
-my Bool $PAGE;
-my Int $INDENT-STEP;
+my %PROP = loud    => False,
+           compact => False,
+	   page    => True,
+	   indent  => 2;
 
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -33,9 +34,6 @@ class Command {
     has Str $.qualifier = '';
     has     $!first;
 
-    my %state = verbose => False,
-       	        compact => False;
-		
     my constant ACTIONS = <show update create edit stub post login endpoints config alias set help quit>;
 
     method actions { ACTIONS }
@@ -110,18 +108,36 @@ class Command {
     }
 
     method set {
-        unless $!qualifier eq 'loud' | 'compact' | 'page' {
+	unless $!qualifier {
+	    return (%PROP.keys.sort.map: { $_ ~ "\t" ~ %PROP{$_}  }).join("\n");
+	}
+
+	unless %PROP.keys.grep($!qualifier) {
 	    return 'Unknown property: ' ~ $!qualifier;
 	}
 
-	if $!first eq '0' | 'off' | 'false' {
-	    $::($!qualifier.uc) = False;
-	    $!qualifier.wordcase ~ ' off';
-	} elsif $!first ~~ /./ {
-	    $::($!qualifier.uc) = True;
-	    $!qualifier.wordcase ~ ' on';
-	} else {
-	    $!qualifier.wordcase ~ ($::($!qualifier.uc) ?? ' on' !! ' off');
+	given %PROP{$!qualifier}.WHAT {
+	    when Bool {
+		if $!first eq '0' | 'off' | 'false' {
+		    %PROP{$!qualifier} = False;
+		    $!qualifier.wordcase ~ ' off';
+		} elsif $!first ~~ /./ {
+		    %PROP{$!qualifier} = True;
+		    $!qualifier.wordcase ~ ' on';
+		} else {
+		    $!qualifier.wordcase ~ (%PROP{$!qualifier} ?? ' on' !! ' off');
+		}
+	    }
+	    when Int {
+		if so $!first.Int {
+		    %PROP{$!qualifier} = $!first.Int;
+		    $!qualifier.wordcase ~ ' ' ~ %PROP{$!qualifier};
+		} elsif $!first ~~ /./ {
+		    $!qualifier.wordcase ~ ' must be a number';
+		} else {
+		    $!qualifier.wordcase ~ ' ' ~ %PROP{$!qualifier};
+		}
+	    }
 	}
     }
 
@@ -168,10 +184,10 @@ sub MAIN(Str  $uri = '/',
 
     config.load($url, $user, $pass, $session, $prompt || $p);
 
-    $LOUD = $verbose || $v;
-    $COMPACT = $compact || $c;
-    $INDENT-STEP = $indent-step || 2;
-    $PAGE = !($no-page || $n);
+    %PROP<loud>    = $verbose || $v;
+    %PROP<compact> = $compact || $c;
+    %PROP<indent>  = $indent-step || 2;
+    %PROP<page>    = !($no-page || $n);
 
     if $alias {
         alias_cmd($alias);
@@ -292,10 +308,10 @@ sub resolve_aliases(Str $text) {
 
 
 sub pretty($json) {
-    if $COMPACT || $json !~~ /^<[\{\[]>/ {
+    if %PROP<compact> || $json !~~ /^<[\{\[]>/ {
 	$json;
     } else {
-	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => $INDENT-STEP))).made;
+	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => %PROP<indent>))).made;
     }
 }
 
@@ -310,7 +326,7 @@ sub edit($file) {
 sub display($text) {
     return unless $text ~~ /./;
 
-    if $PAGE && q:x/tput lines/.chomp.Int < $text.lines {
+    if %PROP<page> && q:x/tput lines/.chomp.Int < $text.lines {
         page($text);
     } else {
         say $text;
@@ -474,7 +490,7 @@ sub save_tmp($data) {
 
 
 sub blurt($out) {
-    say $out if $LOUD;
+    say $out if %PROP<loud>;
 }
 
 
