@@ -8,6 +8,8 @@ use Net::HTTP::GET;
 use Net::HTTP::POST;
 use JSON::Tiny;
 use Linenoise;
+use Digest::MD5;
+use Crypt::Random;
 
 use MONKEY-SEE-NO-EVAL;
 
@@ -77,7 +79,8 @@ class Command {
 	my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
 	if edit(tmp_file) {
 	    my $out = '';
-	    for ^$times { $out ~= pretty post($!first, @!args, slurp(tmp_file)) }
+	    my $json = slurp(tmp_file);
+	    for ^$times -> $c { $out ~= $c ~ ' ' ~ pretty post($!first, @!args, interpolate($json, $c+1)) }
 	    $out;
 	} else {
 	    'No changes to post.';
@@ -362,6 +365,20 @@ sub modify_json($json, @pairs) {
 	EVAL $k ~ ' = $v';
     }
     to-json(%hash);
+}
+
+
+sub interpolate($text, $count) {
+    my $out = $text;
+    $out ~~ s:g/'{n}'/$count/;
+    # FIXME: $0 isn't playing nice in this context
+    $out ~~ s:g/'{h' \s* (\d*) \s* '}'/{random_hex($0[0].Int || 7)}/;
+    $out;
+}
+
+
+sub random_hex(Int $length) {
+    Digest::MD5.new.md5_hex(crypt_random().Str).substr(0, $length);
 }
 
 
