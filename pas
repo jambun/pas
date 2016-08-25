@@ -142,6 +142,7 @@ class Command {
     }
 
     method help {
+	# FIXME: this is the lamest help ever
         self.actions.join("\n");
     }
 
@@ -211,6 +212,7 @@ sub MAIN(Str  $uri = '',
 	   }
 
 	   # FIXME: this is pretty worky, but totally gruesome
+	   # making tab targets work when param bits of uris (eg :id) have values
 	   my @m = $last.split('/');
 	   my $mf = @m.pop;
 	   for @tab_targets.map({
@@ -251,7 +253,7 @@ sub MAIN(Str  $uri = '',
        linenoiseHistorySave(pas_path HIST_FILE);
 
     } else {
-
+	# FIXME: should be using a common command parser
         my $command = $cmd;
     	my $post_file = $post;
     	my $trailing_non_pair = @pairs.elems > 0 && (@pairs.tail.first !~~ /\=/ ?? @pairs.pop !! '');
@@ -327,7 +329,7 @@ sub display($text) {
     return unless $text ~~ /./;
 
     if %PROP<page> && q:x/tput lines/.chomp.Int < $text.lines {
-        page($text);
+        page $text;
     } else {
         say $text;
     }
@@ -363,6 +365,7 @@ sub modify_json($json, @pairs) {
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
 
+# FIXME: trying to avoid the EVAL ...
 #	my @binder;
 #	@binder[0] = %hash;
 #        for $k.split('.').kv -> $ix, $t {
