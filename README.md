@@ -6,6 +6,7 @@ Needs Perl6 and Net::HTTP, and an ArchivesSpace [plugin](https://github.com/jamb
 
     pas - a commandline client for ArchivesSpace
 
+    pas
     pas (switches) uri pairs* cmd?
     pas (swtiches) uri file
 
@@ -15,12 +16,14 @@ Needs Perl6 and Net::HTTP, and an ArchivesSpace [plugin](https://github.com/jamb
     --user=username    Set the username.
     --pass=password    Set the password.
     --sess=token       Set the session token.
-    --post=file        Post file to uri. Same as `pas uri file`
-    --alias=from:to    Alias 'from' to a uri fragment 'to'
-    --alias=list       List aliases
-    --alias=delete!als Delete alias 'als'
+    --post=file        Post file to uri. Same as `pas uri file`.
+    --alias=from:to    Alias 'from' to a uri fragment 'to'.
+    --alias=list       List aliases.
+    --alias=delete!als Delete alias 'als'.
+    -s/--shell         Enter interactive shell. Default if no arguments provided.
     -h/--help          This.
     -v/--verbose       Be noisy.
+    -n/--no-page       Disable paging long results.
     -f/--force-login   Login to ArchivesSpace even if we have a good session.
     -p/--prompt        Prompt for ArchivesSpace connection info even if we already have it.
 
@@ -28,9 +31,11 @@ Needs Perl6 and Net::HTTP, and an ArchivesSpace [plugin](https://github.com/jamb
     show               Get the uri.
     new                Build a record using the pairs and post it.
     edit               Get the uri and present the json in an editor, then post if any changes are made.
+    edit.last          Present the last edited json file in an editor, then post if any changes are made.
     update             Get the uri, update it using the pairs and post the resulting json.
     stub               Get a stub record expected by uri, present it in an editor and post if any changes were made.
-
+    stub.[n]           Create n records from the stub. Use {n} or {h} to interpolate sequence numbers or random hex.
+								  
     Examples:
     pas /repositories
     pas /repositories repo_code=MOO 'name=MOO repo' new
@@ -45,3 +50,4 @@ Needs Perl6 and Net::HTTP, and an ArchivesSpace [plugin](https://github.com/jamb
     pas /endpoints uri=/repositories method=post
     pas --alias=e:/endpoints
     pas .e.
+
