@@ -78,7 +78,7 @@ class Command {
 	if edit(tmp_file) {
 	    my $out = '';
 	    my $json = slurp(tmp_file);
-	    for ^$times -> $c { $out ~= $c ~ ' ' ~ pretty post($!first, @!args, interpolate($json, $c+1)) }
+	    for ^$times -> $c { $out ~= $c+1 ~ ' ' ~ pretty post($!first, @!args, interpolate($json, $c+1)) }
 	    $out;
 	} else {
 	    'No changes to post.';
