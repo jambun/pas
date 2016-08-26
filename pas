@@ -26,6 +26,8 @@ my %PROP = loud    => False,
 	   time    => False,
 	   indent  => 2;
 
+my $SAVE_FILE;
+
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
 
@@ -243,7 +245,7 @@ sub MAIN(Str  $uri = '',
 
        while (my $line = linenoise 'pas> ').defined {
        	   next unless $line.trim;
-       	   linenoiseHistoryAdd($line);
+       	   linenoiseHistoryAdd($line.trim);
 	   my %cmd = parse_cmd($line);
 
 	   my $intime = now;
@@ -281,6 +283,7 @@ sub MAIN(Str  $uri = '',
 sub parse_cmd(Str $cmd) {
     my %out;
     my $c = $cmd.trim;
+    $c ~~ s/\s* \> \s* (\S+) $/{$SAVE_FILE = $0.Str; ''}/;
     my ($first, @args) = $c.split(/\s+/);
     if $first ~~ /^<[./]>/ { # a uri
 	%out<uri> = resolve_aliases($first);
@@ -330,6 +333,12 @@ sub edit($file) {
 
 sub display($text) {
     return unless $text ~~ /./;
+
+    if $SAVE_FILE {
+	spurt $SAVE_FILE, $text;
+	$SAVE_FILE = '';
+	return;
+    }
 
     if %PROP<page> && q:x/tput lines/.chomp.Int < $text.lines {
         page $text;
