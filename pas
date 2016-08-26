@@ -23,6 +23,7 @@ my constant ENDPOINTS_URI = '/endpoints';
 my %PROP = loud    => False,
            compact => False,
 	   page    => True,
+	   time    => False,
 	   indent  => 2;
 
 my Config $CFG;
@@ -245,7 +246,9 @@ sub MAIN(Str  $uri = '',
        	   linenoiseHistoryAdd($line);
 	   my %cmd = parse_cmd($line);
 
+	   my $intime = now;
     	   display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+	   say '[' ~ (now - $intime) ~ 's]' if %PROP<time>;
 
 	   last if %cmd<action> eq 'quit';
        }
