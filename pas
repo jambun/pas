@@ -19,6 +19,7 @@ my constant TMP_FILE      = 'last.json';
 my constant HIST_FILE     = 'history';
 my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
+my constant SCHEMAS_URI   = '/schemas';
 
 my %PROP = loud    => False,
            compact => False,
@@ -27,6 +28,7 @@ my %PROP = loud    => False,
 	   indent  => 2;
 
 my $SAVE_FILE;
+my $SCHEMAS;
 
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -37,7 +39,8 @@ class Command {
     has Str $.qualifier = '';
     has     $!first;
 
-    my constant ACTIONS = <show update create edit stub post login endpoints config alias set help quit>;
+    my constant ACTIONS = <show update create edit stub post login
+                           endpoints schemas config alias set help quit>;
 
     method actions { ACTIONS }
 
@@ -102,6 +105,10 @@ class Command {
     	endpoints.join("\n");
     }
 
+    method schemas {
+	schemas($!qualifier eq 'reload');
+    }
+    
     method config {
     	config.json;
     }
@@ -463,6 +470,11 @@ sub endpoints {
     from-json(get(ENDPOINTS_URI)).unique;
 }
 
+
+sub schemas(Bool $reload = False) {
+    $SCHEMAS = pretty get(SCHEMAS_URI) if $reload || !$SCHEMAS;
+    $SCHEMAS;
+}
 
 sub login {
     blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
