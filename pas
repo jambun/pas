@@ -10,7 +10,7 @@ use JSON::Tiny;
 use Linenoise;
 use Digest::MD5;
 use Crypt::Random;
-#use Terminal::ANSIColor;
+use Terminal::ANSIColor;
 
 use MONKEY-SEE-NO-EVAL;
 
@@ -609,7 +609,7 @@ END
 
 
 sub shell_help {
-    q:heredoc/END/;
+    qq:heredoc/END/;
 
     pas shell help
 
@@ -633,7 +633,7 @@ sub shell_help {
 		    help      this
 		    quit      exit pas (^d works too)
 
-    say 'help [action]' for detailed help. ... well, not yet
+    say 'help [action]' for detailed help. {colored('... well, not yet', 'red')}
 
     Use the <tab> key to cycle through completions for uris or actions.
 
