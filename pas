@@ -153,8 +153,7 @@ class Command {
     }
 
     method help {
-	# FIXME: this is the lamest help ever
-        self.actions.join("\n");
+	shell_help;
     }
 
     method quit {
@@ -605,5 +604,40 @@ pas - a commandline client for ArchivesSpace
     pas /endpoints uri=/repositories method=post
     pas --alias=e:/endpoints
     pas .e.
+END
+}
+
+
+sub shell_help {
+    q:heredoc/END/;
+
+    pas shell help
+
+    uri pairs* action? [ > file ]
+    uri pairs* file
+    action args* [ > file ]
+
+    uri actions:    show      show (default)
+		    update    update with the pairs
+		    create    create using the pairs
+		    edit      edit to update
+		    stub      create from an edited stub
+		    post      post a file (default if last arg is a file)
+
+    other actions:  login     force a login
+		    endpoints show the available endpoints
+		    schemas   show all record schemas
+		    config    show pas config
+		    alias     show or update aliases
+		    set       show or update pas properties
+		    help      this
+		    quit      exit pas (^d works too)
+
+    say 'help [action]' for detailed help. ... well, not yet
+
+    Use the <tab> key to cycle through completions for uris or actions.
+
+    Command history and standard keybindings.
+
 END
 }
