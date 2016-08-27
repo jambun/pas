@@ -10,6 +10,7 @@ use JSON::Tiny;
 use Linenoise;
 use Digest::MD5;
 use Crypt::Random;
+#use Terminal::ANSIColor;
 
 use MONKEY-SEE-NO-EVAL;
 
@@ -384,6 +385,9 @@ sub modify_json($json, @pairs) {
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
 
+	$v = True if $v eq 'true';
+	$v = False if $v eq 'false';
+
 # FIXME: trying to avoid the EVAL ...
 #	my @binder;
 #	@binder[0] = %hash;
@@ -402,6 +406,7 @@ sub modify_json($json, @pairs) {
 	$k ~~ s:g/<:L><[\w_]>*/\{'{$/}'\}/;
 	$k ~~ s:g/ \. (\d+) \. /\[$0\]/;
 	$k = '%hash' ~ $k;
+
 	EVAL $k ~ ' = $v';
     }
     to-json(%hash);
@@ -412,12 +417,27 @@ sub interpolate($text, $count) {
     my $out = $text;
     $out ~~ s:g/'{n}'/$count/;
     $out ~~ s:g/'{h' \s* (\d*) \s* '}'/{random_hex($0.Int || 7)}/;
+    $out ~~ s:g/'s:(' (<-[)]>+) ')' /{select_from($0.Str)}/;
+    $out ~~ s:g/'h' (\d*) ':(' <-[)]>+ ')' /{random_hex($0.Int || 7)}/;
+    $out ~~ s:g/'d:(' <-[)]>+ ')' /{random_date()}/;
     $out;
 }
 
 
 sub random_hex(Int $length) {
     Digest::MD5.new.md5_hex(crypt_random().Str).substr(0, $length);
+}
+
+
+sub select_from($text) {
+    my @a = $text.split('|');
+    @a[crypt_random_uniform(@a.elems)];
+}
+
+
+sub random_date {
+    # lazy, bad, never mind
+    crypt_random_uniform(300)+1715 ~ '-0' ~ crypt_random_uniform(9)+1 ~ '-' ~ crypt_random_uniform(19)+10;
 }
 
 
@@ -474,6 +494,10 @@ sub endpoints {
 sub schemas(Bool $reload = False) {
     $SCHEMAS = pretty get(SCHEMAS_URI) if $reload || !$SCHEMAS;
     $SCHEMAS;
+}
+
+sub cursor(Int $col, Int $row) {
+    print "\e[{$row};{$col}H";
 }
 
 sub login {
