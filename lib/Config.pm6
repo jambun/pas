@@ -6,7 +6,8 @@ class Config {
     has %.attr =
         url  => 'http://localhost:4567',
         user => 'admin',
-        pass => 'admin';
+        pass => 'admin',
+	sessions => {};
 
     has %!prompts =
         url  => 'ArchivesSpace backend URL',
@@ -18,10 +19,10 @@ class Config {
     has Str $.dir;
 
 
-    method load($url, $user, $pass, $session, $prompt) {
+    method load($url, $user, $pass, $token, $prompt) {
         if !$prompt && self.path.IO.e {
             %!attr = from-json slurp(self.path);
-            for <url user pass session> { %!attr{$_} = $::($_) if $::($_) }
+            for <url user pass token> { %!attr{$_} = $::($_) if $::($_) }
         } else {
 	    self.prompt;
         }
@@ -34,7 +35,7 @@ class Config {
 
 
     method prompt_default($prompt, $default) {
-        my $response = prompt $prompt ~ " (default: {$default}):";
+        my $response = prompt $prompt ~ " (default: {$default}): ";
         $response ~~ /\w/ ?? $response !! $default;
     }
 

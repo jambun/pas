@@ -43,7 +43,8 @@ class Command {
     has     $!first;
 
     my constant ACTIONS = <show update create edit stub post login
-                           endpoints schemas config session alias set help quit>;
+                           endpoints schemas config session user
+                           alias set help quit>;
 
     method actions { ACTIONS }
 
@@ -109,14 +110,23 @@ class Command {
     }
 
     method session {
-	(
-	    config.attr<url>,
-	    colored(config.attr<user>, 'green'),
-	    DateTime.new(config.attr<time>).truncated-to('second'),
-	    config.attr<session>
-	).join("\t");
+	if $!first {
+	    switch_to_session($!first);
+	} else {
+	    (for config.attr<sessions>.kv -> $k, $v {
+		    (
+			$v<url>,
+			colored($k, config.attr<user> eq $k ?? 'bold green' !! 'bold white'),
+			DateTime.new($v<time>).truncated-to('second')
+		    ).join("\t");
+		}).join("\n");
+	}
     }
 
+    method user {
+	pretty get '/users/current-user';
+    }
+    
     method endpoints {
     	endpoints.join("\n");
     }
@@ -378,9 +388,11 @@ sub page($text) {
 
 sub request($uri, @pairs, $body?) {
     my $url = build_url($uri, @pairs);
-    my %header = 'X-Archivesspace-Session' => config.attr<session>,
+    my %header = 'X-Archivesspace-Session' => config.attr<token>,
        	       	 'Connection'              => 'close';   # << this works around a bug in Net::HTTP
 
+    blurt %header;
+    
     my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
 
     if $response.status-line ~~ /412/ {
@@ -517,21 +529,45 @@ sub schemas(Bool $reload = False) {
     $SCHEMAS;
 }
 
+
 sub cursor(Int $col, Int $row) {
     print "\e[{$row};{$col}H";
 }
+
+
+sub switch_to_session(Str $name) {
+    my $sess = config.attr<sessions>{$name};
+    return 'Unknown session: ' ~ $name unless $sess;
+
+    config.attr<url>   = $sess<url>;
+    config.attr<user>  = $sess<user>;
+    config.attr<pass>  = $sess<pass>;
+    config.attr<time>  = $sess<time>;
+    config.attr<token> = $sess<token>;
+    config.save;
+
+    'Swtiched to session: ' ~ $name;
+}
+
 
 sub login {
     blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
 
     my $uri      = '/users/' ~ config.attr<user> ~ '/login';
-    my @pairs    = ["password={config.attr<pass>}", 'expiring=false'];
-    my $body     = Buf.new("password={config.attr<pass>}".ords);
-    my $resp     = Net::HTTP::POST(build_url($uri, @pairs), :$body);
+    my @pairs    = ["password={config.attr<pass>}"];
+    my %header   = 'Connection' => 'close';
+    my $resp     = Net::HTTP::POST(build_url($uri, @pairs), :%header);
 
     if $resp.status-line ~~ /200/ {
-        config.attr<session> = (from-json $resp.body.decode('utf-8'))<session>;
+        config.attr<token> = (from-json $resp.body.decode('utf-8'))<session>;
 	config.attr<time> = time;
+	config.attr<sessions>{config.attr<user>} = {
+	    url   => config.attr<url>,
+	    user  => config.attr<user>,
+	    pass  => config.attr<pass>,
+	    token => config.attr<token>,
+	    time  => config.attr<time>
+	};
 	config.save;
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
