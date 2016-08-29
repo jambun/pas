@@ -28,8 +28,8 @@ class Config {
     }
 
 
-    method prompt {
-	for <url user pass> { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+    method prompt(@attrs = <url user pass>) {
+	for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
     }
 
 

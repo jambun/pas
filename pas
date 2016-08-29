@@ -22,11 +22,12 @@ my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
 
-my %PROP = loud    => False,
-           compact => False,
-	   page    => True,
-	   time    => False,
-	   indent  => 2;
+my %PROP = loud     => False,
+           compact  => False,
+	   page     => True,
+	   time     => False,
+	   password => False,
+	   indent   => 2;
 
 my $SAVE_FILE;
 my $SCHEMAS;
@@ -42,7 +43,7 @@ class Command {
     has     $!first;
 
     my constant ACTIONS = <show update create edit stub post login
-                           endpoints schemas config alias set help quit>;
+                           endpoints schemas config session alias set help quit>;
 
     method actions { ACTIONS }
 
@@ -77,8 +78,12 @@ class Command {
 	$puri ~~ s:g/\d+/:id/;
 	my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
 	return "Couldn't find endpoint definition" if @($e).elems == 0;
-	my $model = $e.first{'params'}[0][1];
-	$model ~~ s/\w+\(\:(\w+)\)/$0/;
+
+	my $model;
+	for $e.first<params>.List {
+	    $model = $_[1];
+	    last if $model ~~ s/'JSONModel(:' (\w+) ')'/$0/;
+	}
 
         save_tmp(pretty get('/stub/' ~ $model, @!args));
 
@@ -101,6 +106,15 @@ class Command {
     method login {
 	config.prompt if $!qualifier eq 'prompt';
     	login;
+    }
+
+    method session {
+	(
+	    config.attr<url>,
+	    colored(config.attr<user>, 'green'),
+	    DateTime.new(config.attr<time>).truncated-to('second'),
+	    config.attr<session>
+	).join("\t");
     }
 
     method endpoints {
@@ -251,7 +265,7 @@ sub MAIN(Str  $uri = '',
        });
 
 
-       while (my $line = linenoise 'pas> ').defined {
+       while (my $line = linenoise 'pas ' ~ config.attr<user> ~ '> ').defined {
        	   next unless $line.trim;
        	   linenoiseHistoryAdd($line.trim);
 	   my %cmd = parse_cmd($line);
@@ -517,6 +531,7 @@ sub login {
 
     if $resp.status-line ~~ /200/ {
         config.attr<session> = (from-json $resp.body.decode('utf-8'))<session>;
+	config.attr<time> = time;
 	config.save;
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
