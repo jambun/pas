@@ -460,7 +460,7 @@ sub get($uri, @pairs = []) {
 
 sub extract_uris($text) {
     $text ~~ m:g/ '"' ( '/' <-[\\ \s "]>+ )  '"'  /;
-    @LAST_URIS = $/.map: { $_[0].Str };
+    @LAST_URIS = ($/.map: { $_[0].Str }).sort.unique;
     $text;
 }
 
