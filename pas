@@ -30,6 +30,7 @@ my %PROP = loud    => False,
 
 my $SAVE_FILE;
 my $SCHEMAS;
+my @LAST_URIS = [];
 
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -225,7 +226,7 @@ sub MAIN(Str  $uri = '',
 	   # making tab targets work when param bits of uris (eg :id) have values
 	   my @m = $last.split('/');
 	   my $mf = @m.pop;
-	   for @tab_targets.map({
+	   for (|@LAST_URIS, |@tab_targets).map({
 	       my @t = .split('/');
 	       if @m.elems >= @t.elems {
 	       	  '';
@@ -240,7 +241,7 @@ sub MAIN(Str  $uri = '',
 	       	  '';
 	       }
 	       }
-	   }).grep(/./).sort -> $m {
+	   }).grep(/./) -> $m {
        	        linenoiseAddCompletion($c, $prefix ~ $m);
 	   }
 
@@ -453,7 +454,14 @@ sub post($uri, @pairs, $data) {
 
 
 sub get($uri, @pairs = []) {
-    request($uri, @pairs);
+    extract_uris request($uri, @pairs);
+}
+
+
+sub extract_uris($text) {
+    $text ~~ m:g/ '"' ( '/' <-[\\ \s "]>+ )  '"'  /;
+    @LAST_URIS = $/.map: { $_[0].Str };
+    $text;
 }
 
 
