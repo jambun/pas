@@ -680,15 +680,22 @@ sub shell_help {
 		    update    update with the pairs
 		    create    create using the pairs
 		    edit      edit to update
+                     .last    using last edited record
 		    stub      create from an edited stub
+                     .[n]     post n times
 		    post      post a file (default if last arg is a file)
 
     other actions:  login     force a login
-		    endpoints show the available endpoints
+                     .prompt  prompt for details
+	            user      show the current user
+                    session   show sessions
+                     .[name]  switch to session
+	            endpoints show the available endpoints
 		    schemas   show all record schemas
 		    config    show pas config
 		    alias     show or update aliases
-		    set       show or update pas properties
+		    set       show pas properties
+                     .[prop]  show or set prop
 		    help      this
 		    quit      exit pas (^d works too)
 
