@@ -117,7 +117,7 @@ class Command {
 		    (
 			$v<url>,
 			colored($k, config.attr<user> eq $k ?? 'bold green' !! 'bold white'),
-			DateTime.new($v<time>).truncated-to('second')
+			DateTime.new($v<time>).local.truncated-to('second')
 		    ).join("\t");
 		}).join("\n");
 	}
