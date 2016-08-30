@@ -49,7 +49,7 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post login run
                            endpoints schemas config session user
-                           alias set help quit>;
+                           last alias set help quit>;
 
     method actions { ACTIONS }
 
@@ -160,6 +160,10 @@ class Command {
     	config.json;
     }
 
+    method last {
+	slurp tmp_file;
+    }
+    
     method alias {
     	alias_cmd($!first);
     }
@@ -749,6 +753,7 @@ sub shell_help {
 	            endpoints show the available endpoints
 		    schemas   show all record schemas
 		    config    show pas config
+                    last      show the last saved temp file
 		    alias     show or update aliases
 		    set       show pas properties
                      .[prop]  show or set prop
