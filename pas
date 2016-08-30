@@ -32,6 +32,7 @@ my %PROP = loud     => False,
 my $SAVE_FILE;
 my $SCHEMAS;
 my @LAST_URIS = [];
+my @TAB_TARGETS;
 
 my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -128,7 +129,7 @@ class Command {
     }
     
     method endpoints {
-    	endpoints.join("\n");
+    	load_endpoints.join("\n");
     }
 
     method schemas {
@@ -237,7 +238,6 @@ sub MAIN(Str  $uri = '',
        linenoiseHistoryLoad(pas_path HIST_FILE);
        linenoiseHistorySetMaxLen(HIST_LENGTH);
 
-       my @tab_targets = |Command.actions, |endpoints;
        linenoiseSetCompletionCallback(-> $line, $c {
        	   my $prefix  = '';
 	   my $last = $line;
@@ -250,7 +250,7 @@ sub MAIN(Str  $uri = '',
 	   # making tab targets work when param bits of uris (eg :id) have values
 	   my @m = $last.split('/');
 	   my $mf = @m.pop;
-	   for (|@LAST_URIS, |@tab_targets).map({
+	   for (|@LAST_URIS, |@TAB_TARGETS).map({
 	       my @t = .split('/');
 	       if @m.elems >= @t.elems {
 	       	  '';
@@ -392,6 +392,7 @@ sub request($uri, @pairs, $body?) {
        	       	 'Connection'              => 'close';   # << this works around a bug in Net::HTTP
 
     blurt %header;
+    blurt $url;
     
     my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
 
@@ -401,6 +402,11 @@ sub request($uri, @pairs, $body?) {
     }
     
     blurt $response.status-line;
+
+    if $response.status-line ~~ /412/ {
+	say 'The session was bad. Tried to login again, but it is still not working.';
+	say "Say 'login.prompt' to re-enter login details, or 'session' to find a good session";
+    }
 
     $response.body.decode('utf-8');
 }
@@ -519,8 +525,11 @@ sub alias_cmd($alias) {
 }
 
 
-sub endpoints {
-    from-json(get(ENDPOINTS_URI)).unique;
+sub load_endpoints {
+    my $e = from-json(get(ENDPOINTS_URI));
+    my @endpoints = $e ~~ Array ?? $e.unique !! [];
+    @TAB_TARGETS = |@endpoints, |Command.actions;
+    @endpoints;
 }
 
 
@@ -545,7 +554,8 @@ sub switch_to_session(Str $name) {
     config.attr<time>  = $sess<time>;
     config.attr<token> = $sess<token>;
     config.save;
-
+    load_endpoints;
+    
     'Swtiched to session: ' ~ $name;
 }
 
@@ -569,8 +579,10 @@ sub login {
 	    time  => config.attr<time>
 	};
 	config.save;
+	load_endpoints;
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
+	@TAB_TARGETS = Command.actions;
         'Log in failed!';
     }
 }
