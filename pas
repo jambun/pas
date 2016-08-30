@@ -403,6 +403,7 @@ sub request($uri, @pairs, $body?) {
 
     if $response.status-line ~~ /412/ {
         login;
+	%header<X-Archivesspace-Session> = config.attr<token> if config.attr<token>;
        	$response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
     }
     
