@@ -22,16 +22,12 @@ my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
 
-# FIXME: these should probably be rolled into config
-#        then they will persist, and it won't be annoying
-#        when password gets implemented
-#          ie don't store passwords by default
-my %PROP = loud     => False,
-           compact  => False,
-	   page     => True,
-	   time     => False,
-	   password => False,
-	   indent   => 2;
+my %PROP_DEFAULTS = loud     => False,
+                    compact  => False,
+		    page     => True,
+		    time     => False,
+		    savepwd  => False,
+		    indent   => 2;
 
 my $SAVE_FILE;
 my $SCHEMAS;
@@ -169,34 +165,44 @@ class Command {
     }
 
     method set {
+	my %prop := config.attr<properties>;
 	unless $!qualifier {
-	    return (%PROP.keys.sort.map: { $_ ~ "\t" ~ %PROP{$_}  }).join("\n");
+	    if $!first eq 'defaults' {
+		apply_property_defaults(True);
+		config.save;
+		return 'Properties reset to default values';
+	    } else {
+		return (%prop.keys.sort.map: { $_ ~ "\t" ~ %prop{$_}  }).join("\n");
+	    }
 	}
 
-	unless %PROP.keys.grep($!qualifier) {
+	unless %prop.keys.grep($!qualifier) {
 	    return 'Unknown property: ' ~ $!qualifier;
 	}
 
-	given %PROP{$!qualifier}.WHAT {
+	given %prop{$!qualifier}.WHAT {
 	    when Bool {
 		if $!first eq '0' | 'off' | 'false' {
-		    %PROP{$!qualifier} = False;
-		    $!qualifier.wordcase ~ ' off';
+		    %prop{$!qualifier} = False;
+		    config.save;
+		    $!qualifier ~ ' off';
 		} elsif $!first ~~ /./ {
-		    %PROP{$!qualifier} = True;
-		    $!qualifier.wordcase ~ ' on';
+		    %prop{$!qualifier} = True;
+		    config.save;
+		    $!qualifier ~ ' on';
 		} else {
-		    $!qualifier.wordcase ~ (%PROP{$!qualifier} ?? ' on' !! ' off');
+		    $!qualifier ~ (%prop{$!qualifier} ?? ' on' !! ' off');
 		}
 	    }
 	    when Int {
 		if so $!first.Int {
-		    %PROP{$!qualifier} = $!first.Int;
-		    $!qualifier.wordcase ~ ' ' ~ %PROP{$!qualifier};
+		    %prop{$!qualifier} = $!first.Int;
+		    config.save;
+		    $!qualifier ~ ' ' ~ %prop{$!qualifier};
 		} elsif $!first ~~ /./ {
-		    $!qualifier.wordcase ~ ' must be a number';
+		    $!qualifier ~ ' must be a number';
 		} else {
-		    $!qualifier.wordcase ~ ' ' ~ %PROP{$!qualifier};
+		    $!qualifier ~ ' ' ~ %prop{$!qualifier};
 		}
 	    }
 	}
@@ -247,11 +253,14 @@ sub MAIN(Str  $uri = '',
 
     config.load($url, $user, $pass, $session, $prompt || $p);
 
-    %PROP<loud>    = $verbose || $v;
-    %PROP<compact> = $compact || $c;
-    %PROP<indent>  = $indent-step || 2;
-    %PROP<page>    = !($no-page || $n);
+    my %props := config.attr<properties>;
+    %props<loud>    = True if $verbose || $v;
+    %props<compact> = True if $compact || $c;
+    %props<indent>  = $indent-step if $indent-step;
+    %props<page>    = False if $no-page || $n;
 
+    apply_property_defaults;
+    
     if $alias {
         alias_cmd($alias);
         exit;
@@ -339,7 +348,7 @@ sub run_cmd(Str $line) {
 
     my $intime = now;
     display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
-    say '[' ~ (now - $intime) ~ 's]' if %PROP<time>;
+    say '[' ~ (now - $intime) ~ 's]' if config.attr<properties><time>;
 }
 
 
@@ -373,16 +382,24 @@ sub parse_cmd(Str $cmd) {
 }
 
 
+sub apply_property_defaults(Bool $force = False) {
+    my %props := config.attr<properties>;
+    for %PROP_DEFAULTS.kv -> $k, $v {
+	%props{$k} = $v if $force || !(%props{$k}:exists);
+    }
+}
+
+
 sub resolve_aliases(Str $text) {
     $text.subst: /\. (\w+) \./, -> { config.attr<alias>{$0} }, :g;
 }
 
 
 sub pretty($json) {
-    if %PROP<compact> || $json !~~ /^<[\{\[]>/ {
+    if config.attr<properties><compact> || $json !~~ /^<[\{\[]>/ {
 	$json;
     } else {
-	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => %PROP<indent>))).made;
+	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => config.attr<properties><indent>))).made;
     }
 }
 
@@ -403,7 +420,7 @@ sub display($text) {
 	return;
     }
 
-    if %PROP<page> && q:x/tput lines/.chomp.Int < $text.lines {
+    if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
         page $text;
     } else {
         say $text;
@@ -657,7 +674,7 @@ sub save_tmp($data) {
 
 
 sub blurt($out) {
-    say $out if %PROP<loud>;
+    say $out if config.attr<properties><loud>;
 }
 
 

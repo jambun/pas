@@ -7,7 +7,8 @@ class Config {
         url  => 'http://localhost:4567',
         user => 'admin',
         pass => 'admin',
-	sessions => {};
+	sessions => {},
+	properties => {};
 
     has %!prompts =
         url  => 'ArchivesSpace backend URL',
@@ -35,11 +36,16 @@ class Config {
 
 
     method prompt_default($prompt, $default) {
-        my $response = prompt $prompt ~ " (default: {$default}): ";
+        my $response = prompt $prompt ~ " ({$default}): ";
         $response ~~ /\w/ ?? $response !! $default;
     }
 
 
+    method prop($k) {
+	%!attr<properties>{$k};
+    }
+
+    
     method set($k, $v) {
         %!attr{$k} = $v;
 	self.save;
