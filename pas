@@ -47,7 +47,7 @@ class Command {
     has Str $.qualifier = '';
     has     $!first;
 
-    my constant ACTIONS = <show update create edit stub post login
+    my constant ACTIONS = <show update create edit stub post login run
                            endpoints schemas config session user
                            alias set help quit>;
 
@@ -114,6 +114,18 @@ class Command {
     	login;
     }
 
+    method run {
+	if $!first.IO.e {
+	    my @cmds = slurp($!first).split("\n");
+	    for @cmds -> $line {
+		say cmd_prompt() ~ $line;
+		run_cmd $line;
+	    }
+	} else {
+	    'Script file not found: ' ~ $!first;
+	}
+    }
+    
     method session {
 	if $!first {
 	    if $!qualifier eq 'delete' {
@@ -191,7 +203,9 @@ class Command {
     }
 
     method quit {
-    	'Goodbye';    	
+	linenoiseHistorySave(pas_path HIST_FILE);
+    	say 'Goodbye';    	
+	exit;
     }
 }
 
@@ -276,23 +290,10 @@ sub MAIN(Str  $uri = '',
 	   }).grep(/./) -> $m {
        	        linenoiseAddCompletion($c, $prefix ~ $m);
 	   }
-
-#	   for @tab_targets.grep(/^ "$last" /).sort -> $cmd {
-#       	        linenoiseAddCompletion($c, $prefix ~ $cmd);
-#    	   }
        });
 
-
-       while (my $line = linenoise 'pas ' ~ config.attr<user> ~ '> ').defined {
-       	   next unless $line.trim;
-       	   linenoiseHistoryAdd($line.trim);
-	   my %cmd = parse_cmd($line);
-
-	   my $intime = now;
-    	   display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
-	   say '[' ~ (now - $intime) ~ 's]' if %PROP<time>;
-
-	   last if %cmd<action> eq 'quit';
+       while (my $line = linenoise cmd_prompt).defined {
+	   run_cmd $line;
        }
 
        linenoiseHistorySave(pas_path HIST_FILE);
@@ -317,6 +318,24 @@ sub MAIN(Str  $uri = '',
 
     	display Command.new(action => $command, args => @args.list).execute;
     }
+}
+
+
+sub cmd_prompt { 'pas ' ~ config.attr<user> ~ '> ' }
+
+
+sub run_cmd(Str $line) {
+    return unless $line.trim;
+	   
+    linenoiseHistoryAdd($line.trim);
+
+    return if $line ~~ /^ '#' /; 
+
+    my %cmd = parse_cmd($line);
+
+    my $intime = now;
+    display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+    say '[' ~ (now - $intime) ~ 's]' if %PROP<time>;
 }
 
 
@@ -726,6 +745,7 @@ sub shell_help {
 	            user      show the current user
                     session   show sessions or switch to a session
                      .delete  delete a session
+                    run       run a pas script file
 	            endpoints show the available endpoints
 		    schemas   show all record schemas
 		    config    show pas config
