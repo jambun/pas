@@ -22,6 +22,10 @@ my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
 
+# FIXME: these should probably be rolled into config
+#        then they will persist, and it won't be annoying
+#        when password gets implemented
+#          ie don't store passwords by default
 my %PROP = loud     => False,
            compact  => False,
 	   page     => True,
