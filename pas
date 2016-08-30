@@ -624,8 +624,12 @@ sub delete_session(Str $name) {
 
 
 sub login {
-    blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
+    blurt 'Logging in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
 
+    unless config.attr<pass> {
+	config.prompt_for('pass', 'Enter password for ' ~ config.attr<user>);
+    }
+    
     my $uri      = '/users/' ~ config.attr<user> ~ '/login';
     my @pairs    = ["password={config.attr<pass>}"];
     my %header   = 'Connection' => 'close';
@@ -647,7 +651,8 @@ sub login {
     } else {
 	@TAB_TARGETS = Command.actions;
 	config.attr<token> = '';
-        'Log in failed!';
+        say 'Log in failed!';
+	'';
     }
 }
 

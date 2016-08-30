@@ -35,14 +35,19 @@ class Config {
     }
 
 
+    method prompt_for($k, $prompt) {
+	%!attr{$k} = self.prompt_default($prompt, %!attr{$k});
+    }
+
+
     method prompt_default($prompt, $default) {
-        my $response = prompt $prompt ~ " ({$default}): ";
+        my $response = prompt $prompt ~ ($default ?? " ({$default}): " !! ': ');
         $response ~~ /\w/ ?? $response !! $default;
     }
 
 
-    method prop($k) {
-	%!attr<properties>{$k};
+    method prop {
+	%!attr<properties>;
     }
 
     
@@ -56,7 +61,7 @@ class Config {
 
 
     method json {
-        JSONPretty::Grammar.parse(to-json(%!attr), :actions(JSONPretty::Actions.new)).made;
+        JSONPretty::Grammar.parse(to-json(self.stripped), :actions(JSONPretty::Actions.new)).made;
     }
 
 
@@ -65,5 +70,15 @@ class Config {
         spurt self.path, self.json;
     }
 
+    
+    method stripped {
+	return %!attr if self.prop<savepwd>;
+
+	my %h = %!attr;
+
+	%h<pass> = '';
+	for %h<sessions>.values { $_<pass> = '' }
+	%h;
+    }
 
 }
