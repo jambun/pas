@@ -229,6 +229,7 @@ sub MAIN(Str  $uri = '',
          Str  :$session?,
          Str  :$post?,
          Str  :$alias?,
+	 Str  :$e?,
          Bool :$help=False,
          Bool :$h=False,
          Bool :$compact=False,
@@ -268,6 +269,10 @@ sub MAIN(Str  $uri = '',
 
     login if $url || $user || $pass || !config.attr<session> || $force-login || $f;
 
+    if $e {
+	run_cmd $e;
+	exit;
+    }
 
     if $shell || $s || !$uri {
        linenoiseHistoryLoad(pas_path HIST_FILE);
