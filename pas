@@ -353,7 +353,7 @@ sub run_cmd(Str $line) {
 
     my $intime = now;
     display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
-    say '[' ~ (now - $intime) ~ 's]' if config.attr<properties><time>;
+    say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 
 
