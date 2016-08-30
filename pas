@@ -112,7 +112,11 @@ class Command {
 
     method session {
 	if $!first {
-	    switch_to_session($!first);
+	    if $!qualifier eq 'delete' {
+		delete_session($!first);
+	    } else {
+		switch_to_session($!first);
+	    }
 	} else {
 	    (for config.attr<sessions>.kv -> $k, $v {
 		    (
@@ -388,9 +392,10 @@ sub page($text) {
 
 sub request($uri, @pairs, $body?) {
     my $url = build_url($uri, @pairs);
-    my %header = 'X-Archivesspace-Session' => config.attr<token>,
-       	       	 'Connection'              => 'close';   # << this works around a bug in Net::HTTP
+    my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
 
+    %header<X-Archivesspace-Session> = config.attr<token> if config.attr<token>;
+    
     blurt %header;
     blurt $url;
     
@@ -560,6 +565,19 @@ sub switch_to_session(Str $name) {
 }
 
 
+sub delete_session(Str $name) {
+    my $sess = config.attr<sessions>{$name};
+    return 'Unknown session: ' ~ $name unless $sess;
+
+    return "Can't delete current session!" if $sess<token> eq config.attr<token>;
+
+    config.attr<sessions>{$name}:delete;
+    config.save;
+
+    'Deleted session: ' ~ $name;
+}
+
+
 sub login {
     blurt 'Logging in to ' ~ config.attr<url> ~ ' with: ' ~ config.attr<user> ~ '/' ~ config.attr<pass>;
 
@@ -583,6 +601,7 @@ sub login {
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
 	@TAB_TARGETS = Command.actions;
+	config.attr<token> = '';
         'Log in failed!';
     }
 }
@@ -700,8 +719,8 @@ sub shell_help {
     other actions:  login     force a login
                      .prompt  prompt for details
 	            user      show the current user
-                    session   show sessions
-                     .[name]  switch to session
+                    session   show sessions or switch to a session
+                     .delete  delete a session
 	            endpoints show the available endpoints
 		    schemas   show all record schemas
 		    config    show pas config
