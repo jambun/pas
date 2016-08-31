@@ -268,7 +268,7 @@ sub MAIN(Str  $uri = '',
         exit;
     }
 
-    login if $url || $user || $pass || !config.attr<session> || $force-login || $f;
+    login if $url || $user || $pass || !config.attr<token> || $force-login || $f;
 
     if $e {
 	run_cmd $e;
