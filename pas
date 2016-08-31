@@ -42,6 +42,7 @@ my Config $CFG;
 sub config { $CFG ||= Config.new(dir => $PAS_DIR) }
 
 class Command {
+    has Str $.line;
     has Str $.action;
     has     @.args;
     has Str $.qualifier = '';
@@ -49,7 +50,7 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post login logout run
                            endpoints schemas config session user
-                           last alias set help quit>;
+                           last alias set ls help quit>;
 
     method actions { ACTIONS }
 
@@ -221,6 +222,10 @@ class Command {
 	}
     }
 
+    method ls {
+	qq:x/$!line/.trim;
+    }
+    
     method help {
 	shell_help;
     }
@@ -367,7 +372,7 @@ sub run_cmd(Str $line) {
     my %cmd = parse_cmd($line);
 
     my $intime = now;
-    display Command.new(action => %cmd<action>, args => %cmd<args>.list).execute;
+    display Command.new(line => $line, action => %cmd<action>, args => %cmd<args>.list).execute;
     say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 
