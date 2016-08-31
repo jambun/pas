@@ -49,7 +49,7 @@ class Command {
     has     $!first;
 
     my constant ACTIONS = <show update create edit stub post login logout run
-                           endpoints schemas config session user
+                           endpoints schemas config session user who
                            last alias set ls help quit>;
 
     method actions { ACTIONS }
@@ -151,6 +151,10 @@ class Command {
 
     method user {
 	pretty get USER_URI;
+    }
+
+    method who {
+	from-json(get(USER_URI))<name>;
     }
     
     method endpoints {
