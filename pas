@@ -33,6 +33,7 @@ my %PROP_DEFAULTS = loud     => False,
 my $SAVE_FILE;
 my $SCHEMAS;
 my @LAST_URIS = [];
+my @ENDPOINTS = [];
 my @TAB_TARGETS;
 
 my Config $CFG;
@@ -173,7 +174,7 @@ class Command {
 		config.save;
 		return 'Properties reset to default values';
 	    } else {
-		return (%prop.keys.sort.map: { $_ ~ "\t" ~ %prop{$_}  }).join("\n");
+		return (for %prop.kv -> $k, $v { $k ~ "\t" ~ $v }).join("\n");
 	    }
 	}
 
@@ -276,36 +277,38 @@ sub MAIN(Str  $uri = '',
     }
 
     if $shell || $s || !$uri {
-       linenoiseHistoryLoad(pas_path HIST_FILE);
-       linenoiseHistorySetMaxLen(HIST_LENGTH);
+	load_endpoints;
 
-       linenoiseSetCompletionCallback(-> $line, $c {
-       	   my $prefix  = '';
-	   my $last = $line;
-	   if $line ~~ /(.* \s+) (<[\S]>+ $)/ {
-	      $prefix = $0;
-	      $last = $1;
-	   }
+	linenoiseHistoryLoad(pas_path HIST_FILE);
+	linenoiseHistorySetMaxLen(HIST_LENGTH);
 
-	   # FIXME: this is pretty worky, but totally gruesome
-	   # making tab targets work when param bits of uris (eg :id) have values
-	   my @m = $last.split('/');
-	   my $mf = @m.pop;
-	   for (|@LAST_URIS, |@TAB_TARGETS).map({
-	       my @t = .split('/');
-	       if @m.elems >= @t.elems {
-	       	  '';
-	       } else {
-	       my @out;
-	       for zip @m, @t -> ($m, $t) {
-	       	   @out.push($m) if $t ~~ /^ ':' / || $t eq $m;
-	       }
-	       if @out.elems == @m.elems && @t[@m.elems] ~~ /^ "$mf" / {
-	       	  (|@m, |@t[@m.elems .. @t.end]).join('/');
-	       } else {
-	       	  '';
-	       }
-	       }
+	linenoiseSetCompletionCallback(-> $line, $c {
+       	    my $prefix  = '';
+	    my $last = $line;
+	    if $line ~~ /(.* \s+) (<[\S]>+ $)/ {
+		$prefix = $0;
+		$last = $1;
+	    }
+
+	    # FIXME: this is pretty worky, but totally gruesome
+	    # making tab targets work when param bits of uris (eg :id) have values
+	    my @m = $last.split('/');
+	    my $mf = @m.pop;
+	    for (|@LAST_URIS, |@TAB_TARGETS).map({
+                my @t = .split('/');
+		if @m.elems >= @t.elems {
+	       	    '';
+		} else {
+		    my @out;
+		    for zip @m, @t -> ($m, $t) {
+	       		@out.push($m) if $t ~~ /^ ':' / || $t eq $m;
+		    }
+		    if @out.elems == @m.elems && @t[@m.elems] ~~ /^ "$mf" / {
+	       		(|@m, |@t[@m.elems .. @t.end]).join('/');
+		    } else {
+	       		'';
+		    }
+		}
 	   }).grep(/./) -> $m {
        	        linenoiseAddCompletion($c, $prefix ~ $m);
 	   }
@@ -581,7 +584,9 @@ sub alias_cmd($alias) {
 }
 
 
-sub load_endpoints {
+sub load_endpoints(Bool $force = False) {
+    return @ENDPOINTS if @ENDPOINTS && !$force;
+    
     my $e = get(ENDPOINTS_URI).trim;
     if $e ~~ /^ <-[{[]> / {
 	say 'No endpoints endpoint!';
@@ -589,9 +594,9 @@ sub load_endpoints {
 	return [];
     }
     $e = from-json $e;
-    my @endpoints = $e ~~ Array ?? $e.unique !! [];
-    @TAB_TARGETS = |@endpoints, |Command.actions;
-    @endpoints;
+    @ENDPOINTS = $e ~~ Array ?? $e.unique !! [];
+    @TAB_TARGETS = |@ENDPOINTS, |Command.actions;
+    @ENDPOINTS;
 }
 
 
@@ -616,7 +621,7 @@ sub switch_to_session(Str $name) {
     config.attr<time>  = $sess<time>;
     config.attr<token> = $sess<token>;
     config.save;
-    load_endpoints;
+    load_endpoints(True);
     
     'Swtiched to session: ' ~ $name;
 }
@@ -658,7 +663,7 @@ sub login {
 	    time  => config.attr<time>
 	};
 	config.save;
-	load_endpoints;
+	load_endpoints(True);
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
 	@TAB_TARGETS = Command.actions;
