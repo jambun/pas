@@ -174,7 +174,13 @@ class Command {
 		config.save;
 		return 'Properties reset to default values';
 	    } else {
-		return (for %prop.kv -> $k, $v { $k ~ "\t" ~ $v }).join("\n");
+		return (for %prop.kv -> $k, $v {
+			       my $out = $v;
+			       $out = colored('on', 'green') if $out.WHAT ~~ Bool && $out;
+			       $out = colored('off', 'red') if $out.WHAT ~~ Bool && !$out;
+			       sprintf("  %-10s %s", $k, $out);
+			       #$k ~ "\t" ~ $out;
+			   }).join("\n");
 	    }
 	}
 
@@ -187,13 +193,13 @@ class Command {
 		if $!first eq '0' | 'off' | 'false' {
 		    %prop{$!qualifier} = False;
 		    config.save;
-		    $!qualifier ~ ' off';
+		    $!qualifier ~ colored(' off', 'red');
 		} elsif $!first ~~ /./ {
 		    %prop{$!qualifier} = True;
 		    config.save;
-		    $!qualifier ~ ' on';
+		    $!qualifier ~ colored(' on', 'green');
 		} else {
-		    $!qualifier ~ (%prop{$!qualifier} ?? ' on' !! ' off');
+		    $!qualifier ~ (%prop{$!qualifier} ?? colored(' on', 'green') !! colored(' off', 'red'));
 		}
 	    }
 	    when Int {
