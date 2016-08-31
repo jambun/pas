@@ -22,7 +22,8 @@ my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
 my constant USER_URI      = '/users/current-user';
-my constant LOGOUT_URI      = '/logout';
+my constant LOGOUT_URI    = '/logout';
+my constant ANON_USER     = 'anon';
 
 my %PROP_DEFAULTS = loud     => False,
                     compact  => False,
@@ -109,12 +110,12 @@ class Command {
     }
 
     method login {
-	config.prompt if $!qualifier eq 'prompt';
+	config.prompt if $!qualifier eq 'prompt' || config.attr<user> eq ANON_USER;
     	login;
     }
 
     method logout {
-	pretty post(LOGOUT_URI, [], 'byebye');
+	pretty logout;
     }
     
     method run {
@@ -141,7 +142,7 @@ class Command {
 		    (
 			$v<url>,
 			colored($k, config.attr<user> eq $k ?? 'bold green' !! 'bold white'),
-			DateTime.new($v<time>).local.truncated-to('second')
+			$v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! ''
 		    ).join("\t");
 		}).join("\n");
 	}
@@ -184,7 +185,6 @@ class Command {
 			       $out = colored('on', 'green') if $out.WHAT ~~ Bool && $out;
 			       $out = colored('off', 'red') if $out.WHAT ~~ Bool && !$out;
 			       sprintf("  %-10s %s", $k, $out);
-			       #$k ~ "\t" ~ $out;
 			   }).join("\n");
 	    }
 	}
@@ -652,6 +652,8 @@ sub delete_session(Str $name) {
 
 
 sub login {
+    return if config.attr<user> eq ANON_USER;
+    
     blurt 'Logging in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
 
     unless config.attr<pass> {
@@ -663,8 +665,6 @@ sub login {
     my %header   = 'Connection' => 'close';
     my $resp     = Net::HTTP::POST(build_url($uri, @pairs), :%header);
 
-    load_endpoints(True);
-
     if $resp.status-line ~~ /200/ {
         config.attr<token> = (from-json $resp.body.decode('utf-8'))<session>;
 	config.attr<time> = time;
@@ -675,6 +675,13 @@ sub login {
 	    token => config.attr<token>,
 	    time  => config.attr<time>
 	};
+	config.attr<sessions>{ANON_USER} = {
+	    url   => config.attr<url>,
+	    user  => ANON_USER,
+	    pass  => '',
+	    token => '',
+	    time  => 0
+	};
 	config.save;
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
@@ -682,6 +689,15 @@ sub login {
         say 'Log in failed!';
 	'';
     }
+}
+
+
+sub logout {
+    my $out = post(LOGOUT_URI, [], 'byebye');
+    my $user = config.attr<user>;
+    switch_to_session(ANON_USER);
+    delete_session($user);
+    $out;
 }
 
 
