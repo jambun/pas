@@ -176,7 +176,7 @@ class Command {
 	my %prop := config.attr<properties>;
 	unless $!qualifier {
 	    if $!first eq 'defaults' {
-		apply_property_defaults(True);
+		apply_property_defaults(:force);
 		config.save;
 		return 'Properties reset to default values';
 	    } else {
@@ -402,7 +402,7 @@ sub parse_cmd(Str $cmd) {
 }
 
 
-sub apply_property_defaults(Bool $force = False) {
+sub apply_property_defaults(Bool :$force) {
     my %props := config.attr<properties>;
     for %PROP_DEFAULTS.kv -> $k, $v {
 	%props{$k} = $v if $force || !(%props{$k}:exists);
@@ -595,7 +595,7 @@ sub alias_cmd($alias) {
 }
 
 
-sub load_endpoints(Bool $force = False) {
+sub load_endpoints(Bool :$force) {
     return @ENDPOINTS if @ENDPOINTS && !$force;
     
     my $e = get(ENDPOINTS_URI).trim;
@@ -632,7 +632,7 @@ sub switch_to_session(Str $name) {
 	config.attr{$_} = $sess{$_}
     }
     config.save;
-    load_endpoints(True);
+    load_endpoints(:force);
     
     'Swtiched to session: ' ~ $name;
 }
