@@ -622,15 +622,15 @@ sub cursor(Int $col, Int $row) {
 }
 
 
+# FIXME: this session handling stuff should probably move
+#        to Config, and probably wants a Session class
 sub switch_to_session(Str $name) {
     my $sess = config.attr<sessions>{$name};
     return 'Unknown session: ' ~ $name unless $sess;
 
-    config.attr<url>   = $sess<url>;
-    config.attr<user>  = $sess<user>;
-    config.attr<pass>  = $sess<pass>;
-    config.attr<time>  = $sess<time>;
-    config.attr<token> = $sess<token>;
+    for <url user pass time token> {
+	config.attr{$_} = $sess{$_}
+    }
     config.save;
     load_endpoints(True);
     
