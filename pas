@@ -22,6 +22,7 @@ my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
 my constant USER_URI      = '/users/current-user';
+my constant LOGOUT_URI      = '/logout';
 
 my %PROP_DEFAULTS = loud     => False,
                     compact  => False,
@@ -45,7 +46,7 @@ class Command {
     has Str $.qualifier = '';
     has     $!first;
 
-    my constant ACTIONS = <show update create edit stub post login run
+    my constant ACTIONS = <show update create edit stub post login logout run
                            endpoints schemas config session user
                            last alias set help quit>;
 
@@ -112,6 +113,10 @@ class Command {
     	login;
     }
 
+    method logout {
+	pretty post(LOGOUT_URI, [], 'byebye');
+    }
+    
     method run {
 	if $!first.IO.e {
 	    my @cmds = slurp($!first).split("\n");
