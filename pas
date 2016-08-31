@@ -663,6 +663,8 @@ sub login {
     my %header   = 'Connection' => 'close';
     my $resp     = Net::HTTP::POST(build_url($uri, @pairs), :%header);
 
+    load_endpoints(True);
+
     if $resp.status-line ~~ /200/ {
         config.attr<token> = (from-json $resp.body.decode('utf-8'))<session>;
 	config.attr<time> = time;
@@ -674,10 +676,8 @@ sub login {
 	    time  => config.attr<time>
 	};
 	config.save;
-	load_endpoints(True);
 	'Successfully logged in to ' ~ config.attr<url> ~ ' as ' ~ config.attr<user>;
     } else {
-	@TAB_TARGETS = Command.actions;
 	config.attr<token> = '';
         say 'Log in failed!';
 	'';
