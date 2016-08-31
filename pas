@@ -581,7 +581,13 @@ sub alias_cmd($alias) {
 
 
 sub load_endpoints {
-    my $e = from-json(get(ENDPOINTS_URI));
+    my $e = get(ENDPOINTS_URI).trim;
+    if $e ~~ /^ <-[{[]> / {
+	say 'No endpoints endpoint!';
+	@TAB_TARGETS = |Command.actions;
+	return [];
+    }
+    $e = from-json $e;
     my @endpoints = $e ~~ Array ?? $e.unique !! [];
     @TAB_TARGETS = |@endpoints, |Command.actions;
     @endpoints;
