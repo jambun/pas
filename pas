@@ -21,6 +21,7 @@ my constant HIST_FILE     = 'history';
 my constant HIST_LENGTH   = 100;
 my constant ENDPOINTS_URI = '/endpoints';
 my constant SCHEMAS_URI   = '/schemas';
+my constant USER_URI      = '/users/current-user';
 
 my %PROP_DEFAULTS = loud     => False,
                     compact  => False,
@@ -141,7 +142,7 @@ class Command {
     }
 
     method user {
-	pretty get '/users/current-user';
+	pretty get USER_URI;
     }
     
     method endpoints {
