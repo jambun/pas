@@ -122,6 +122,7 @@ class Command {
     method run {
 	if $!first.IO.e {
 	    for slurp($!first).lines -> $line {
+		next unless $line;
 		say cmd_prompt() ~ $line;
 		run_cmd $line;
 	    }
@@ -439,7 +440,7 @@ sub edit($file) {
 
 
 sub display($text) {
-    return unless $text ~~ /./;
+    return unless $text;
 
     if $SAVE_FILE {
 	spurt $SAVE_FILE, $text;
