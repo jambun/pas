@@ -643,7 +643,7 @@ sub switch_to_session(Str $name) {
     config.save;
     load_endpoints(:force);
     
-    'Swtiched to session: ' ~ $name;
+    'Switched to session: ' ~ $name;
 }
 
 
