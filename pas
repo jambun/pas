@@ -121,8 +121,7 @@ class Command {
     
     method run {
 	if $!first.IO.e {
-	    my @cmds = slurp($!first).split("\n");
-	    for @cmds -> $line {
+	    for slurp($!first).lines -> $line {
 		say cmd_prompt() ~ $line;
 		run_cmd $line;
 	    }
