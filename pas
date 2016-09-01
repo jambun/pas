@@ -162,7 +162,7 @@ class Command {
     }
 
     method schemas {
-	schemas($!qualifier eq 'reload');
+	schemas(:reload($!qualifier eq 'reload'));
     }
     
     method config {
@@ -229,7 +229,7 @@ class Command {
     method ls {
 	qq:x/$!line/.trim;
     }
-    
+
     method help {
 	shell_help;
     }
@@ -620,7 +620,7 @@ sub load_endpoints(Bool :$force) {
 }
 
 
-sub schemas(Bool $reload = False) {
+sub schemas(Bool :$reload) {
     $SCHEMAS = pretty get(SCHEMAS_URI) if $reload || !$SCHEMAS;
     $SCHEMAS;
 }
