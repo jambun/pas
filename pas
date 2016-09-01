@@ -140,11 +140,10 @@ class Command {
 	    }
 	} else {
 	    (for config.attr<sessions>.kv -> $k, $v {
-		    (
-			$v<url>,
-			colored($k, config.attr<user> eq $k ?? 'bold green' !! 'bold white'),
-			$v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! ''
-		    ).join("\t");
+		    sprintf("%-25s  %-25s  %s",
+			    $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
+			    colored($k, config.attr<user> eq $k ?? 'bold green' !! 'bold white'),
+			    $v<url>);
 		}).join("\n");
 	}
     }
