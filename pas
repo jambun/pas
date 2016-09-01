@@ -83,7 +83,7 @@ class Command {
 	my $puri = $!first;
 	$puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
 	$puri ~~ s:g/\d+/:id/;
-	my $e = from-json get('/endpoints', ['uri=' ~ $puri, 'method=post']);
+	my $e = from-json get(ENDPOINTS_URI, ['uri=' ~ $puri, 'method=post']);
 	return "Couldn't find endpoint definition" if @($e).elems == 0;
 
 	my $model;
