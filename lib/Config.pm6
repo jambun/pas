@@ -20,10 +20,9 @@ class Config {
     has Str $.dir;
 
 
-    method load($url, $user, $pass, $token, $prompt) {
-        if !$prompt && self.path.IO.e {
+    method load {
+        if self.path.IO.e {
             %!attr = from-json slurp(self.path);
-            for <url user pass token> { %!attr{$_} = $::($_) if $::($_) }
         } else {
 	    self.prompt;
         }
