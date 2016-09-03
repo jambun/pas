@@ -68,3 +68,8 @@ class Actions {
     method value:sym<array>($/)       { make $<array>.made      }
 }
 
+
+our sub prettify($json, $indent) {
+    Grammar.parse($json, :actions(Actions.new(step => $indent))).made;
+}
+

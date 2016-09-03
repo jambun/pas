@@ -92,7 +92,7 @@ our sub pretty($json) is export {
     if config.attr<properties><compact> || $json !~~ /^<[\{\[]>/ {
 	$json;
     } else {
-	JSONPretty::Grammar.parse($json, :actions(JSONPretty::Actions.new(step => config.attr<properties><indent>))).made;
+	JSONPretty::prettify($json, config.attr<properties><indent>);
     }
 }
 
