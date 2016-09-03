@@ -50,7 +50,7 @@ class Actions {
     }
 
     method TOP ($/)        { make self.indent($<value>.made)                  }
-    method object($/)      { make "\n" ~ '{' ~ "\n" ~ $<pairlist>.made ~ '}'         }
+    method object($/)      { make "\n" ~ '{' ~ "\n" ~ $<pairlist>.made ~ '}'  }
     method pairlist($/)    { make $<pair>>>.made.join(",\n") ~ "\n"           }
     method pair($/)        { make $<string> ~ ': ' ~ $<value>.made            }
     method emptyarray($/)  { make '[]'                                        }
