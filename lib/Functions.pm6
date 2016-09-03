@@ -195,6 +195,10 @@ sub interpolate($text, $count) is export {
     $out ~~ s:g/'s:(' (<-[)]>+) ')' /{select_from($0.Str)}/;
     $out ~~ s:g/'h' (\d*) ':(' <-[)]>+ ')' /{random_hex($0.Int || 7)}/;
     $out ~~ s:g/'d:(' <-[)]>+ ')' /{random_date()}/;
+
+    $out ~~ s:g/'(string)'/{random_hex(7)}/;
+    $out ~~ s:g/'(date)' /{random_date()}/;
+
     $out;
 }
 
