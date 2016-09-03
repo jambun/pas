@@ -12,13 +12,14 @@ use MONKEY-SEE-NO-EVAL;
 
 my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
 
-my constant TMP_FILE      = 'last.json';
+my constant LAST_DIR       = 'last';
+my constant TMP_FILE       = 'last.json';
 our constant HIST_FILE     = 'history';
 our constant HIST_LENGTH   = 100;
 our constant ENDPOINTS_URI = '/endpoints';
-my constant SCHEMAS_URI   = '/schemas';
+my constant SCHEMAS_URI    = '/schemas';
 our constant USER_URI      = '/users/current-user';
-my constant LOGOUT_URI    = '/logout';
+my constant LOGOUT_URI     = '/logout';
 our constant ANON_USER     = 'anon';
 
 my %PROP_DEFAULTS = loud     => False,
@@ -36,6 +37,7 @@ my @TAB_TARGETS;
 
 sub last_uris is export { @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
+#sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 
 my Config $CFG;
 sub config is export { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -222,7 +224,7 @@ sub update_uri($uri, $json, @pairs) is export {
 
 sub post($uri, @pairs, $data) is export {
     my $body = Buf.new($data.ords);
-    request($uri, @pairs, $body);
+    extract_uris request($uri, @pairs, $body);
 }
 
 
@@ -380,7 +382,7 @@ sub pas_path($file) is export {
 
 
 sub save_pas_file($file, $data) {
-    mkdir($PAS_DIR);
+    mkdir($PAS_DIR ~ '/' ~ LAST_DIR);
     spurt $PAS_DIR ~ '/' ~ $file, $data;
 }
 

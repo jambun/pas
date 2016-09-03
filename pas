@@ -34,6 +34,7 @@ sub MAIN(Str  :$e?, Bool :$h) {
 	# making tab targets work when param bits of uris (eg :id) have values
 	my @m = $last.split('/');
 	my $mf = @m.pop;
+#	for tab_targets.map({
 	for (|last_uris, |Command.actions, |tab_targets).map({
             my @t = .split('/');
 	    if @m.elems >= @t.elems {
