@@ -49,7 +49,7 @@ sub parse_cmd(Str $cmd) is export {
     $c ~~ s/\s* \> \s* (\S+) $/{$SAVE_FILE = $0.Str; ''}/;
     my ($first, @args) = $c.split(/\s+/);
     if $first ~~ /^<[./]>/ { # a uri
-	%out<uri> = resolve_aliases($first);
+	%out<uri> = $first;
 	my $action = 'show';
 	my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
 
@@ -78,11 +78,6 @@ sub apply_property_defaults(Bool :$force) is export {
     for %PROP_DEFAULTS.kv -> $k, $v {
 	%props{$k} = $v if $force || !(%props{$k}:exists);
     }
-}
-
-
-sub resolve_aliases(Str $text) is export {
-    $text.subst: /\. (\w+) \./, -> { config.attr<alias>{$0} }, :g;
 }
 
 
@@ -248,25 +243,6 @@ sub build_url($uri, @pairs) {
     # FIXME: escape this properly
     $url ~~ s:g/\s/\%20/;
     $url;
-}
-
-
-our sub alias_cmd($alias) is export {
-    config.attr<alias> ||= {};
-    my ($from, $to) = $alias.split(':', 2);
-    my ($cmd, $als) = $alias.split('!', 2);
-    if $cmd && $als {
-        config.attr<alias>{$als}:delete if $cmd eq 'delete';
-        config.save;
-        "Alias .$als. deleted.";
-    } elsif $to {
-       	config.attr<alias>{$from} = $to;
-	config.save;
-	"Alias .$from. added.";
-    } else {
-       	my %aliases = config.attr<alias>;
-	(%aliases.keys.sort.map({ ".$_.\t{%aliases{$_}}" })).join("\n");
-    }
 }
 
 
@@ -457,7 +433,6 @@ sub shell_help is export {
 		    schemas   show all record schemas
 		    config    show pas config
                     last      show the last saved temp file
-		    alias     show or update aliases
 		    set       show pas properties
                      .[prop]  show or set prop
 		    help      this

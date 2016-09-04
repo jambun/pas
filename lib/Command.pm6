@@ -14,7 +14,7 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post login logout run
                            endpoints schemas config session user who
-                           last alias set ls help quit>;
+                           last set ls help quit>;
 
     method actions { ACTIONS }
 
@@ -140,10 +140,6 @@ class Command {
 	slurp tmp_file;
     }
     
-    method alias {
-    	alias_cmd($!first);
-    }
-
     method set {
 	my %prop := config.attr<properties>;
 	unless $!qualifier {
