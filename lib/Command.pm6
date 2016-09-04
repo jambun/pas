@@ -202,7 +202,6 @@ class Command {
     }
 
     method quit {
-	linenoiseHistorySave(pas_path HIST_FILE);
     	say 'Goodbye';    	
 	exit;
     }

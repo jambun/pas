@@ -7,6 +7,9 @@ use Functions;
 
 use Linenoise;
 
+my constant HIST_FILE     = 'history';
+my constant HIST_LENGTH   = 100;
+
 
 sub MAIN(Str  :$e?, Bool :$h) {
 
@@ -59,8 +62,8 @@ sub MAIN(Str  :$e?, Bool :$h) {
 	linenoiseHistoryAdd($line.trim) if $line.trim;
 	
 	run_cmd $line;
-    }
 
-    linenoiseHistorySave(pas_path HIST_FILE);
+	linenoiseHistorySave(pas_path HIST_FILE);
+    }
 
 }
