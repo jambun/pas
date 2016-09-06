@@ -1,4 +1,5 @@
 use Config;
+use Pas::ASClient;
 use Functions;
 
 use Linenoise;
@@ -6,17 +7,22 @@ use Terminal::ANSIColor;
 
 
 class Command {
+    has     $.client;
     has Str $.line;
     has Str $.action;
-    has     @.args;
     has Str $.qualifier = '';
     has     $!first;
-
+    has     @.args;
+    
     my constant ACTIONS = <show update create edit stub post login logout run
                            endpoints schemas config session user who
                            last set ls help quit>;
 
     method actions { ACTIONS }
+
+
+#    method client { $!client ||= client; }
+
 
     method execute {
     	($!action, $!qualifier) = $!action.split('.', 2);
@@ -30,28 +36,33 @@ class Command {
 	(ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
     }
 
+
     method show {
-        pretty get($!first, @!args);
+        pretty extract_uris client.get($!first, @!args);
     }
+
 
     method update {
-	pretty update_uri($!first, get($!first), @!args);
+	pretty extract_uris client.post($!first, @!args, modify_json(client.get($!first), @!args));
     }
+
 
     method create {
-      	pretty update_uri($!first, '{}', @!args);
+	pretty extract_uris client.post($!first, @!args, modify_json('{}', @!args));
     }
 
+
     method edit {
-        save_tmp(pretty get($!first)) unless $!qualifier eq 'last';
-	edit(tmp_file) ?? pretty post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
+        save_tmp(pretty extract_uris client.get($!first)) unless $!qualifier eq 'last';
+	edit(tmp_file) ?? pretty extract_uris client.post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
     }
+
 
     method stub {
 	my $puri = $!first;
 	$puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
 	$puri ~~ s:g/\d+/:id/;
-	my $e = from-json get(ENDPOINTS_URI, ['uri=' ~ $puri, 'method=post']);
+	my $e = from-json client.get(ENDPOINTS_URI, ['uri=' ~ $puri, 'method=post']);
 	return "Couldn't find endpoint definition" if @($e).elems == 0;
 
 	my $model;
@@ -60,33 +71,37 @@ class Command {
 	    last if $model ~~ s/'JSONModel(:' (\w+) ')'/$0/;
 	}
 
-        save_tmp(pretty get('/stub/' ~ $model, @!args));
+        save_tmp(pretty client.get('/stub/' ~ $model, @!args));
 
 	my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
 	if edit(tmp_file) {
 	    my $out = '';
 	    my $json = slurp(tmp_file);
-	    for ^$times -> $c { $out ~= $c+1 ~ ' ' ~ pretty post($!first, @!args, interpolate($json, $c+1)) }
+	    for ^$times -> $c { $out ~= $c+1 ~ ' ' ~ pretty extract_uris client.post($!first, @!args, interpolate($json, $c+1)) }
 	    $out;
 	} else {
 	    'No changes to post.';
 	}
     }
 
+
     method post {
 	my $post_file = @!args.pop;
-	pretty post($!first, @!args, slurp($post_file));
+	pretty extract_uris client.post($!first, @!args, slurp($post_file));
     }
+
 
     method login {
 	config.prompt if $!qualifier eq 'prompt' || config.attr<user> eq ANON_USER;
-    	login;
+    	client.login;
     }
 
+
     method logout {
-	pretty logout;
+	pretty client.logout;
     }
     
+
     method run {
 	if $!first.IO.e {
 	    for slurp($!first).lines -> $line {
@@ -99,12 +114,14 @@ class Command {
 	}
     }
     
+
     method session {
 	if $!first {
 	    if $!qualifier eq 'delete' {
-		delete_session($!first);
+		client.delete_session($!first);
 	    } else {
-		switch_to_session($!first);
+		client.switch_to_session($!first);
+		load_endpoints(:force);
 	    }
 	} else {
 	    (for config.attr<sessions>.kv -> $k, $v {
@@ -116,30 +133,37 @@ class Command {
 	}
     }
 
+
     method user {
-	pretty get USER_URI;
+	pretty extract_uris client.get(USER_URI);
     }
 
+
     method who {
-	from-json(get(USER_URI))<name>;
+	from-json(client.get(USER_URI))<name>;
     }
     
+
     method endpoints {
     	load_endpoints.join("\n");
     }
+
 
     method schemas {
 	schemas(:reload($!qualifier eq 'reload'));
     }
     
+
     method config {
     	config.json;
     }
+
 
     method last {
 	slurp tmp_file;
     }
     
+
     method set {
 	my %prop := config.attr<properties>;
 	unless $!qualifier {
@@ -189,13 +213,16 @@ class Command {
 	}
     }
 
+
     method ls {
 	qq:x/$!line/.trim;
     }
 
+
     method help {
 	shell_help;
     }
+
 
     method quit {
     	say 'Goodbye';    	
