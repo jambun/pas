@@ -120,8 +120,9 @@ class Command {
 	    if $!qualifier eq 'delete' {
 		client.delete_session($!first);
 	    } else {
-		client.switch_to_session($!first);
+		my $out = client.switch_to_session($!first);
 		load_endpoints(:force);
+		$out;
 	    }
 	} else {
 	    (for config.attr<sessions>.kv -> $k, $v {
