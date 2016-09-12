@@ -7,7 +7,7 @@ class Config {
         url  => 'http://localhost:4567',
         user => 'admin',
         pass => 'admin',
-	sessions => {},
+	sessions => {anon => {url => '', user => 'anon', pass => '', token => '', time => 0}},
 	properties => {};
 
     has %!prompts =
@@ -17,7 +17,8 @@ class Config {
 
     has $!file = 'config.json';
 
-    has Str $.dir;
+
+    our sub dir { %*ENV<HOME> ~ '/.pas'; }
 
 
     method load {
@@ -25,6 +26,7 @@ class Config {
             %!attr = from-json slurp(self.path);
         } else {
 	    self.prompt;
+	    self.save;
         }
     }
 
@@ -56,7 +58,7 @@ class Config {
     }
 
 
-    method path { $!dir ~ '/' ~ $!file }
+    method path { dir() ~ '/' ~ $!file }
 
 
     method json {
@@ -65,7 +67,7 @@ class Config {
 
 
     method save {
-    	mkdir($!dir);
+    	mkdir(dir());
         spurt self.path, self.json;
     }
 

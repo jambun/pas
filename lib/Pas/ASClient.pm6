@@ -81,6 +81,28 @@ class Pas::ASClient {
     }
 
 
+    method ensure_session {
+	if $!config.attr<token> {
+	    self.add_session;
+	} else {
+	    self.login;
+	}
+    }
+    
+
+    method add_session(Str $name = $!config.attr<user>) {
+	$!config.attr<sessions>{$name} = {
+	    url   => $!config.attr<url>,
+	    user  => $!config.attr<user>,
+	    pass  => $!config.attr<pass>,
+	    token => $!config.attr<token>,
+	    time  => $!config.attr<time>
+	};
+	$!config.attr<sessions>{ANON_USER}<url> = $!config.attr<url>;
+	$!config.save;
+    }
+    
+
     method delete_session(Str $name) {
 	my $sess = $!config.attr<sessions>{$name};
 	return 'Unknown session: ' ~ $name unless $sess;
@@ -111,21 +133,7 @@ class Pas::ASClient {
 	if $resp.status-line ~~ /200/ {
             $!config.attr<token> = (from-json $resp.body.decode('utf-8'))<session>;
 	    $!config.attr<time> = time;
-	    $!config.attr<sessions>{$!config.attr<user>} = {
-		url   => $!config.attr<url>,
-		user  => $!config.attr<user>,
-		pass  => $!config.attr<pass>,
-		token => $!config.attr<token>,
-		time  => $!config.attr<time>
-	    };
-	    $!config.attr<sessions>{ANON_USER} = {
-		url   => $!config.attr<url>,
-		user  => ANON_USER,
-		pass  => '',
-		token => '',
-		time  => 0
-	    };
-	    $!config.save;
+	    self.add_session;
 	    'Successfully logged in to ' ~ $!config.attr<url> ~ ' as ' ~ $!config.attr<user>;
 	} else {
 	    $!config.attr<token> = '';

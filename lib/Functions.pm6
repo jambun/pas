@@ -9,7 +9,8 @@ use Terminal::ANSIColor;
 use MONKEY-SEE-NO-EVAL;
 
 
-my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
+#my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
+my $PAS_DIR = Config::dir;
 
 my constant LAST_DIR       = 'last';
 my constant TMP_FILE       = 'last.json';
