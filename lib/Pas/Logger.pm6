@@ -1,9 +1,11 @@
 use Config;
 
+use Terminal::ANSIColor;
+
 class Pas::Logger {
     has Config $.config;
 
     method blurt($msg) {
-	say $msg if $!config.attr<properties><loud>;
+	say colored($msg.Str, 'magenta') if $!config.attr<properties><loud>;
     }
 }
