@@ -245,3 +245,45 @@ sub run_cmd(Str $line) is export {
     say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 
+
+sub shell_help {
+    qq:heredoc/END/;
+
+    pas shell help
+
+    uri pairs* action? [ > file ]
+    uri pairs* file
+    action args* [ > file ]
+
+    uri actions:    show      show (default)
+                    update    update with the pairs
+                    create    create using the pairs
+                    edit      edit to update
+                     .last    using last edited record
+                    stub      create from an edited stub
+                     .[n]     post n times
+                    post      post a file (default if last arg is a file)
+
+    other actions:  login     force a login
+                     .prompt  prompt for details
+                    user      show the current user
+                    session   show sessions or switch to a session
+                     .delete  delete a session
+                    run       run a pas script file
+                    endpoints show the available endpoints
+                    schemas   show all record schemas
+                    config    show pas config
+                    last      show the last saved temp file
+                    set       show pas properties
+                     .[prop]  show or set prop
+                    help      this
+                    quit      exit pas (^d works too)
+
+    say 'help [action]' for detailed help. ... well, not yet
+
+    Use the <tab> key to cycle through completions for uris or actions.
+
+    Command history and standard keybindings.
+
+END
+}
