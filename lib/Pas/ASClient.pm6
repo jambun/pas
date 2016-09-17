@@ -3,6 +3,7 @@ use Pas::Logger;
 
 use Net::HTTP::GET;
 use Net::HTTP::POST;
+use JSON::Tiny;
 
 
 class Pas::ASClient {

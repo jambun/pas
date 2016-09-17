@@ -4,6 +4,7 @@ use Functions;
 
 use Linenoise;
 use Terminal::ANSIColor;
+use JSON::Tiny;
 
 
 class Command {
