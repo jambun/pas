@@ -32,6 +32,7 @@ class Command {
 	for @!args -> $arg is rw {
 	    $arg ~~ s/^ 'p='/page=/;
 	    $arg ~~ s/^ 'r='/resolve[]=/;
+	    $arg ~~ s/^ 't='/type[]=/;
 	}
 	$!qualifier ||= '';
 	(ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
