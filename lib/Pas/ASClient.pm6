@@ -18,6 +18,8 @@ class Pas::ASClient {
 	my $url = self.build_url($uri, @pairs);
 	my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
 
+        %header<X-ArchivesSpace-Priority> = 'high';
+
 	%header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
     
 	self.log.blurt(%header);
