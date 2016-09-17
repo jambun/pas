@@ -21,13 +21,14 @@ our constant ANON_USER     = 'anon';
 
 my $SAVE_FILE;
 my $SCHEMAS;
-our @LAST_URIS = [];
+my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
 
 sub last_uris is export { @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
+sub save_file($file) is export { $SAVE_FILE = $file }
 
 my Config $CFG;
 sub config is export { $CFG ||= Config.new(dir => $PAS_DIR) }
@@ -36,36 +37,6 @@ my Pas::ASClient $CLIENT;
 sub client is export { $CLIENT ||= Pas::ASClient.new(config => config) }
 
 sub cmd_prompt is export { 'pas ' ~ config.attr<user> ~ '> ' }
-
-
-sub parse_cmd(Str $cmd) is export {
-    my %out;
-    my $c = $cmd.trim;
-    $c ~~ s/\s* \> \s* (\S+) $/{$SAVE_FILE = $0.Str; ''}/;
-    my ($first, @args) = $c.split(/\s+/);
-    if $first ~~ /^<[./]>/ { # a uri
-	%out<uri> = $first;
-	my $action = 'show';
-	my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
-
-	if $trailing_non_pair {
-	    if $trailing_non_pair.IO.e {
-		$action = 'post';
-		@args.push($trailing_non_pair);
-	    } else {
-		$action = $trailing_non_pair;
-	    }
-	}
-
-	%out<action> = $action;
-	@args.unshift(%out<uri>);
-	%out<args> = @args;
-    } else {
-	%out<action> = $first;
-	%out<args> = @args;
-    }
-    %out;
-}
 
 
 sub pretty($json) is export {
