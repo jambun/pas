@@ -11,7 +11,7 @@ my constant HIST_FILE     = 'history';
 my constant HIST_LENGTH   = 100;
 
 
-sub MAIN(Str  :$e?, Bool :$h) {
+sub MAIN(Str :$e?, Bool :$h) {
 
     if $h { help; exit; }
 
@@ -68,4 +68,17 @@ sub MAIN(Str  :$e?, Bool :$h) {
 	linenoiseHistorySave(pas_path HIST_FILE);
     }
 
+}
+
+
+sub help {
+    say q:heredoc/END/;
+
+pas - a terminal client for ArchivesSpace
+
+    pas             Start pas interactive shell
+    pas -e cmd      Evaluate cmd and write output to stdout
+    pas -h          This.
+
+END
 }

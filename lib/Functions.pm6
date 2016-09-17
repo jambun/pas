@@ -9,7 +9,6 @@ use Terminal::ANSIColor;
 use MONKEY-SEE-NO-EVAL;
 
 
-#my $PAS_DIR = %*ENV<HOME> ~ '/.pas';
 my $PAS_DIR = Config::dir;
 
 my constant LAST_DIR       = 'last';
@@ -84,7 +83,7 @@ sub apply_property_defaults(Bool :$force) is export {
 }
 
 
-our sub pretty($json) is export {
+sub pretty($json) is export {
     if config.attr<properties><compact> || $json !~~ /^<[\{\[]>/ {
 	$json;
     } else {
@@ -242,30 +241,6 @@ sub tmp_file is export {
 
 sub save_tmp($data) is export {
     save_pas_file(TMP_FILE, $data);
-}
-
-
-sub blurt($out) {
-    say $out if config.attr<properties><loud>;
-}
-
-
-sub prompt_default($prompt, $default) {
-    my $response = prompt $prompt ~ " (default: {$default}):";
-    $response ~~ /\w/ ?? $response !! $default;
-}
-
-
-sub help is export {
-    say q:heredoc/END/;
-
-pas - a terminal client for ArchivesSpace
-
-    pas             Start pas interactive client
-    pas -e cmd      Evaluate cmd and write output to stdout
-    pas -h          This.
-
-END
 }
 
 
