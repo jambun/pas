@@ -10,6 +10,14 @@ class Config {
 	sessions => {anon => {url => '', user => 'anon', pass => '', token => '', time => 0}},
 	properties => {};
 
+    has %.prop_defaults =
+        loud     => False,
+        compact  => False,
+        page     => True,
+        time     => False,
+        savepwd  => False,
+        indent   => 2;
+
     has %!prompts =
         url  => 'ArchivesSpace backend URL',
         user => 'Username',
@@ -51,7 +59,14 @@ class Config {
 	%!attr<properties>;
     }
 
-    
+
+    method apply_property_defaults(Bool :$force) {
+        for %!prop_defaults.kv -> $k, $v {
+            %!attr<properties>{$k} = $v if $force || !(%!attr<properties>{$k}:exists);
+        }
+    }
+
+
     method set($k, $v) {
         %!attr{$k} = $v;
 	self.save;

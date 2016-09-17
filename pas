@@ -16,7 +16,7 @@ sub MAIN(Str :$e?, Bool :$h) {
     if $h { help; exit; }
 
     config.load;
-    apply_property_defaults;
+    config.apply_property_defaults;
 
     client.ensure_session;
     

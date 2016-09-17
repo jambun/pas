@@ -170,7 +170,7 @@ class Command {
 	my %prop := config.attr<properties>;
 	unless $!qualifier {
 	    if $!first eq 'defaults' {
-		apply_property_defaults(:force);
+		config.apply_property_defaults(:force);
 		config.save;
 		return 'Properties reset to default values';
 	    } else {

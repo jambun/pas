@@ -19,13 +19,6 @@ our constant USER_URI      = '/users/current-user';
 my constant LOGOUT_URI     = '/logout';
 our constant ANON_USER     = 'anon';
 
-my %PROP_DEFAULTS = loud     => False,
-                    compact  => False,
-		    page     => True,
-		    time     => False,
-		    savepwd  => False,
-		    indent   => 2;
-
 my $SAVE_FILE;
 my $SCHEMAS;
 our @LAST_URIS = [];
@@ -72,14 +65,6 @@ sub parse_cmd(Str $cmd) is export {
 	%out<args> = @args;
     }
     %out;
-}
-
-
-sub apply_property_defaults(Bool :$force) is export {
-    my %props := config.attr<properties>;
-    for %PROP_DEFAULTS.kv -> $k, $v {
-	%props{$k} = $v if $force || !(%props{$k}:exists);
-    }
 }
 
 
