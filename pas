@@ -24,7 +24,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     load_endpoints;
 
-    linenoiseHistoryLoad(pas_path HIST_FILE);
+    linenoiseHistoryLoad(store.path(HIST_FILE));
     linenoiseHistorySetMaxLen(HIST_LENGTH);
 
     linenoiseSetCompletionCallback(-> $line, $c {
@@ -65,7 +65,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 	
 	run_cmd $line;
 
-	linenoiseHistorySave(pas_path HIST_FILE);
+	linenoiseHistorySave(store.path(HIST_FILE));
     }
 
 }

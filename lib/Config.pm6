@@ -1,3 +1,5 @@
+use Pas::Store;
+
 use JSON::Tiny;
 use JSONPretty;
 
@@ -25,13 +27,12 @@ class Config {
 
     has $!file = 'config.json';
 
-
-    our sub dir { %*ENV<HOME> ~ '/.pas'; }
+    has Pas::Store $.store;
 
 
     method load {
-        if self.path.IO.e {
-            %!attr = from-json slurp(self.path);
+        if $!store.path($!file).IO.e {
+            %!attr = from-json $!store.load($!file);
         } else {
 	    self.prompt;
 	    self.save;
@@ -73,17 +74,13 @@ class Config {
     }
 
 
-    method path { dir() ~ '/' ~ $!file }
-
-
     method json {
         JSONPretty::Grammar.parse(to-json(self.stripped), :actions(JSONPretty::Actions.new)).made;
     }
 
 
     method save {
-    	mkdir(dir());
-        spurt self.path, self.json;
+	$!store.save($!file, self.json);
     }
 
     

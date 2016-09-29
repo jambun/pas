@@ -1,5 +1,6 @@
 use Config;
 use Pas::ASClient;
+use Pas::Store;
 
 use JSON::Tiny;
 use Digest::MD5;
@@ -8,8 +9,6 @@ use Terminal::ANSIColor;
 
 use MONKEY-SEE-NO-EVAL;
 
-
-my $PAS_DIR = Config::dir;
 
 my constant LAST_DIR       = 'last';
 my constant TMP_FILE       = 'last.json';
@@ -30,8 +29,11 @@ sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 sub save_file($file) is export { $SAVE_FILE = $file }
 
+my Pas::Store $STORE;
+sub store is export { $STORE ||= Pas::Store.new(:dir(%*ENV<HOME> ~ '/.pas')) }
+
 my Config $CFG;
-sub config is export { $CFG ||= Config.new(dir => $PAS_DIR) }
+sub config is export { $CFG ||= Config.new(:store(store)) }
 
 my Pas::ASClient $CLIENT;
 sub client is export { $CLIENT ||= Pas::ASClient.new(config => config) }
@@ -179,22 +181,11 @@ sub cursor(Int $col, Int $row) {
 }
 
 
-sub pas_path($file) is export {
-    $PAS_DIR ~ '/' ~ $file;
-}
-
-
-sub save_pas_file($file, $data) {
-    mkdir($PAS_DIR ~ '/' ~ LAST_DIR);
-    spurt $PAS_DIR ~ '/' ~ $file, $data;
-}
-
-
 sub tmp_file is export {
-    pas_path TMP_FILE;
+    store.path(TMP_FILE);
 }
 
 
 sub save_tmp($data) is export {
-    save_pas_file(TMP_FILE, $data);
+    store.save(TMP_FILE, $data);
 }
