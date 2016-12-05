@@ -171,7 +171,7 @@ sub load_endpoints(Bool :$force) is export {
 
 
 sub schemas(Bool :$reload) is export {
-    $SCHEMAS = pretty get(SCHEMAS_URI) if $reload || !$SCHEMAS;
+    $SCHEMAS = pretty client.get(SCHEMAS_URI) if $reload || !$SCHEMAS;
     $SCHEMAS;
 }
 
