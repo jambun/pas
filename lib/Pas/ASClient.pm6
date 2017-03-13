@@ -20,9 +20,9 @@ class Pas::ASClient {
 	my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
 
         %header<X-ArchivesSpace-Priority> = 'high';
-
 	%header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
-    
+	%header<Content-Type> = 'text/json' if $body;
+
 	self.log.blurt(%header);
 	self.log.blurt($url);
 
