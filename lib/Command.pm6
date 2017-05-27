@@ -15,7 +15,8 @@ class Command {
     has     $!first;
     has     @.args;
     
-    my constant ACTIONS = <show update create edit stub post login logout run
+    my constant ACTIONS = <show update create edit stub post search
+                           login logout run
                            endpoints schemas config session user who
                            last set ls help quit>;
 
@@ -33,6 +34,7 @@ class Command {
 	    $arg ~~ s/^ 'p='/page=/;
 	    $arg ~~ s/^ 'r='/resolve[]=/;
 	    $arg ~~ s/^ 't='/type[]=/;
+	    $arg ~~ s/^ 'u='/uri[]=/;
 	}
 	$!qualifier ||= '';
 	(ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
@@ -90,6 +92,18 @@ class Command {
     method post {
 	my $post_file = @!args.pop;
 	pretty extract_uris client.post($!first, @!args, slurp($post_file));
+    }
+
+
+    method search {
+	my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $!first]);
+	if $results<total_hits> == 1 {
+	    my $record = $results<results>[0];
+	    $record<json> = from-json $record<json>;
+	    pretty extract_uris to-json $record;
+	} else {
+	    'No record in search index for ' ~ $!first;
+	}
     }
 
 
@@ -294,6 +308,7 @@ sub shell_help {
                     stub      create from an edited stub
                      .[n]     post n times
                     post      post a file (default if last arg is a file)
+		    search    show search index document
 
     other actions:  login     force a login
                      .prompt  prompt for details

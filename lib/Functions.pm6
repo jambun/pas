@@ -10,13 +10,14 @@ use Terminal::ANSIColor;
 use MONKEY-SEE-NO-EVAL;
 
 
-my constant LAST_DIR       = 'last';
-my constant TMP_FILE       = 'last.json';
-our constant ENDPOINTS_URI = '/endpoints';
-my constant SCHEMAS_URI    = '/schemas';
-our constant USER_URI      = '/users/current-user';
-my constant LOGOUT_URI     = '/logout';
-our constant ANON_USER     = 'anon';
+my constant   LAST_DIR           = 'last';
+my constant   TMP_FILE           = 'last.json';
+our constant  ENDPOINTS_URI      = '/endpoints';
+my constant   SCHEMAS_URI        = '/schemas';
+our constant  USER_URI           = '/users/current-user';
+our constant  SEARCH_RECORDS_URI = '/search/records';
+my constant   LOGOUT_URI         = '/logout';
+our constant  ANON_USER          = 'anon';
 
 my $SAVE_FILE;
 my $SCHEMAS;
