@@ -18,7 +18,7 @@ class Command {
     my constant ACTIONS = <show update create edit stub post search
                            login logout run
                            endpoints schemas config session user who
-                           last set ls help quit>;
+                           history last set ls help quit>;
 
     method actions { ACTIONS }
 
@@ -172,7 +172,15 @@ class Command {
     method who {
 	from-json(client.get(USER_URI))<name>;
     }
-    
+
+    method history {
+	my @lines = slurp(store.path(HISTORY_FILE)).split("\n").grep(/\S/);
+	if $!first {
+	    @lines.tail($!first).join("\n");
+	} else {
+	    @lines.join("\n");
+	}
+    }
 
     method endpoints {
     	load_endpoints.join("\n");
@@ -341,6 +349,8 @@ sub shell_help {
                     last      show the last saved temp file
                     set       show pas properties
                      .[prop]  show or set prop
+		    history   show command history
+		     [n]      show the last n commands 
                     help      this
                     quit      exit pas (^d works too)
 

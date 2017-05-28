@@ -7,9 +7,6 @@ use Functions;
 
 use Linenoise;
 
-my constant HIST_FILE     = 'history';
-my constant HIST_LENGTH   = 100;
-
 
 sub MAIN(Str :$e?, Bool :$h) {
 
@@ -24,8 +21,8 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     load_endpoints;
 
-    linenoiseHistoryLoad(store.path(HIST_FILE));
-    linenoiseHistorySetMaxLen(HIST_LENGTH);
+    linenoiseHistoryLoad(store.path(HISTORY_FILE));
+    linenoiseHistorySetMaxLen(HISTORY_LENGTH);
 
     linenoiseSetCompletionCallback(-> $line, $c {
         my $prefix  = '';
@@ -65,7 +62,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 	
 	run_cmd $line;
 
-	linenoiseHistorySave(store.path(HIST_FILE));
+	linenoiseHistorySave(store.path(HISTORY_FILE));
     }
 
 }

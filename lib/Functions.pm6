@@ -12,6 +12,8 @@ use MONKEY-SEE-NO-EVAL;
 
 my constant   LAST_DIR           = 'last';
 my constant   TMP_FILE           = 'last.json';
+our constant  HISTORY_FILE       = 'history';
+our constant  HISTORY_LENGTH     = 100;
 our constant  ENDPOINTS_URI      = '/endpoints';
 my constant   SCHEMAS_URI        = '/schemas';
 our constant  USER_URI           = '/users/current-user';
