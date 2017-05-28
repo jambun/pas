@@ -180,7 +180,7 @@ class Command {
 
 
     method schemas {
-	schemas(:reload($!qualifier eq 'reload'));
+	schemas(:reload($!qualifier eq 'reload'), :name($!first));
     }
     
 
@@ -331,6 +331,7 @@ sub shell_help {
                     run       run a pas script file
                     endpoints show the available endpoints
                     schemas   show all record schemas
+		     [name]   show a named record schema
 		    search    perform a search, using the first arg as q and defaulting page to 1
                      .parse   parse the 'json' property
                     config    show pas config

@@ -22,6 +22,7 @@ our constant  ANON_USER          = 'anon';
 
 my $SAVE_FILE;
 my $SCHEMAS;
+my $SCHEMAS_PARSED;
 my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
@@ -172,9 +173,18 @@ sub load_endpoints(Bool :$force) is export {
 }
 
 
-sub schemas(Bool :$reload) is export {
-    $SCHEMAS = pretty client.get(SCHEMAS_URI) if $reload || !$SCHEMAS;
-    $SCHEMAS;
+sub schemas(Bool :$reload, Str :$name) is export {
+     if $reload || !$SCHEMAS {
+	 my $schemas = client.get(SCHEMAS_URI);
+	 $SCHEMAS = pretty $schemas;
+	 $SCHEMAS_PARSED = from-json $schemas;
+     }
+
+     if $name {
+	 pretty to-json $SCHEMAS_PARSED{$name};
+     } else {
+	 $SCHEMAS;
+     }
 }
 
 
