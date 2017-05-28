@@ -96,13 +96,25 @@ class Command {
 
 
     method search {
-	my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $!first]);
-	if $results<total_hits> == 1 {
-	    my $record = $results<results>[0];
-	    $record<json> = from-json $record<json>;
-	    pretty extract_uris to-json $record;
+	if $!first ~~ /^<[./]>/ { # a uri
+	    my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $!first]);
+	    if $results<total_hits> == 1 {
+		my $record = $results<results>[0];
+		$record<json> = from-json $record<json>;
+		pretty extract_uris to-json $record;
+	    } else {
+		'No record in search index for ' ~ $!first;
+	    }
 	} else {
-	    'No record in search index for ' ~ $!first;
+	    @!args.push('page=1') unless @!args.grep(/^ 'page='/);
+	    my $results = client.get(SEARCH_URI, @!args);
+	    if $!qualifier eq 'raw' {
+		pretty extract_uris $results;
+	    } else {
+		my $parsed = from-json $results;
+		$parsed<results>.map: { $_<json> = from-json $_<json>; }
+		pretty extract_uris to-json $parsed;
+	    }
 	}
     }
 
@@ -318,6 +330,8 @@ sub shell_help {
                     run       run a pas script file
                     endpoints show the available endpoints
                     schemas   show all record schemas
+		    search    perform a search, defaulting page to 1 and parsing json
+                     .raw     don't parse json
                     config    show pas config
                     last      show the last saved temp file
                     set       show pas properties

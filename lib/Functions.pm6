@@ -15,6 +15,7 @@ my constant   TMP_FILE           = 'last.json';
 our constant  ENDPOINTS_URI      = '/endpoints';
 my constant   SCHEMAS_URI        = '/schemas';
 our constant  USER_URI           = '/users/current-user';
+our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
 our constant  ANON_USER          = 'anon';
