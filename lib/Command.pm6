@@ -330,10 +330,13 @@ sub shell_help {
                      .delete  delete a session
                     run       run a pas script file
                     endpoints show the available endpoints
+		     .reload  force a reload
                     schemas   show all record schemas
+		     .reload  force a reload
 		     [name]   show a named record schema
-		    search    perform a search, using the first arg as q and defaulting page to 1
+		    search    perform a search (page defaults to 1)
                      .parse   parse the 'json' property
+                     q        the query string
                     config    show pas config
                     last      show the last saved temp file
                     set       show pas properties
