@@ -106,14 +106,15 @@ class Command {
 		'No record in search index for ' ~ $!first;
 	    }
 	} else {
+	    @!args.push("q=$!first");
 	    @!args.push('page=1') unless @!args.grep(/^ 'page='/);
 	    my $results = client.get(SEARCH_URI, @!args);
-	    if $!qualifier eq 'raw' {
-		pretty extract_uris $results;
-	    } else {
+	    if $!qualifier ~~ /^ 'p'/ { # parse
 		my $parsed = from-json $results;
 		$parsed<results>.map: { $_<json> = from-json $_<json>; }
 		pretty extract_uris to-json $parsed;
+	    } else {
+		pretty extract_uris $results;
 	    }
 	}
     }
@@ -330,8 +331,8 @@ sub shell_help {
                     run       run a pas script file
                     endpoints show the available endpoints
                     schemas   show all record schemas
-		    search    perform a search, defaulting page to 1 and parsing json
-                     .raw     don't parse json
+		    search    perform a search, using the first arg as q and defaulting page to 1
+                     .parse   parse the 'json' property
                     config    show pas config
                     last      show the last saved temp file
                     set       show pas properties
