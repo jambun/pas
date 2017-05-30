@@ -15,7 +15,7 @@ class Command {
     has     $!first;
     has     @.args;
     
-    my constant ACTIONS = <show update create edit stub post search
+    my constant ACTIONS = <show update create edit stub post search nav
                            login logout run
                            endpoints schemas config session user who
                            history last set ls help quit>;
@@ -119,7 +119,157 @@ class Command {
 	}
     }
 
+    my Int $x;
+    my Int $y;
+    my Int $y_offset;
+    my Str %uris;
+    my Str @uris;
+    my Hash %uri_cache;
+    my $current_uri;
 
+    sub graph_message(Str $message) {
+	run 'tput', 'civis'; # hide the cursor
+	cursor(0,0);
+	say $message;
+	cursor($x, $y);
+	run 'tput', 'cvvis'; # show the cursor
+    }
+    
+    sub plot_uri(Str $uri, @args = (), Bool :$reload) {
+	%uri_cache ||= Hash.new;
+
+	my $raw_json;
+	# my $new_y;
+	if %uri_cache{$uri} && !$reload {
+	    $raw_json = %uri_cache{$uri}<json>;
+	    # graph_message("got cached y: $cached_y");
+	} else {
+	    $raw_json = client.get($uri, @args);
+	    %uri_cache{$uri} = { json => $raw_json, y => 10 };
+	    # graph_message("caching y: " ~  %uri_cache{$uri}<y>);
+	}
+
+	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
+	$current_uri = $uri;
+	
+	my %json = from-json extract_uris $raw_json;
+
+	return False if %json<error>:exists;
+	
+	%uris = Hash.new;
+	@uris = Array.new;
+	%uris{%json<uri>} = (%json<display_string> || %json<title> || %json<name>);
+	%uris{%json<uri>}  ~~ s:g/'<' .+? '>'//;
+	@uris = [%json<uri>];
+	for %json.kv -> $prop, $val {
+	    if $val.WHAT ~~ Hash {
+		if $val<ref>:exists && !%uris{$val<ref>} {
+		    %uris{$val<ref>} = $prop;
+		    @uris.push($val<ref>);
+		}
+	    } elsif $val.WHAT ~~ Array {
+		for $val.values -> $h {
+		    if $h.WHAT ~~ Hash {
+			if $h<ref>:exists && !%uris{$h<ref>} {
+			    %uris{$h<ref>} = 'hmm';
+			    @uris.push($h<ref>);
+			}
+		    }
+		}
+	    }
+	}
+
+	run 'tput', 'civis'; # hide the cursor
+	print state $ = qx[clear]; # clear the screen
+	$x = 4;
+	$y = 8;
+	$y_offset = 10;
+	cursor($x, $y);
+	say %uris{@uris.first};
+	$x = 6;
+	$y = 10;
+	cursor($x, $y);
+	say @uris.first;
+	$x = 8;
+	$y++;
+	cursor($x, $y);
+	@uris.tail(@uris.elems-1).map: {
+	    .say;
+	    $y++;
+	    cursor($x, $y);
+	}
+	$x = 4;
+	# $y = $cached_y || 10;
+	$y = %uri_cache{$uri}<y>;
+	cursor($x, $y);
+	run 'tput', 'cvvis'; # show the cursor
+    }
+
+    
+    my constant UP_ARROW    =  "\x[1b][A";
+    my constant DOWN_ARROW  =  "\x[1b][B";
+    my constant RIGHT_ARROW =  "\x[1b][C";
+    my constant LEFT_ARROW  =  "\x[1b][D";
+
+    method nav {
+	my $uri = $!first;
+	my Bool $new_uri = True;
+	my $c = '';
+	my @uri_history = ();
+	my $message = '';
+	while $c ne 'q' {
+	    if $new_uri {
+		plot_uri($uri) || ($message = "No record for $uri") && last;
+		$new_uri = False;
+	    }
+	    
+	    $c = get_char;
+	    if $c eq "\x[1b]" {
+		$c = $c ~ get_char() ~ get_char();
+		# say $c.ords;
+		given $c {
+		    when UP_ARROW {
+			$y-- if $y > $y_offset;
+		    }
+		    when DOWN_ARROW {
+			$y++ if $y < $y_offset + @uris.elems - 1;
+		    }
+		    when RIGHT_ARROW {
+			@uri_history.push: $uri;
+			$uri = @uris[$y-$y_offset];
+			$new_uri = True;
+		    }
+		    when LEFT_ARROW {
+			if @uri_history {
+			    $uri = @uri_history.pop;
+			    $new_uri = True;
+			}
+		    }
+		}
+	    } else {
+		given $c {
+		    when ' ' {
+			page(pretty client.get(@uris[$y-$y_offset]));
+		    }
+		}
+	    }
+	    cursor($x, $y);
+	}
+	print state $ = qx[clear]; # clear the screen
+	cursor(0, q:x/tput lines/.chomp.Int);
+	%uri_cache = Hash.new;
+	$current_uri = Str.new;
+
+	$message;
+    }
+
+    sub get_char {
+	ENTER shell "stty raw -echo min 1 time 1";
+	LEAVE shell "stty sane";
+	$*IN.read(1).decode;
+    }
+
+    
     method login {
 	config.prompt if $!qualifier eq 'prompt' || config.attr<user> eq ANON_USER;
     	client.login;

@@ -79,7 +79,7 @@ sub display($text) is export {
 }
 
 
-sub page($text) {
+sub page($text) is export {
     save_tmp($text);
     shell (%*ENV<PAGER> || 'less') ~ ' ' ~ tmp_file;
 }
@@ -190,7 +190,7 @@ sub schemas(Bool :$reload, Str :$name) is export {
 }
 
 
-sub cursor(Int $col, Int $row) {
+sub cursor(Int $col, Int $row) is export {
     print "\e[{$row};{$col}H";
 }
 
