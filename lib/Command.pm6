@@ -122,11 +122,11 @@ class Command {
     my Int $x;
     my Int $y;
     my Int $y_offset;
-    my Str %uris;
     my Str @uris;
     my Hash %uri_cache;
     my $current_uri;
-
+    my $term_cols;
+    
     sub graph_message(Str $message) {
 	run 'tput', 'civis'; # hide the cursor
 	cursor(0,0);
@@ -156,63 +156,66 @@ class Command {
 
 	return False if %json<error>:exists;
 	
-	%uris = Hash.new;
-	@uris = Array.new;
-	%uris{%json<uri>} = (%json<display_string> || %json<title> || %json<name>);
-	%uris{%json<uri>}  ~~ s:g/'<' .+? '>'//;
-	@uris = [%json<uri>];
-	for %json.kv -> $prop, $val {
-	    if $val.WHAT ~~ Hash {
-		if $val<ref>:exists && !%uris{$val<ref>} {
-		    %uris{$val<ref>} = record_link_label($prop, $val);;
-		    @uris.push($val<ref>);
-		}
-	    } elsif $val.WHAT ~~ Array {
-		for $val.values -> $h {
-		    if $h.WHAT ~~ Hash {
-			if $h<ref>:exists && !%uris{$h<ref>} {
-			    %uris{$h<ref>} = record_link_label($prop, $h);
-			    @uris.push($h<ref>);
-			}
-		    }
-		}
-	    }
-	}
+	$term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
+	run 'tput', 'civis';                   # hide the cursor
+	print state $ = qx[clear];             # clear the screen
 
-	run 'tput', 'civis'; # hide the cursor
-	my $cols = q:x/tput cols/.chomp.Int;
-	print state $ = qx[clear]; # clear the screen
-	$x = 4;
-	$y = 8;
+	my $record_title = (%json<long_display_string> || %json<display_string> || %json<title> || %json<name>);
+	$record_title ~~ s:g/'<' .+? '>'//;
+	print_at($record_title, 4, 8);
+	print_at($uri, 6, 10);
+	@uris = ($uri);
+	$y = 11;
 	$y_offset = 10;
-	cursor($x, $y);
-	say %uris{@uris.first};
-	$x = 6;
-	$y = 10;
-	cursor($x, $y);
-	say @uris.first;
-	$x = 8;
-	$y++;
-	cursor($x, $y);
-	@uris.tail(@uris.elems-1).map: {
-	    printf "%-42s%.*s", $_, ($cols - 50), %uris{$_};
-	    $y++;
-	    cursor($x, $y);
-	}
+	
+	plot_hash(%json, 'top', 8);
+
 	$x = 4;
-	# $y = $cached_y || 10;
 	$y = %uri_cache{$uri}<y>;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
     }
 
+    sub plot_hash(%hash, $parent, $indent) {
+	for %hash.kv -> $prop, $val {
+	    if $prop eq 'ref' || $prop eq 'record_uri' {
+		plot_ref($val, %hash, $parent, $indent);
+	    }
+	    if $val.WHAT ~~ Hash {
+		plot_hash($val, $prop, $indent);
+	    } elsif $val.WHAT ~~ Array {
+		for $val.values -> $h {
+		    if $h.WHAT ~~ Hash {
+			plot_hash($h, $prop, $indent);
+		    }
+		}
+	    }
+	}
+    }
+
+    sub plot_ref($uri, %hash, $parent, $indent) {
+	my $s = sprintf "%-42s%s", $uri, record_link_label($parent, %hash);
+	print_at($s, $indent, $y);
+	@uris.push($uri);
+	$y++;
+    }
+    
     sub record_link_label($prop, %hash) {
 	my $label = $prop;
 	$label ~= ": %hash<role>" if %hash<role>;
 	$label ~= ": %hash<relator>" if %hash<relator>;
 	$label ~= ": %hash<level>" if %hash<level>;
+	$label ~= ": %hash<identifier>" if %hash<identifier>;
+	$label ~= ": %hash<display_string>" if %hash<display_string>;
 	$label ~= ": %hash<description>" if %hash<description>;
+	$label ~~ s:g/'<' .+? '>'//;
 	$label;
+    }
+
+    sub print_at($s, $col, $row) {
+	cursor($col, $row);
+	$term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
+	printf "%.*s", ($term_cols - $col), $s;
     }
     
     my constant UP_ARROW    =  "\x[1b][A";
@@ -230,6 +233,8 @@ class Command {
 	while $c ne 'q' {
 	    if $new_uri {
 		plot_uri($uri) || ($message = "No record for $uri") && last;
+		print_at('.' x @uri_history, 4, 4);
+		cursor($x, $y);
 		$new_uri = False;
 	    }
 	    
