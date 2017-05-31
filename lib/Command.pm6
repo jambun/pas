@@ -164,14 +164,14 @@ class Command {
 	for %json.kv -> $prop, $val {
 	    if $val.WHAT ~~ Hash {
 		if $val<ref>:exists && !%uris{$val<ref>} {
-		    %uris{$val<ref>} = $prop;
+		    %uris{$val<ref>} = record_link_label($prop, $val);;
 		    @uris.push($val<ref>);
 		}
 	    } elsif $val.WHAT ~~ Array {
 		for $val.values -> $h {
 		    if $h.WHAT ~~ Hash {
 			if $h<ref>:exists && !%uris{$h<ref>} {
-			    %uris{$h<ref>} = 'hmm';
+			    %uris{$h<ref>} = record_link_label($prop, $h);
 			    @uris.push($h<ref>);
 			}
 		    }
@@ -180,6 +180,7 @@ class Command {
 	}
 
 	run 'tput', 'civis'; # hide the cursor
+	my $cols = q:x/tput cols/.chomp.Int;
 	print state $ = qx[clear]; # clear the screen
 	$x = 4;
 	$y = 8;
@@ -194,7 +195,7 @@ class Command {
 	$y++;
 	cursor($x, $y);
 	@uris.tail(@uris.elems-1).map: {
-	    .say;
+	    printf "%-42s%.*s", $_, ($cols - 50), %uris{$_};
 	    $y++;
 	    cursor($x, $y);
 	}
@@ -205,6 +206,14 @@ class Command {
 	run 'tput', 'cvvis'; # show the cursor
     }
 
+    sub record_link_label($prop, %hash) {
+	my $label = $prop;
+	$label ~= ": %hash<role>" if %hash<role>;
+	$label ~= ": %hash<relator>" if %hash<relator>;
+	$label ~= ": %hash<level>" if %hash<level>;
+	$label ~= ": %hash<description>" if %hash<description>;
+	$label;
+    }
     
     my constant UP_ARROW    =  "\x[1b][A";
     my constant DOWN_ARROW  =  "\x[1b][B";
