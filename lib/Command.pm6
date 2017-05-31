@@ -210,7 +210,8 @@ class Command {
     my constant DOWN_ARROW  =  "\x[1b][B";
     my constant RIGHT_ARROW =  "\x[1b][C";
     my constant LEFT_ARROW  =  "\x[1b][D";
-
+    my constant BEL         =  "\x[07]";
+    
     method nav {
 	my $uri = $!first;
 	my Bool $new_uri = True;
@@ -229,10 +230,18 @@ class Command {
 		# say $c.ords;
 		given $c {
 		    when UP_ARROW {
-			$y-- if $y > $y_offset;
+			if $y > $y_offset {
+			    $y--;
+			} else {
+			    print BEL;
+			}
 		    }
 		    when DOWN_ARROW {
-			$y++ if $y < $y_offset + @uris.elems - 1;
+			if $y < $y_offset + @uris.elems - 1 {
+			    $y++;
+			} else {
+			    print BEL;
+			}
 		    }
 		    when RIGHT_ARROW {
 			@uri_history.push: $uri;
@@ -243,6 +252,8 @@ class Command {
 			if @uri_history {
 			    $uri = @uri_history.pop;
 			    $new_uri = True;
+			} else {
+			    print BEL;
 			}
 		    }
 		}
