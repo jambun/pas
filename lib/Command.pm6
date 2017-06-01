@@ -126,27 +126,32 @@ class Command {
     my Hash %uri_cache;
     my $current_uri;
     my $term_cols;
+    my Str $nav_message;
     
-    sub graph_message(Str $message) {
+    sub nav_message(Str $message = '') {
+	$x ||= 0;
+	$y ||= 0;
+	$nav_message = $message if $message;
 	run 'tput', 'civis'; # hide the cursor
-	cursor(0,0);
-	say $message;
+	print_at($nav_message, 0, 0);;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
+    }
+
+    sub clear_screen {
+	print state $ = qx[clear];
+	nav_message;
     }
     
     sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 	%uri_cache ||= Hash.new;
 
 	my $raw_json;
-	# my $new_y;
 	if %uri_cache{$uri} && !$reload {
 	    $raw_json = %uri_cache{$uri}<json>;
-	    # graph_message("got cached y: $cached_y");
 	} else {
 	    $raw_json = client.get($uri, @args);
 	    %uri_cache{$uri} = { json => $raw_json, y => 10 };
-	    # graph_message("caching y: " ~  %uri_cache{$uri}<y>);
 	}
 
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
@@ -158,17 +163,17 @@ class Command {
 	
 	$term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
 	run 'tput', 'civis';                   # hide the cursor
-	print state $ = qx[clear];             # clear the screen
+	clear_screen;
 
-	print_at(record_label(%json), 4, 8);
-	print_at($uri, 6, 10);
+	print_at(record_label(%json), 2, 8);
+	print_at($uri, 4, 10);
 	@uris = ($uri);
 	$y = 11;
 	$y_offset = 10;
 	
-	plot_hash(%json, 'top', 8);
+	plot_hash(%json, 'top', 6);
 
-	$x = 4;
+	$x = 2;
 	$y = %uri_cache{$uri}<y>;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
@@ -192,7 +197,7 @@ class Command {
     }
 
     sub plot_ref($uri, %hash, $parent, $indent) {
-	my $s = sprintf "%-42s%s", $uri, link_label($parent, %hash);
+	my $s = sprintf "%-41s %s", $uri, link_label($parent, %hash);
 	print_at($s, $indent, $y);
 	@uris.push($uri);
 	$y++;
@@ -202,7 +207,7 @@ class Command {
     
     sub record_label(%hash) {
 	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Str)[0];
-	$label ~~ s:g/'<' .+? '>'//;
+	$label ~~ s:g/'<' .+? '>'// if $label;;
 	$label;
     }
 
@@ -211,10 +216,13 @@ class Command {
     sub link_label($prop, %hash) {
 	my $label = $prop;
 	LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
+	my $record;
 	if %hash<_resolved>:exists {
-	    my $record = record_label(%hash<_resolved>);
-	    $label ~= " > $record" if $record;
+	    $record = record_label(%hash<_resolved>);
+	} else {
+	    $record = record_label(%hash);
 	}
+	$label ~= " > $record" if $record;
 	$label ~~ s:g/'<' .+? '>'//;
 	$label;
     }
@@ -233,6 +241,7 @@ class Command {
     
     method nav {
 	my $uri = $!first;
+	nav_message(cmd_prompt() ~ " $!line");
 	my Bool $new_uri = True;
 	my $c = '';
 	my @uri_history = ();
@@ -240,7 +249,7 @@ class Command {
 	while $c ne 'q' {
 	    if $new_uri {
 		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
-		print_at('.' x @uri_history, 4, 4);
+		print_at('.' x @uri_history, 2, 4);
 		cursor($x, $y);
 		$new_uri = False;
 	    }
@@ -287,7 +296,9 @@ class Command {
 	    }
 	    cursor($x, $y);
 	}
-	print state $ = qx[clear]; # clear the screen
+	nav_message(' ');
+	clear_screen;
+	#	print state $ = qx[clear]; # clear the screen
 	cursor(0, q:x/tput lines/.chomp.Int);
 	%uri_cache = Hash.new;
 	$current_uri = Str.new;
