@@ -160,9 +160,7 @@ class Command {
 	run 'tput', 'civis';                   # hide the cursor
 	print state $ = qx[clear];             # clear the screen
 
-	my $record_title = (%json<long_display_string> || %json<display_string> || %json<title> || %json<name>);
-	$record_title ~~ s:g/'<' .+? '>'//;
-	print_at($record_title, 4, 8);
+	print_at(record_label(%json), 4, 8);
 	print_at($uri, 6, 10);
 	@uris = ($uri);
 	$y = 11;
@@ -194,20 +192,29 @@ class Command {
     }
 
     sub plot_ref($uri, %hash, $parent, $indent) {
-	my $s = sprintf "%-42s%s", $uri, record_link_label($parent, %hash);
+	my $s = sprintf "%-42s%s", $uri, link_label($parent, %hash);
 	print_at($s, $indent, $y);
 	@uris.push($uri);
 	$y++;
     }
+
+    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name>;
     
-    sub record_link_label($prop, %hash) {
+    sub record_label(%hash) {
+	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Str)[0];
+	$label ~~ s:g/'<' .+? '>'//;
+	$label;
+    }
+
+    my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
+
+    sub link_label($prop, %hash) {
 	my $label = $prop;
-	$label ~= ": %hash<role>" if %hash<role>;
-	$label ~= ": %hash<relator>" if %hash<relator>;
-	$label ~= ": %hash<level>" if %hash<level>;
-	$label ~= ": %hash<identifier>" if %hash<identifier>;
-	$label ~= ": %hash<display_string>" if %hash<display_string>;
-	$label ~= ": %hash<description>" if %hash<description>;
+	LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
+	if %hash<_resolved>:exists {
+	    my $record = record_label(%hash<_resolved>);
+	    $label ~= " > $record" if $record;
+	}
 	$label ~~ s:g/'<' .+? '>'//;
 	$label;
     }
@@ -232,7 +239,7 @@ class Command {
 	my $message = '';
 	while $c ne 'q' {
 	    if $new_uri {
-		plot_uri($uri) || ($message = "No record for $uri") && last;
+		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
 		print_at('.' x @uri_history, 4, 4);
 		cursor($x, $y);
 		$new_uri = False;
