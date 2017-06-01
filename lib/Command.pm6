@@ -126,12 +126,17 @@ class Command {
     my Hash %uri_cache;
     my $current_uri;
     my $term_cols;
+    my $term_lines;
+    my Str $default_nav_message;
     my Str $nav_message;
     
-    sub nav_message(Str $message = '') {
+    sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
+	$default_nav_message ||= '';
 	$x ||= 0;
 	$y ||= 0;
 	$nav_message = $message if $message;
+	$default_nav_message = $message if $set_default;
+	$nav_message = $default_nav_message if $default;
 	run 'tput', 'civis'; # hide the cursor
 	print_at($nav_message, 0, 0);;
 	cursor($x, $y);
@@ -150,7 +155,9 @@ class Command {
 	if %uri_cache{$uri} && !$reload {
 	    $raw_json = %uri_cache{$uri}<json>;
 	} else {
+	    nav_message("getting $uri ...");
 	    $raw_json = client.get($uri, @args);
+	    nav_message(:default);
 	    %uri_cache{$uri} = { json => $raw_json, y => 10 };
 	}
 
@@ -162,6 +169,7 @@ class Command {
 	return False if %json<error>:exists;
 	
 	$term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
+	$term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
 	run 'tput', 'civis';                   # hide the cursor
 	clear_screen;
 
@@ -180,6 +188,7 @@ class Command {
     }
 
     sub plot_hash(%hash, $parent, $indent) {
+	return if $y >= $term_lines;
 	for %hash.kv -> $prop, $val {
 	    if $prop eq 'ref' || $prop eq 'record_uri' {
 		plot_ref($val, %hash, $parent, $indent);
@@ -188,6 +197,7 @@ class Command {
 		plot_hash($val, $prop, $indent);
 	    } elsif $val.WHAT ~~ Array {
 		for $val.values -> $h {
+		    last if $y >= $term_lines;
 		    if $h.WHAT ~~ Hash {
 			plot_hash($h, $prop, $indent);
 		    }
@@ -230,7 +240,8 @@ class Command {
     sub print_at($s, $col, $row) {
 	cursor($col, $row);
 	$term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
-	printf "%.*s", ($term_cols - $col), $s;
+	$term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
+	printf("%.*s", ($term_cols - $col), $s) if $row <= $term_lines;
     }
     
     my constant UP_ARROW    =  "\x[1b][A";
@@ -241,7 +252,7 @@ class Command {
     
     method nav {
 	my $uri = $!first;
-	nav_message(cmd_prompt() ~ " $!line");
+	nav_message(cmd_prompt() ~ " $!line", :set_default);
 	my Bool $new_uri = True;
 	my $c = '';
 	my @uri_history = ();
@@ -298,7 +309,6 @@ class Command {
 	}
 	nav_message(' ');
 	clear_screen;
-	#	print state $ = qx[clear]; # clear the screen
 	cursor(0, q:x/tput lines/.chomp.Int);
 	%uri_cache = Hash.new;
 	$current_uri = Str.new;
