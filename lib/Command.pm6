@@ -138,7 +138,8 @@ class Command {
 	$default_nav_message = $message if $set_default;
 	$nav_message = $default_nav_message if $default;
 	run 'tput', 'civis'; # hide the cursor
-	print_at($nav_message, 0, 0);;
+	$term_lines ||= q:x/tput lines/.chomp.Int;
+	print_at(sprintf("%-*s", $term_cols - 1, $nav_message), 0, $term_lines);
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
     }
@@ -158,7 +159,7 @@ class Command {
 	    nav_message("getting $uri ...");
 	    $raw_json = client.get($uri, @args);
 	    nav_message(:default);
-	    %uri_cache{$uri} = { json => $raw_json, y => 10 };
+	    %uri_cache{$uri} = { json => $raw_json, y => 6 };
 	}
 
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
@@ -173,11 +174,11 @@ class Command {
 	run 'tput', 'civis';                   # hide the cursor
 	clear_screen;
 
-	print_at(record_label(%json), 2, 8);
-	print_at($uri, 4, 10);
+	print_at(record_label(%json), 2, 4);
+	print_at($uri, 4, 6);
 	@uris = ($uri);
-	$y = 11;
-	$y_offset = 10;
+	$y = 7;
+	$y_offset = 6;
 	
 	plot_hash(%json, 'top', 6);
 
@@ -207,6 +208,7 @@ class Command {
     }
 
     sub plot_ref($uri, %hash, $parent, $indent) {
+	return if $y >= $term_lines - 1;
 	my $s = sprintf "%-41s %s", $uri, link_label($parent, %hash);
 	print_at($s, $indent, $y);
 	@uris.push($uri);
@@ -253,6 +255,7 @@ class Command {
     method nav {
 	my $uri = $!first;
 	nav_message(cmd_prompt() ~ " $!line", :set_default);
+	clear_screen;
 	my Bool $new_uri = True;
 	my $c = '';
 	my @uri_history = ();
@@ -260,7 +263,7 @@ class Command {
 	while $c ne 'q' {
 	    if $new_uri {
 		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
-		print_at('.' x @uri_history, 2, 4);
+		print_at('.' x @uri_history, 2, 2);
 		cursor($x, $y);
 		$new_uri = False;
 	    }
@@ -268,7 +271,6 @@ class Command {
 	    $c = get_char;
 	    if $c eq "\x[1b]" {
 		$c = $c ~ get_char() ~ get_char();
-		# say $c.ords;
 		given $c {
 		    when UP_ARROW {
 			if $y > $y_offset {
@@ -278,7 +280,7 @@ class Command {
 			}
 		    }
 		    when DOWN_ARROW {
-			if $y < $y_offset + @uris.elems - 1 {
+			if $y < $y_offset + @uris - 1 && $y < $term_lines - 2 {
 			    $y++;
 			} else {
 			    print BEL;
