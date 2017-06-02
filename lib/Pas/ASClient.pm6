@@ -26,7 +26,12 @@ class Pas::ASClient {
 	self.log.blurt(%header);
 	self.log.blurt($url);
 
-	my $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+	my $response;
+        try {
+	    $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+        
+            CATCH { self.log.blurt("Sadly, nobody seems to be listening at $url"); return '{"error": "No backend"}' }
+        }
 
 	# there's something wrong with the session
 	if $response.status-line ~~ /412/ {
