@@ -224,13 +224,14 @@ class Command {
 	$label;
     }
 
-    sub record_summary(%hash) {
-        my @out = [];
-	my @props = <dates extents instances notes rights_statements
-           	     external_ids external_documents revision_statements>;
+    my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statements
+           	     		         external_ids external_documents revision_statements
+					 terms names agent_contacts>;
 
- 	@props.map: { @out.push($_ ~ ': ' ~ %hash{$_}.elems) if %hash{$_}.WHAT ~~ Array && %hash{$_} > 0 }
-	@out.join(', ');
+    sub record_summary(%hash) {
+ 	RECORD_SUMMARY_ARRAYS.map: {
+	    $_ ~ ': ' ~ %hash{$_}.elems if %hash{$_}:exists && %hash{$_} > 0;
+	}
     }
 
     my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
