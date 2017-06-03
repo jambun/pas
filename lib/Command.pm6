@@ -174,7 +174,8 @@ class Command {
 	run 'tput', 'civis';                   # hide the cursor
 	clear_screen;
 
-	print_at(record_label(%json), 2, 4);
+	print_at(record_label(%json), 2, 3);
+	print_at(record_summary(%json), 6, 4);
 	print_at($uri, 4, 6);
 	@uris = ($uri);
 	$y = 7;
@@ -223,6 +224,15 @@ class Command {
 	$label;
     }
 
+    sub record_summary(%hash) {
+        my @out = [];
+	my @props = <dates extents instances notes rights_statements
+           	     external_ids external_documents revision_statements>;
+
+ 	@props.map: { @out.push($_ ~ ': ' ~ %hash{$_}.elems) if %hash{$_}.WHAT ~~ Array && %hash{$_} > 0 }
+	@out.join(', ');
+    }
+
     my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
 
     sub link_label($prop, %hash) {
@@ -263,7 +273,7 @@ class Command {
 	while $c ne 'q' {
 	    if $new_uri {
 		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
-		print_at('.' x @uri_history, 2, 2);
+		print_at('.' x @uri_history, 2, 1);
 		cursor($x, $y);
 		$new_uri = False;
 	    }
