@@ -165,7 +165,7 @@ class Command {
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
 	$current_uri = $uri;
 	
-	my %json = from-json extract_uris $raw_json;
+	my %json = from-json $raw_json;
 
 	return False if %json<error>:exists;
 	
