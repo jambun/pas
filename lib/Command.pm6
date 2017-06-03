@@ -192,7 +192,7 @@ class Command {
     sub plot_hash(%hash, $parent, $indent) {
 	return if $y >= $term_lines;
 	for %hash.kv -> $prop, $val {
-	    if $prop eq 'ref' || $prop eq 'record_uri' {
+	    if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
 		plot_ref($val, %hash, $parent, $indent);
 	    }
 	    if $val.WHAT ~~ Hash {
@@ -216,10 +216,10 @@ class Command {
 	$y++;
     }
 
-    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name>;
+    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name total_hits>;
     
     sub record_label(%hash) {
-	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Str)[0];
+	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
 	$label ~~ s:g/'<' .+? '>'// if $label;;
 	$label;
     }
