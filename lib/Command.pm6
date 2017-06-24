@@ -311,9 +311,13 @@ class Command {
 			}
 		    }
 		    when RIGHT_ARROW {
-			@uri_history.push: $uri;
-			$uri = @uris[$y-$y_offset];
-			$new_uri = True;
+			if $y == $y_offset {
+			    print BEL;
+			} else {
+			    @uri_history.push: $uri;
+			    $uri = @uris[$y-$y_offset];
+			    $new_uri = True;
+			}
 		    }
 		    when LEFT_ARROW {
 			if @uri_history {
