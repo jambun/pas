@@ -183,7 +183,7 @@ class Command {
 	run 'tput', 'civis';                   # hide the cursor
 	clear_screen;
 
-	print_at(colored(record_label(%json), 'bold'), 2, 3);
+	print_at(colored(record_label(%json).Str, 'bold'), 2, 3);
 	print_at(record_summary(%json), 6, 4);
 	print_at(colored($uri, 'bold'), 4, 6);
 	@uris = ($uri);
@@ -226,8 +226,8 @@ class Command {
 	$y++;
     }
 
-    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name total_hits>;
-    
+    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name last_page>;
+
     sub record_label(%hash) {
 	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
 	$label ~~ s:g/'<' .+? '>'// if $label;;
