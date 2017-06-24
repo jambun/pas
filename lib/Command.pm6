@@ -148,6 +148,15 @@ class Command {
 	print state $ = qx[clear];
 	nav_message;
     }
+
+    sub clear_nav_cursor($line = False) {
+	print_at(' ', 46, $line || $y);
+    }
+    
+    sub print_nav_cursor($clear = False) {
+	clear_nav_cursor($clear) if $clear;
+	print_at(colored('>', 'bold'), 46, $y);
+    }
     
     sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 	%uri_cache ||= Hash.new;
@@ -174,9 +183,9 @@ class Command {
 	run 'tput', 'civis';                   # hide the cursor
 	clear_screen;
 
-	print_at(record_label(%json), 2, 3);
+	print_at(colored(record_label(%json), 'bold'), 2, 3);
 	print_at(record_summary(%json), 6, 4);
-	print_at($uri, 4, 6);
+	print_at(colored($uri, 'bold'), 4, 6);
 	@uris = ($uri);
 	$y = 7;
 	$y_offset = 6;
@@ -185,6 +194,7 @@ class Command {
 
 	$x = 2;
 	$y = %uri_cache{$uri}<y>;
+	print_nav_cursor unless $y == $y_offset;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
     }
@@ -285,7 +295,9 @@ class Command {
 		given $c {
 		    when UP_ARROW {
 			if $y > $y_offset {
+			    clear_nav_cursor;
 			    $y--;
+			    print_nav_cursor unless $y == $y_offset;
 			} else {
 			    print BEL;
 			}
@@ -293,6 +305,7 @@ class Command {
 		    when DOWN_ARROW {
 			if $y < $y_offset + @uris - 1 && $y < $term_lines - 2 {
 			    $y++;
+			    print_nav_cursor($y-1);
 			} else {
 			    print BEL;
 			}
