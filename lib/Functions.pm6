@@ -29,7 +29,7 @@ my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
 
-sub last_uris is export { @LAST_URIS }
+sub last_uris(@uris = ()) is export { @LAST_URIS = @uris if @uris; @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 sub save_file($file) is export { $SAVE_FILE = $file }

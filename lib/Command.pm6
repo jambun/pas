@@ -342,7 +342,7 @@ class Command {
 	cursor(0, q:x/tput lines/.chomp.Int);
 	%uri_cache = Hash.new;
 	$current_uri = Str.new;
-
+	last_uris(@uris);
 	$message;
     }
 
