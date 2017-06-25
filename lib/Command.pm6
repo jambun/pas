@@ -264,7 +264,7 @@ class Command {
 	cursor($col, $row);
 	$term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
 	$term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
-	printf("%.*s", ($term_cols - $col), $s) if $row <= $term_lines;
+	printf("%.*s", ($term_cols - $col + (+$s.perl.comb: /'\x'/)*9), $s) if $row <= $term_lines;
     }
     
     my constant UP_ARROW    =  "\x[1b][A";
@@ -285,6 +285,8 @@ class Command {
 	    if $new_uri {
 		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
 		print_at('.' x @uri_history, 2, 1);
+		print_at(colored('h', 'bold') ~ 'elp, ' ~ colored('q', 'bold') ~ 'uit',
+			 $term_cols - 10, 1);
 		cursor($x, $y);
 		$new_uri = False;
 	    }
