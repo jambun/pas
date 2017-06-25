@@ -125,6 +125,8 @@ class Command {
     my Str @uris;
     my Hash %uri_cache;
     my $current_uri;
+    my @resolves;
+    my %current_refs;
     my $term_cols;
     my $term_lines;
     my Str $default_nav_message;
@@ -160,13 +162,14 @@ class Command {
     
     sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 	%uri_cache ||= Hash.new;
+	%current_refs = Hash.new;
 
 	my $raw_json;
 	if %uri_cache{$uri} && !$reload {
 	    $raw_json = %uri_cache{$uri}<json>;
 	} else {
 	    nav_message("getting $uri ...");
-	    $raw_json = client.get($uri, @args);
+	    $raw_json = client.get($uri, @args.map: { /^ 'resolve[]=' / ?? $_ !! 'resolve[]=' ~ $_});
 	    nav_message(:default);
 	    %uri_cache{$uri} = { json => $raw_json, y => 6 };
 	}
@@ -206,12 +209,12 @@ class Command {
 		plot_ref($val, %hash, $parent, $indent);
 	    }
 	    if $val.WHAT ~~ Hash {
-		plot_hash($val, $prop, $indent);
+		plot_hash($val, $prop, $indent+1);
 	    } elsif $val.WHAT ~~ Array {
 		for $val.values -> $h {
 		    last if $y >= $term_lines;
 		    if $h.WHAT ~~ Hash {
-			plot_hash($h, $prop, $indent);
+			plot_hash($h, $prop, $indent+1);
 		    }
 		}
 	    }
@@ -220,6 +223,7 @@ class Command {
 
     sub plot_ref($uri, %hash, $parent, $indent) {
 	return if $y >= $term_lines - 1;
+	%current_refs{$y} = $parent;
 	my $s = sprintf "%-41s %s", $uri, link_label($parent, %hash);
 	print_at($s, $indent, $y);
 	@uris.push($uri);
@@ -230,7 +234,7 @@ class Command {
 
     sub record_label(%hash) {
 	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
-	$label ~~ s:g/'<' .+? '>'// if $label;;
+	$label ~~ s:g/'<' .+? '>'// if $label;
 	$label;
     }
 
@@ -281,12 +285,13 @@ class Command {
 	my $c = '';
 	my @uri_history = ();
 	my $message = '';
+	@resolves = @!args;
 	while $c ne 'q' {
 	    if $new_uri {
-		plot_uri($uri, @!args) || ($message = "No record for $uri") && last;
+		plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
 		print_at('.' x @uri_history, 2, 1);
-		print_at(colored('h', 'bold') ~ 'elp, ' ~ colored('q', 'bold') ~ 'uit',
-			 $term_cols - 10, 1);
+		print_at(colored('h', 'bold') ~ 'elp ' ~ colored('q', 'bold') ~ 'uit',
+			 $term_cols - 9, 1);
 		cursor($x, $y);
 		$new_uri = False;
 	    }
@@ -334,6 +339,15 @@ class Command {
 		given $c {
 		    when ' ' {
 			page(pretty client.get(@uris[$y-$y_offset]));
+		    }
+		    when 'r' {
+			if @resolves.grep(%current_refs{$y}) {
+			    @resolves = @resolves.grep: { $_ ne %current_refs{$y} };
+			} else {
+			    @resolves.push(%current_refs{$y});
+			}
+			%uri_cache{$current_uri}:delete;
+			$new_uri = True;
 		    }
 		}
 	    }
