@@ -159,6 +159,10 @@ class Command {
 	clear_nav_cursor($clear) if $clear;
 	print_at(colored('>', 'bold'), 46, $y);
     }
+
+    sub to_resolve_params(@args) {
+	@args.map: { /^ 'resolve[]=' / ?? $_ !! 'resolve[]=' ~ $_};
+    }
     
     sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 	%uri_cache ||= Hash.new;
@@ -169,7 +173,7 @@ class Command {
 	    $raw_json = %uri_cache{$uri}<json>;
 	} else {
 	    nav_message("getting $uri ...");
-	    $raw_json = client.get($uri, @args.map: { /^ 'resolve[]=' / ?? $_ !! 'resolve[]=' ~ $_});
+	    $raw_json = client.get($uri, to_resolve_params(@args));
 	    nav_message(:default);
 	    %uri_cache{$uri} = { json => $raw_json, y => 6 };
 	}
@@ -207,8 +211,7 @@ class Command {
 	for %hash.kv -> $prop, $val {
 	    if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
 		plot_ref($val, %hash, $parent, $indent);
-	    }
-	    if $val.WHAT ~~ Hash {
+	    } elsif $val.WHAT ~~ Hash {
 		plot_hash($val, $prop, $indent+1);
 	    } elsif $val.WHAT ~~ Array {
 		for $val.values -> $h {
@@ -259,7 +262,7 @@ class Command {
 	} else {
 	    $record = record_label(%hash);
 	}
-	$label ~= " > $record" if $record;
+	$label ~= "  > $record" if $record;
 	$label ~~ s:g/'<' .+? '>'//;
 	$label;
     }
@@ -338,7 +341,7 @@ class Command {
 	    } else {
 		given $c {
 		    when ' ' {
-			page(pretty client.get(@uris[$y-$y_offset]));
+			page(pretty client.get(@uris[$y-$y_offset], to_resolve_params(@resolves)));
 		    }
 		    when 'r' {
 			if @resolves.grep(%current_refs{$y}) {
