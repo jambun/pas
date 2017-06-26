@@ -161,7 +161,7 @@ class Command {
     }
 
     sub to_resolve_params(@args) {
-	@args.map: { /^ 'resolve[]=' / ?? $_ !! 'resolve[]=' ~ $_};
+	@args.map: { / '=' / ?? $_ !! 'resolve[]=' ~ $_};
     }
     
     sub plot_uri(Str $uri, @args = (), Bool :$reload) {
