@@ -208,7 +208,8 @@ class Command {
 
     sub plot_hash(%hash, $parent, $indent) {
 	return if $y >= $term_lines;
-	for %hash.kv -> $prop, $val {
+	for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
+	    my $val = %hash{$prop};
 	    if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
 		plot_ref($val, %hash, $parent, $indent);
 	    } elsif $val.WHAT ~~ Hash {
