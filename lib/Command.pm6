@@ -208,17 +208,19 @@ class Command {
 
     sub plot_hash(%hash, $parent, $indent) {
 	return if $y >= $term_lines;
+	my $found_ref = 0;
 	for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
 	    my $val = %hash{$prop};
 	    if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
 		plot_ref($val, %hash, $parent, $indent);
+		$found_ref = 1;
 	    } elsif $val.WHAT ~~ Hash {
-		plot_hash($val, $prop, $indent+1);
+		plot_hash($val, $prop, $indent+$found_ref);
 	    } elsif $val.WHAT ~~ Array {
 		for $val.values -> $h {
 		    last if $y >= $term_lines;
 		    if $h.WHAT ~~ Hash {
-			plot_hash($h, $prop, $indent+1);
+			plot_hash($h, $prop, $indent+$found_ref);
 		    }
 		}
 	    }
