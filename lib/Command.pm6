@@ -272,7 +272,29 @@ class Command {
 	cursor($col, $row);
 	$term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
 	$term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
-	printf("%.*s", ($term_cols - $col + (+$s.perl.comb: /'\x'/)*9), $s) if $row <= $term_lines;
+	printf("%.*s", ($term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
+    }
+
+    sub print_nav_help($s, $line) {
+	print_at(sprintf("  %-*s", 70, $s), $term_cols - 50, $line);
+    }
+    
+    sub nav_help {
+	run 'tput', 'civis'; # hide the cursor
+	print_nav_help('', 1);
+	print_nav_help(colored('UP', 'bold') ~ '/' ~ colored('DOWN', 'bold') ~ '  Previous/Next uri', 2);
+	print_nav_help(colored('LEFT', 'bold') ~ '     Back to last uri', 3);
+	print_nav_help(colored('RIGHT', 'bold') ~ '    Load selected uri', 4);
+	print_nav_help(colored('SPACE', 'bold') ~ '    View json for selected uri', 5);
+	print_nav_help(colored('r', 'bold') ~ '        Resolve refs like the selected uri', 6);
+	print_nav_help(colored('q', 'bold') ~ '        Quit navigator', 7);
+	print_nav_help(colored('h', 'bold') ~ '        This help', 8);
+	print_nav_help('', 9);
+	print_nav_help(colored('    <ANY KEY> to exit help', 'bold'), 10);
+	print_nav_help('', 11);
+	get_char;
+	cursor($x, $y);
+	run 'tput', 'cvvis'; # show the cursor
     }
     
     my constant UP_ARROW    =  "\x[1b][A";
@@ -351,6 +373,10 @@ class Command {
 			    @resolves.push(%current_refs{$y});
 			}
 			%uri_cache{$current_uri}:delete;
+			$new_uri = True;
+		    }
+		    when 'h' {
+			nav_help;
 			$new_uri = True;
 		    }
 		}
