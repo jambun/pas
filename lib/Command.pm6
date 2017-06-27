@@ -121,6 +121,7 @@ class Command {
 
     my Int $x;
     my Int $y;
+    my Int $nav_cursor_col = 50;
     my Int $y_offset;
     my Str @uris;
     my Hash %uri_cache;
@@ -152,12 +153,12 @@ class Command {
     }
 
     sub clear_nav_cursor($line = False) {
-	print_at(' ', 46, $line || $y);
+	print_at(' ', $nav_cursor_col, $line || $y);
     }
     
     sub print_nav_cursor($clear = False) {
 	clear_nav_cursor($clear) if $clear;
-	print_at(colored('>', 'bold'), 46, $y);
+	print_at(colored('>', 'bold'), $nav_cursor_col, $y);
     }
 
     sub to_resolve_params(@args) {
@@ -230,7 +231,7 @@ class Command {
     sub plot_ref($uri, %hash, $parent, $indent) {
 	return if $y >= $term_lines - 1;
 	%current_refs{$y} = $parent;
-	my $s = sprintf "%-41s %s", $uri, link_label($parent, %hash);
+	my $s = sprintf "%-*s %s", $nav_cursor_col - 5, $uri, link_label($parent, %hash);
 	print_at($s, $indent, $y);
 	@uris.push($uri);
 	$y++;
