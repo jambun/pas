@@ -285,16 +285,17 @@ class Command {
     sub nav_help {
 	run 'tput', 'civis'; # hide the cursor
 	print_nav_help('', 1);
-	print_nav_help(colored('UP', 'bold') ~ '/' ~ colored('DOWN', 'bold') ~ '  Previous/Next uri', 2);
+	print_nav_help(colored('UP', 'bold') ~ '/' ~ colored('DOWN', 'bold') ~ '  Select Previous/Next uri', 2);
 	print_nav_help(colored('LEFT', 'bold') ~ '     Back to last uri', 3);
 	print_nav_help(colored('RIGHT', 'bold') ~ '    Load selected uri', 4);
 	print_nav_help(colored('SPACE', 'bold') ~ '    View json for selected uri', 5);
-	print_nav_help(colored('r', 'bold') ~ '        Resolve refs like the selected uri', 6);
-	print_nav_help(colored('q', 'bold') ~ '        Quit navigator', 7);
-	print_nav_help(colored('h', 'bold') ~ '        This help', 8);
-	print_nav_help('', 9);
-	print_nav_help(colored('    <ANY KEY> to exit help', 'bold'), 10);
-	print_nav_help('', 11);
+	print_nav_help(colored('RETURN', 'bold') ~ '   View summary for selected uri', 6);
+	print_nav_help(colored('r', 'bold') ~ '        Resolve refs like the selected uri', 7);
+	print_nav_help(colored('q', 'bold') ~ '        Quit navigator', 8);
+	print_nav_help(colored('h', 'bold') ~ '        This help', 9);
+	print_nav_help('', 10);
+	print_nav_help(colored('    <ANY KEY> to exit help', 'bold'), 11);
+	print_nav_help('', 12);
 	get_char;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
@@ -369,6 +370,9 @@ class Command {
 		    when ' ' {
 			page(pretty client.get(@uris[$y-$y_offset], to_resolve_params(@resolves)));
 		    }
+		    when "\r" {
+			page(stripped pretty client.get(@uris[$y-$y_offset], to_resolve_params(@resolves)));
+		    }
 		    when 'r' {
 			if @resolves.grep(%current_refs{$y}) {
 			    @resolves = @resolves.grep: { $_ ne %current_refs{$y} };
@@ -401,6 +405,26 @@ class Command {
 	$*IN.read(1).decode;
     }
 
+    sub stripped($t) {
+	my @dropped = <lock_version created_by last_modified_by create_time
+                       system_mtime user_mtime jsonmodel_type>;
+
+	my @tl = grep -> $line {
+	    (!grep -> $field { $line.index($field) }, @dropped) && $line !~~ / '[]' /;
+	}, $t.lines;
+
+	my $out = @tl.join("\n");
+
+	$out ~~ s:g/'"'//;
+	$out ~~ s:g/",\n"/\n/;
+	$out ~~ s:g/^^ \s* '[' $$/\n/;
+	$out ~~ s:g/^^ \s* ']' $$//;
+	$out ~~ s:g/\s* '}' \s* '{'/\n/;
+	$out ~~ s:g/^^ \s* '{' \n//;
+	$out ~~ s:g/^^ \s* '}' \n//;
+	
+	$out;
+    }
     
     method login {
 	config.prompt if $!qualifier eq 'prompt' || config.attr<user> eq ANON_USER;
