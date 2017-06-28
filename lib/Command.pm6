@@ -406,6 +406,7 @@ class Command {
     }
 
     sub stripped($t) {
+	# this should be a grammar
 	my @dropped = <lock_version created_by last_modified_by create_time
                        system_mtime user_mtime jsonmodel_type>;
 
@@ -413,15 +414,32 @@ class Command {
 	    (!grep -> $field { $line.index($field) }, @dropped) && $line !~~ / '[]' /;
 	}, $t.lines;
 
+	@tl = map {
+	    my $line = $_;
+	    if $line.chars > $term_cols-2 {
+		my $left = $line.index(':') || $line.index('"') || 10;
+		my $offset = $term_cols;
+		while $offset < $line.chars {
+		    my $off = $line.substr(0, $offset).rindex(' ') || $offset;
+		    $off += 1 unless $off == $offset;
+		    # $line = $line.substr(0, $off) ~ "\n" ~ ' ' x $left ~ $line.substr($off);
+		    $line.substr-rw($off, 0) = "\n" ~ ' ' x $left;
+		    $offset = $off + $term_cols-2;
+		}
+	    }
+	    $line;
+	}, @tl;
+	
 	my $out = @tl.join("\n");
 
-	$out ~~ s:g/'"'//;
+	$out ~~ s:g/ (<-[\\]>) '"'/$0/;
+	$out ~~ s:g/ '\"'/\x22/; # avoiding explicit " so emacs mode doesn't freak out
 	$out ~~ s:g/",\n"/\n/;
 	$out ~~ s:g/^^ \s* '[' $$/\n/;
 	$out ~~ s:g/^^ \s* ']' $$//;
 	$out ~~ s:g/\s* '}' \s* '{'/\n/;
 	$out ~~ s:g/^^ \s* '{' \n//;
-	$out ~~ s:g/^^ \s* '}' \n//;
+	$out ~~ s:g/^^ \s* '}' \n?//;
 	
 	$out;
     }
