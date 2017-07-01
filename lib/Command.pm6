@@ -237,7 +237,8 @@ class Command {
 	$y++;
     }
 
-    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name last_page>;
+    my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
+                                      last_page outcome_note jsonmodel_type>;
 
     sub record_label(%hash) {
 	my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
