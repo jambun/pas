@@ -122,8 +122,8 @@ class Command {
     my Int $x;
     my Int $y;
     my Int $nav_cursor_col = 50;
-    my Int $y_offset;
-    my Str @uris;
+    my Int $y_offset = 6;
+    my Hash @uris;
     my Hash %uri_cache;
     my $current_uri;
     my @resolves;
@@ -132,6 +132,8 @@ class Command {
     my $term_lines;
     my Str $default_nav_message;
     my Str $nav_message;
+    my Int $nav_page_size;
+    my Int $current_nav_offset = 0;
     
     sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
 	$default_nav_message ||= '';
@@ -176,10 +178,11 @@ class Command {
 	    nav_message("getting $uri ...");
 	    $raw_json = client.get($uri, to_resolve_params(@args));
 	    nav_message(:default);
-	    %uri_cache{$uri} = { json => $raw_json, y => 6 };
+	    %uri_cache{$uri} = { json => $raw_json, y => $y_offset, offset => 0 };
 	}
 
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
+	%uri_cache{$current_uri}<offset> = $current_nav_offset if $current_uri && %uri_cache{$current_uri};
 	$current_uri = $uri;
 	
 	my %json = from-json $raw_json;
@@ -194,12 +197,16 @@ class Command {
 	print_at(colored(record_label(%json).Str, 'bold'), 2, 3);
 	print_at(record_summary(%json), 6, 4);
 	print_at(colored($uri, 'bold'), 4, 6);
-	@uris = ($uri);
+	@uris = Array.new;
+	@uris.push(uri_hash($uri, 'top', colored($uri, 'bold'), 4));
 	$y = 7;
-	$y_offset = 6;
 	
 	plot_hash(%json, 'top', 6);
 
+	$nav_page_size = $term_lines - $y_offset - 2;
+
+	print_nav_page(%uri_cache{$current_uri}<offset>);
+	
 	$x = 2;
 	$y = %uri_cache{$uri}<y>;
 	print_nav_cursor unless $y == $y_offset;
@@ -207,8 +214,11 @@ class Command {
 	run 'tput', 'cvvis'; # show the cursor
     }
 
+    sub uri_hash($uri, $ref, $label, $indent) {
+	(uri => $uri, ref => $ref, label => $label, indent => $indent).Hash;
+    }
+
     sub plot_hash(%hash, $parent, $indent) {
-	return if $y >= $term_lines;
 	my $found_ref = 0;
 	for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
 	    my $val = %hash{$prop};
@@ -229,14 +239,27 @@ class Command {
     }
 
     sub plot_ref($uri, %hash, $parent, $indent) {
-	return if $y >= $term_lines - 1;
-	%current_refs{$y} = $parent;
 	my $s = sprintf "%-*s %s", $nav_cursor_col - 5, $uri, link_label($parent, %hash);
-	print_at($s, $indent, $y);
-	@uris.push($uri);
-	$y++;
+	@uris.push(uri_hash($uri, $parent, $s, $indent));
     }
 
+    sub print_nav_page(Int $offset = 0) {
+	$current_nav_offset = ($offset, 0).max;
+	my $has_next_page = so @uris > $offset + $nav_page_size;
+	for ($offset..$offset + $nav_page_size) {
+	    my %ref = @uris[$_];
+	    if %ref {
+		%current_refs{$_} = %ref<ref>;
+		print_at(' ' x %ref<indent> ~ %ref<label>, 0, $_ - $offset + $y_offset, :fill);
+		$y = $_ - $offset + $y_offset;
+	    } else {
+		print_at(' ', 0, $_ - $offset + $y_offset, :fill);
+	    }
+	}
+	print_at('^', 1, $y_offset) if $offset > 0;
+	print_at('v', 1, $nav_page_size + $y_offset) if $has_next_page;
+    }
+    
     my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
                                       last_page outcome_note jsonmodel_type>;
 
@@ -272,11 +295,11 @@ class Command {
 	$label;
     }
 
-    sub print_at($s, $col, $row) {
+    sub print_at($s, $col, $row, Bool :$fill) {
 	cursor($col, $row);
 	$term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
 	$term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
-	printf("%.*s", ($term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
+	printf("%-*.*s", ($fill ?? $term_cols !! $s.chars, $term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
     }
 
     sub print_nav_help($s, $line) {
@@ -337,15 +360,24 @@ class Command {
 			    $y--;
 			    print_nav_cursor unless $y == $y_offset;
 			} else {
-			    print BEL;
+			    if $current_nav_offset > 0 {
+				print_nav_page($current_nav_offset - $nav_page_size);
+				$y = $y_offset;
+			    } else {
+				print BEL;
+			    }
 			}
 		    }
 		    when DOWN_ARROW {
-			if $y < $y_offset + @uris - 1 && $y < $term_lines - 2 {
+			if $y < $y_offset + @uris - $current_nav_offset - 1 && $y < $term_lines - 2 {
 			    $y++;
 			    print_nav_cursor($y-1);
 			} else {
-			    print BEL;
+			    if @uris > $current_nav_offset + $nav_page_size {
+				print_nav_page($current_nav_offset + $nav_page_size);
+			    } else {
+				print BEL;
+			    }
 			}
 		    }
 		    when RIGHT_ARROW {
@@ -353,7 +385,7 @@ class Command {
 			    print BEL;
 			} else {
 			    @uri_history.push: $uri;
-			    $uri = @uris[$y-$y_offset];
+			    $uri = @uris[$y-$y_offset+$current_nav_offset]<uri>;
 			    $new_uri = True;
 			}
 		    }
@@ -369,10 +401,10 @@ class Command {
 	    } else {
 		given $c {
 		    when ' ' {
-			page(pretty client.get(@uris[$y-$y_offset], to_resolve_params(@resolves)));
+			page(pretty client.get(@uris[$y-$y_offset]<uri>, to_resolve_params(@resolves)));
 		    }
 		    when "\r" {
-			page(stripped pretty client.get(@uris[$y-$y_offset], to_resolve_params(@resolves)));
+			page(stripped pretty client.get(@uris[$y-$y_offset]<uri>, to_resolve_params(@resolves)));
 		    }
 		    when 'r' {
 			if @resolves.grep(%current_refs{$y}) {
@@ -396,7 +428,7 @@ class Command {
 	cursor(0, q:x/tput lines/.chomp.Int);
 	%uri_cache = Hash.new;
 	$current_uri = Str.new;
-	last_uris(@uris);
+	last_uris(map { $_<uri> }, @uris);
 	$message;
     }
 
