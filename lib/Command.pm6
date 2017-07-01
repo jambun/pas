@@ -158,9 +158,9 @@ class Command {
 	print_at(' ', $nav_cursor_col, $line || $y);
     }
     
-    sub print_nav_cursor($clear = False) {
+    sub print_nav_cursor(Int $clear = 0) {
 	clear_nav_cursor($clear) if $clear;
-	print_at(colored('>', 'bold'), $nav_cursor_col, $y);
+	print_at(colored('>', 'bold'), $nav_cursor_col, $y) unless $y == $y_offset && $current_nav_offset == 0;
     }
 
     sub to_resolve_params(@args) {
@@ -184,11 +184,14 @@ class Command {
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
 	%uri_cache{$current_uri}<offset> = $current_nav_offset if $current_uri && %uri_cache{$current_uri};
 	$current_uri = $uri;
-	
+
+	nav_message("parsing $uri ...");
 	my %json = from-json $raw_json;
+	nav_message(:default);
 
 	return False if %json<error>:exists;
 	
+	nav_message("plotting $uri ...");
 	$term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
 	$term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
 	run 'tput', 'civis';                   # hide the cursor
@@ -200,18 +203,16 @@ class Command {
 	@uris = Array.new;
 	@uris.push(uri_hash($uri, 'top', colored($uri, 'bold'), 4));
 	$y = 7;
-	
+
 	plot_hash(%json, 'top', 6);
-
 	$nav_page_size = $term_lines - $y_offset - 2;
-
-	print_nav_page(%uri_cache{$current_uri}<offset>);
+	print_nav_page(%uri_cache{$current_uri}<offset>, %uri_cache{$current_uri}<y>);
 	
 	$x = 2;
 	$y = %uri_cache{$uri}<y>;
-	print_nav_cursor unless $y == $y_offset;
 	cursor($x, $y);
 	run 'tput', 'cvvis'; # show the cursor
+	nav_message(:default);
     }
 
     sub uri_hash($uri, $ref, $label, $indent) {
@@ -243,19 +244,22 @@ class Command {
 	@uris.push(uri_hash($uri, $parent, $s, $indent));
     }
 
-    sub print_nav_page(Int $offset = 0) {
+    sub print_nav_page(Int $offset, Int $cursor_y) {
 	$current_nav_offset = ($offset, 0).max;
+	my $last_y = $y;
 	my $has_next_page = so @uris > $offset + $nav_page_size;
 	for ($offset..$offset + $nav_page_size) {
 	    my %ref = @uris[$_];
 	    if %ref {
 		%current_refs{$_} = %ref<ref>;
 		print_at(' ' x %ref<indent> ~ %ref<label>, 0, $_ - $offset + $y_offset, :fill);
-		$y = $_ - $offset + $y_offset;
+		$last_y = $_ - $offset + $y_offset;
 	    } else {
 		print_at(' ', 0, $_ - $offset + $y_offset, :fill);
 	    }
 	}
+	$y = ($last_y, $cursor_y).min;
+	print_nav_cursor;
 	print_at('^', 1, $y_offset) if $offset > 0;
 	print_at('v', 1, $nav_page_size + $y_offset) if $has_next_page;
     }
@@ -358,11 +362,10 @@ class Command {
 			if $y > $y_offset {
 			    clear_nav_cursor;
 			    $y--;
-			    print_nav_cursor unless $y == $y_offset;
+			    print_nav_cursor;
 			} else {
 			    if $current_nav_offset > 0 {
-				print_nav_page($current_nav_offset - $nav_page_size);
-				$y = $y_offset;
+				print_nav_page($current_nav_offset - $nav_page_size, $y_offset);
 			    } else {
 				print BEL;
 			    }
@@ -374,7 +377,7 @@ class Command {
 			    print_nav_cursor($y-1);
 			} else {
 			    if @uris > $current_nav_offset + $nav_page_size {
-				print_nav_page($current_nav_offset + $nav_page_size);
+				print_nav_page($current_nav_offset + $nav_page_size, $y);
 			    } else {
 				print BEL;
 			    }
@@ -401,10 +404,12 @@ class Command {
 	    } else {
 		given $c {
 		    when ' ' {
-			page(pretty client.get(@uris[$y-$y_offset]<uri>, to_resolve_params(@resolves)));
+			page(pretty client.get(@uris[$y-$y_offset]<uri>,
+					       to_resolve_params(@resolves)));
 		    }
 		    when "\r" {
-			page(stripped pretty client.get(@uris[$y-$y_offset]<uri>, to_resolve_params(@resolves)));
+			page(stripped pretty client.get(@uris[$y-$y_offset]<uri>,
+							to_resolve_params(@resolves)));
 		    }
 		    when 'r' {
 			if @resolves.grep(%current_refs{$y}) {
