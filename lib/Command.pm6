@@ -171,23 +171,21 @@ class Command {
 	%uri_cache ||= Hash.new;
 	%current_refs = Hash.new;
 
-	my $raw_json;
+	my %json;
 	if %uri_cache{$uri} && !$reload {
-	    $raw_json = %uri_cache{$uri}<json>;
+	    %json = %uri_cache{$uri}<json>;
 	} else {
 	    nav_message("getting $uri ...");
-	    $raw_json = client.get($uri, to_resolve_params(@args));
+	    my $raw_json = client.get($uri, to_resolve_params(@args));
+	    nav_message("parsing $uri ...");
+	    %json = from-json $raw_json;
+	    %uri_cache{$uri} = { json => %json, y => $y_offset, offset => 0 };
 	    nav_message(:default);
-	    %uri_cache{$uri} = { json => $raw_json, y => $y_offset, offset => 0 };
 	}
 
 	%uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
 	%uri_cache{$current_uri}<offset> = $current_nav_offset if $current_uri && %uri_cache{$current_uri};
 	$current_uri = $uri;
-
-	nav_message("parsing $uri ...");
-	my %json = from-json $raw_json;
-	nav_message(:default);
 
 	return False if %json<error>:exists;
 	
