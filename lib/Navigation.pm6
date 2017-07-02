@@ -1,0 +1,382 @@
+use Functions;
+use Terminal::ANSIColor;
+use JSON::Tiny;
+
+my Int $x;
+my Int $y;
+my Int $nav_cursor_col = 50;
+my Int $y_offset = 6;
+my Hash @uris;
+my Hash %uri_cache;
+my $current_uri;
+my @resolves;
+my %current_refs;
+my $term_cols;
+my $term_lines;
+my Str $default_nav_message;
+my Str $nav_message;
+my Int $nav_page_size;
+my Int $current_nav_offset = 0;
+
+my constant UP_ARROW    =  "\x[1b][A";
+my constant DOWN_ARROW  =  "\x[1b][B";
+my constant RIGHT_ARROW =  "\x[1b][C";
+my constant LEFT_ARROW  =  "\x[1b][D";
+my constant BEL         =  "\x[07]";
+
+my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
+                                  last_page outcome_note jsonmodel_type>;
+
+my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statements
+           	     		     external_ids external_documents revision_statements
+			             terms names agent_contacts>;
+
+my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
+
+
+sub navigation($start_uri, @args, $line) is export {
+    my $uri = $start_uri;
+    nav_message(cmd_prompt() ~ " $line", :set_default);
+    clear_screen;
+    my Bool $new_uri = True;
+    my $c = '';
+    my @uri_history = ();
+    my $message = '';
+    @resolves = @args;
+    while $c ne 'q' {
+	if $new_uri {
+	    plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
+	    print_at('.' x @uri_history, 2, 1);
+	    print_at(colored('h', 'bold') ~ 'elp ' ~ colored('q', 'bold') ~ 'uit',
+		     $term_cols - 9, 1);
+	    cursor($x, $y);
+	    $new_uri = False;
+	}
+	
+	$c = get_char;
+	if $c eq "\x[1b]" {
+	    $c = $c ~ get_char() ~ get_char();
+	    given $c {
+		when UP_ARROW {
+		    if $y > $y_offset {
+			clear_nav_cursor;
+			$y--;
+			print_nav_cursor;
+		    } else {
+			if $current_nav_offset > 0 {
+			    print_nav_page($current_nav_offset - $nav_page_size, $y_offset);
+			} else {
+			    print BEL;
+			}
+		    }
+		}
+		when DOWN_ARROW {
+		    if $y < $y_offset + @uris - $current_nav_offset - 1 && $y < $term_lines - 2 {
+			$y++;
+			print_nav_cursor($y-1);
+		    } else {
+			if @uris > $current_nav_offset + $nav_page_size {
+			    print_nav_page($current_nav_offset + $nav_page_size, $y);
+			} else {
+			    print BEL;
+			}
+		    }
+		}
+		when RIGHT_ARROW {
+		    if $y == $y_offset {
+			print BEL;
+		    } else {
+			@uri_history.push: $uri;
+			$uri = @uris[$y-$y_offset+$current_nav_offset]<uri>;
+			$new_uri = True;
+		    }
+		}
+		when LEFT_ARROW {
+		    if @uri_history {
+			$uri = @uri_history.pop;
+			$new_uri = True;
+		    } else {
+			print BEL;
+		    }
+		}
+	    }
+	} else {
+	    given $c {
+		when ' ' {
+		    page(pretty client.get(@uris[$y-$y_offset]<uri>,
+					   to_resolve_params(@resolves)));
+		}
+		when "\r" {
+		    page(stripped pretty client.get(@uris[$y-$y_offset]<uri>,
+						    to_resolve_params(@resolves)));
+		}
+		when 'r' {
+		    if @resolves.grep(%current_refs{$y}) {
+			@resolves = @resolves.grep: { $_ ne %current_refs{$y} };
+		    } else {
+			@resolves.push(%current_refs{$y});
+		    }
+		    %uri_cache{$current_uri}:delete;
+		    $new_uri = True;
+		}
+		when 'h' {
+		    nav_help;
+		    $new_uri = True;
+		}
+	    }
+	}
+	cursor($x, $y);
+    }
+    nav_message(' ');
+    clear_screen;
+    cursor(0, q:x/tput lines/.chomp.Int);
+    %uri_cache = Hash.new;
+    $current_uri = Str.new;
+    last_uris(map { $_<uri> }, @uris);
+    $message;
+}
+
+
+sub get_char {
+    ENTER shell "stty raw -echo min 1 time 1";
+    LEAVE shell "stty sane";
+    $*IN.read(1).decode;
+}
+
+
+sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
+    $default_nav_message ||= '';
+    $x ||= 0;
+    $y ||= 0;
+    $nav_message = $message if $message;
+    $default_nav_message = $message if $set_default;
+    $nav_message = $default_nav_message if $default;
+    run 'tput', 'civis'; # hide the cursor
+    $term_lines ||= q:x/tput lines/.chomp.Int;
+    print_at(sprintf("%-*s", $term_cols - 1, $nav_message), 0, $term_lines);
+    cursor($x, $y);
+    run 'tput', 'cvvis'; # show the cursor
+}
+
+
+sub clear_screen {
+    print state $ = qx[clear];
+    nav_message;
+}
+
+
+sub clear_nav_cursor($line = False) {
+    print_at(' ', $nav_cursor_col, $line || $y);
+}
+
+
+sub print_nav_cursor(Int $clear = 0) {
+    clear_nav_cursor($clear) if $clear;
+    print_at(colored('>', 'bold'), $nav_cursor_col, $y) unless $y == $y_offset && $current_nav_offset == 0;
+}
+
+
+sub to_resolve_params(@args) {
+    @args.map: { / '=' / ?? $_ !! 'resolve[]=' ~ $_};
+}
+    
+
+sub plot_uri(Str $uri, @args = (), Bool :$reload) {
+    %uri_cache ||= Hash.new;
+    %current_refs = Hash.new;
+
+    my %json;
+    if %uri_cache{$uri} && !$reload {
+	%json = %uri_cache{$uri}<json>;
+    } else {
+	nav_message("getting $uri ...");
+	my $raw_json = client.get($uri, to_resolve_params(@args));
+	nav_message("parsing $uri ...");
+	%json = from-json $raw_json;
+	%uri_cache{$uri} = { json => %json, y => $y_offset, offset => 0 };
+	nav_message(:default);
+    }
+
+    %uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
+    %uri_cache{$current_uri}<offset> = $current_nav_offset if $current_uri && %uri_cache{$current_uri};
+    $current_uri = $uri;
+
+    return False if %json<error>:exists;
+    
+    nav_message("plotting $uri ...");
+    $term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
+    $term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
+    run 'tput', 'civis';                   # hide the cursor
+    clear_screen;
+
+    print_at(colored(record_label(%json).Str, 'bold'), 2, 3);
+    print_at(record_summary(%json), 6, 4);
+    print_at(colored($uri, 'bold'), 4, 6);
+    @uris = Array.new;
+    @uris.push(uri_hash($uri, 'top', colored($uri, 'bold'), 4));
+    $y = 7;
+
+    plot_hash(%json, 'top', 6);
+    $nav_page_size = $term_lines - $y_offset - 2;
+    print_nav_page(%uri_cache{$current_uri}<offset>, %uri_cache{$current_uri}<y>);
+	
+    $x = 2;
+    $y = %uri_cache{$uri}<y>;
+    cursor($x, $y);
+    run 'tput', 'cvvis'; # show the cursor
+    nav_message(:default);
+}
+
+
+sub uri_hash($uri, $ref, $label, $indent) {
+    (uri => $uri, ref => $ref, label => $label, indent => $indent).Hash;
+}
+
+sub plot_hash(%hash, $parent, $indent) {
+    my $found_ref = 0;
+    for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
+	my $val = %hash{$prop};
+	if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
+	    plot_ref($val, %hash, $parent, $indent);
+	    $found_ref = 1;
+	} elsif $val.WHAT ~~ Hash {
+	    plot_hash($val, $prop, $indent+$found_ref);
+	} elsif $val.WHAT ~~ Array {
+	    for $val.values -> $h {
+		last if $y >= $term_lines;
+		if $h.WHAT ~~ Hash {
+		    plot_hash($h, $prop, $indent+$found_ref);
+		}
+	    }
+	}
+    }
+}
+
+
+sub plot_ref($uri, %hash, $parent, $indent) {
+    my $s = sprintf "%-*s %s", $nav_cursor_col - 5, $uri, link_label($parent, %hash);
+    @uris.push(uri_hash($uri, $parent, $s, $indent));
+}
+
+
+sub print_nav_page(Int $offset, Int $cursor_y) {
+    $current_nav_offset = ($offset, 0).max;
+    my $last_y = $y;
+    my $has_next_page = so @uris > $offset + $nav_page_size;
+    for ($offset..$offset + $nav_page_size) {
+	my %ref = @uris[$_];
+	if %ref {
+	    %current_refs{$_} = %ref<ref>;
+	    print_at(' ' x %ref<indent> ~ %ref<label>, 0, $_ - $offset + $y_offset, :fill);
+	    $last_y = $_ - $offset + $y_offset;
+	} else {
+	    print_at(' ', 0, $_ - $offset + $y_offset, :fill);
+	}
+    }
+    $y = ($last_y, $cursor_y).min;
+    print_nav_cursor;
+    print_at('^', 1, $y_offset) if $offset > 0;
+    print_at('v', 1, $nav_page_size + $y_offset) if $has_next_page;
+}
+    
+
+sub record_label(%hash) {
+    my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
+    $label ~~ s:g/'<' .+? '>'// if $label;
+    $label;
+}
+
+
+sub record_summary(%hash) {
+    RECORD_SUMMARY_ARRAYS.map: {
+	$_ ~ ': ' ~ %hash{$_}.elems if %hash{$_}:exists && %hash{$_} > 0;
+    }
+}
+
+
+sub link_label($prop, %hash) {
+    my $label = $prop;
+    LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
+    my $record;
+    if %hash<_resolved>:exists {
+	$record = record_label(%hash<_resolved>);
+    } else {
+	$record = record_label(%hash);
+    }
+    $label ~= "  > $record" if $record;
+    $label ~~ s:g/'<' .+? '>'//;
+    $label;
+}
+
+
+sub print_at($s, $col, $row, Bool :$fill) {
+    cursor($col, $row);
+    $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
+    $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
+    printf("%-*.*s", ($fill ?? $term_cols !! $s.chars, $term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
+}
+
+
+sub print_nav_help($s, $line) {
+    print_at(sprintf("  %-*s", 70, $s), $term_cols - 50, $line);
+}
+    
+
+sub nav_help {
+    run 'tput', 'civis'; # hide the cursor
+    print_nav_help('', 1);
+    print_nav_help(colored('UP', 'bold') ~ '/' ~ colored('DOWN', 'bold') ~ '  Select Previous/Next uri', 2);
+    print_nav_help(colored('LEFT', 'bold') ~ '     Back to last uri', 3);
+    print_nav_help(colored('RIGHT', 'bold') ~ '    Load selected uri', 4);
+    print_nav_help(colored('SPACE', 'bold') ~ '    View json for selected uri', 5);
+    print_nav_help(colored('RETURN', 'bold') ~ '   View summary for selected uri', 6);
+    print_nav_help(colored('r', 'bold') ~ '        Resolve refs like the selected uri', 7);
+    print_nav_help(colored('q', 'bold') ~ '        Quit navigator', 8);
+    print_nav_help(colored('h', 'bold') ~ '        This help', 9);
+    print_nav_help('', 10);
+    print_nav_help(colored('    <ANY KEY> to exit help', 'bold'), 11);
+    print_nav_help('', 12);
+    get_char;
+    cursor($x, $y);
+    run 'tput', 'cvvis'; # show the cursor
+}
+    
+
+sub stripped($t) {
+    # this should be a grammar
+    my @dropped = <lock_version created_by last_modified_by create_time
+                   system_mtime user_mtime jsonmodel_type>;
+
+    my @tl = grep -> $line {
+	(!grep -> $field { $line.index($field) }, @dropped) && $line !~~ / '[]' /;
+    }, $t.lines;
+
+    @tl = map {
+	my $line = $_;
+	if $line.chars > $term_cols-2 {
+	    my $left = $line.index(':') || $line.index('"') || 10;
+	    my $offset = $term_cols;
+	    while $offset < $line.chars {
+		my $off = $line.substr(0, $offset).rindex(' ') || $offset;
+		$off += 1 unless $off == $offset;
+		# $line = $line.substr(0, $off) ~ "\n" ~ ' ' x $left ~ $line.substr($off);
+		$line.substr-rw($off, 0) = "\n" ~ ' ' x $left;
+		$offset = $off + $term_cols-2;
+	    }
+	}
+	$line;
+    }, @tl;
+	
+    my $out = @tl.join("\n");
+
+    $out ~~ s:g/ (<-[\\]>) '"'/$0/;
+    $out ~~ s:g/ '\"'/\x22/; # avoiding explicit " so emacs mode doesn't freak out
+    $out ~~ s:g/",\n"/\n/;
+    $out ~~ s:g/^^ \s* '[' $$/\n/;
+    $out ~~ s:g/^^ \s* ']' $$//;
+    $out ~~ s:g/\s* '}' \s* '{'/\n/;
+    $out ~~ s:g/^^ \s* '{' \n//;
+    $out ~~ s:g/^^ \s* '}' \n?//;
+	
+    $out;
+}
