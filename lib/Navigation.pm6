@@ -2,8 +2,8 @@ use Functions;
 use Terminal::ANSIColor;
 use JSON::Tiny;
 
-my Int $x;
-my Int $y;
+my Int $x = 0;
+my Int $y = 0;
 my Int $nav_cursor_col = 50;
 my Int $y_offset = 6;
 my Hash @uris;
@@ -42,7 +42,7 @@ sub navigation($start_uri, @args, $line) is export {
     my $c = '';
     my @uri_history = ();
     my $message = '';
-    @resolves = @args;
+    @resolves = @args || ();
     while $c ne 'q' {
 	if $new_uri {
 	    plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
@@ -111,10 +111,10 @@ sub navigation($start_uri, @args, $line) is export {
 						    to_resolve_params(@resolves)));
 		}
 		when 'r' {
-		    if @resolves.grep(%current_refs{$y}) {
-			@resolves = @resolves.grep: { $_ ne %current_refs{$y} };
+		    if @resolves.grep(%current_refs{$y-$y_offset}) {
+			@resolves = @resolves.grep: { $_ ne %current_refs{$y-$y_offset} };
 		    } else {
-			@resolves.push(%current_refs{$y});
+			@resolves.push(%current_refs{$y-$y_offset});
 		    }
 		    %uri_cache{$current_uri}:delete;
 		    $new_uri = True;
@@ -134,6 +134,11 @@ sub navigation($start_uri, @args, $line) is export {
     $current_uri = Str.new;
     last_uris(map { $_<uri> }, @uris);
     $message;
+}
+
+
+sub cursor(Int $col, Int $row) {
+    print "\e[{$row};{$col}H";
 }
 
 
@@ -183,7 +188,6 @@ sub to_resolve_params(@args) {
 
 sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     %uri_cache ||= Hash.new;
-    %current_refs = Hash.new;
 
     my %json;
     if %uri_cache{$uri} && !$reload {
@@ -193,16 +197,17 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 	my $raw_json = client.get($uri, to_resolve_params(@args));
 	nav_message("parsing $uri ...");
 	%json = from-json $raw_json;
-	%uri_cache{$uri} = { json => %json, y => $y_offset, offset => 0 };
+	return False if %json<error>:exists;
+	%uri_cache{$uri} = { json => %json.clone, y => $y_offset, offset => 0 };
 	nav_message(:default);
     }
 
-    %uri_cache{$current_uri}<y> = $y if $current_uri && %uri_cache{$current_uri};
-    %uri_cache{$current_uri}<offset> = $current_nav_offset if $current_uri && %uri_cache{$current_uri};
+    if (%uri_cache{$current_uri}:exists) {
+	%uri_cache{$current_uri}<y> = $y;
+	%uri_cache{$current_uri}<offset> = $current_nav_offset;
+    }
     $current_uri = $uri;
 
-    return False if %json<error>:exists;
-    
     nav_message("plotting $uri ...");
     $term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
     $term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
@@ -260,6 +265,7 @@ sub plot_ref($uri, %hash, $parent, $indent) {
 
 
 sub print_nav_page(Int $offset, Int $cursor_y) {
+    %current_refs = Hash.new;
     $current_nav_offset = ($offset, 0).max;
     my $last_y = $y;
     my $has_next_page = so @uris > $offset + $nav_page_size;
@@ -380,3 +386,4 @@ sub stripped($t) {
 	
     $out;
 }
+

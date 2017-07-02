@@ -190,11 +190,6 @@ sub schemas(Bool :$reload, Str :$name) is export {
 }
 
 
-sub cursor(Int $col, Int $row) is export {
-    print "\e[{$row};{$col}H";
-}
-
-
 sub tmp_file is export {
     store.path(TMP_FILE);
 }
