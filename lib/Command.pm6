@@ -122,7 +122,7 @@ class Command {
 
 
     method nav {
-	navigation($!first, @!args, $!line);
+	Navigation.new(uri =>$!first, args =>@!args, line => $!line).start;
     }
 
     

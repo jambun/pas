@@ -2,6 +2,11 @@ use Functions;
 use Terminal::ANSIColor;
 use JSON::Tiny;
 
+unit class Navigation;
+has $.uri;
+has @.args;
+has $.line;
+
 my Int $x = 0;
 my Int $y = 0;
 my Int $nav_cursor_col = 50;
@@ -34,15 +39,15 @@ my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statem
 my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
 
 
-sub navigation($start_uri, @args, $line) is export {
-    my $uri = $start_uri;
-    nav_message(cmd_prompt() ~ " $line", :set_default);
+method start {
+    my $uri = $!uri;
+    nav_message(cmd_prompt() ~ " $!line", :set_default);
     clear_screen;
     my Bool $new_uri = True;
     my $c = '';
     my @uri_history = ();
     my $message = '';
-    @resolves = @args || ();
+    @resolves = @!args || ();
     while $c ne 'q' {
 	if $new_uri {
 	    plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
@@ -149,6 +154,14 @@ sub get_char {
 }
 
 
+sub print_at($s, $col, $row, Bool :$fill) {
+    cursor($col, $row);
+    $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
+    $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
+    printf("%-*.*s", ($fill ?? $term_cols - $col !! $s.chars, $term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
+}
+
+
 sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
     $default_nav_message ||= '';
     $x ||= 0;
@@ -184,7 +197,7 @@ sub print_nav_cursor(Int $clear = 0) {
 sub to_resolve_params(@args) {
     @args.map: { / '=' / ?? $_ !! 'resolve[]=' ~ $_};
 }
-    
+
 
 sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     %uri_cache ||= Hash.new;
@@ -270,8 +283,8 @@ sub print_nav_page(Int $offset, Int $cursor_y) {
     my $last_y = $y;
     my $has_next_page = so @uris > $offset + $nav_page_size;
     for ($offset..$offset + $nav_page_size) {
-	my %ref = @uris[$_];
-	if %ref {
+	if @uris[$_]:exists {
+	    my %ref = @uris[$_];
 	    %current_refs{$_} = %ref<ref>;
 	    print_at(' ' x %ref<indent> ~ %ref<label>, 0, $_ - $offset + $y_offset, :fill);
 	    $last_y = $_ - $offset + $y_offset;
@@ -315,18 +328,10 @@ sub link_label($prop, %hash) {
 }
 
 
-sub print_at($s, $col, $row, Bool :$fill) {
-    cursor($col, $row);
-    $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
-    $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
-    printf("%-*.*s", ($fill ?? $term_cols !! $s.chars, $term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
-}
-
-
 sub print_nav_help($s, $line) {
-    print_at(sprintf("  %-*s", 70, $s), $term_cols - 50, $line);
+    print_at(" $s", $term_cols - 50, $line, :fill);
 }
-    
+
 
 sub nav_help {
     run 'tput', 'civis'; # hide the cursor
@@ -386,4 +391,3 @@ sub stripped($t) {
 	
     $out;
 }
-

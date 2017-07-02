@@ -1,6 +1,7 @@
 use Config;
 use Pas::ASClient;
 use Pas::Store;
+use JSONPretty;
 
 use JSON::Tiny;
 use Digest::MD5;
