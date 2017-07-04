@@ -76,13 +76,18 @@ class Command {
 	    last if $model ~~ s/'JSONModel(:' (\w+) ')'/$0/;
 	}
 
-        save_tmp(pretty client.get('/stub/' ~ $model, @!args));
+        save_tmp(interpolate_help() ~ pretty(client.get('/stub/' ~ $model, @!args)));
 
 	my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
 	if edit(tmp_file) {
 	    my $out = '';
 	    my $json = slurp(tmp_file);
-	    for ^$times -> $c { $out ~= $c+1 ~ ' ' ~ pretty extract_uris client.post($!first, @!args, interpolate($json, $c+1)) }
+	    for ^$times -> $c {
+		$out ~= $c+1 ~ ' ' ~
+		        pretty extract_uris client.post($!first,
+							@!args,
+							interpolate(remove_comments($json), $c+1))
+	    }
 	    $out;
 	} else {
 	    'No changes to post.';

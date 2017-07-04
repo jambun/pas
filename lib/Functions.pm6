@@ -127,10 +127,40 @@ sub interpolate($text, $count) is export {
     $out ~~ s:g/'h' (\d*) ':(' <-[)]>+ ')' /{random_hex($0.Int || 7)}/;
     $out ~~ s:g/'d:(' <-[)]>+ ')' /{random_date()}/;
 
+    $out ~~ s:g/'(' [ ':' (<-[|]>+) '|' || <-[)]>+ '|:' (<-[|)]>+) ] .*?  ')'/{$0 ?? $0.Str !! $1.Str}/;
+
+    $out ~~ s:g/'(' (<-[)]>+ '|' <-[)]>+) ')' /{select_from($0.Str)}/;
     $out ~~ s:g/'(string)'/{random_hex(7)}/;
     $out ~~ s:g/'(date)' /{random_date()}/;
 
     $out;
+}
+
+
+sub interpolate_help is export {
+    q:to/END/;
+    # Stub interpolation
+    #
+    #  Lines starting with # are comments and will be removed
+    #
+    #   {n}       -> The number of the record counting from 1 (eg stub.3 will yield 1, 2 and 3)
+    #   {h}       -> A random hex value of 7 chars
+    #   {h#}      -> A random hex value of # chars
+    #   s:(..|..) -> Randomly select from a list
+    #   h:(...)   -> A random hex value of 7 chars
+    #   h#:(...)  -> A random hex value of # chars
+    #   d:(...)   -> A random date
+    #   (..|:..)  -> Select the item following : from a list
+    #   (..|..)   -> Same as s:(..|..)
+    #   (string)  -> A random hex value of 7 chars
+    #   (date)    -> A random date
+    #
+    END
+}
+
+
+sub remove_comments($text) is export {
+    $text.subst(/^^ \s*? '#' .*? \n/, '', :g);
 }
 
 
@@ -160,7 +190,7 @@ sub extract_uris($text) is export {
 
 sub load_endpoints(Bool :$force) is export {
     return @ENDPOINTS if @ENDPOINTS && !$force;
-    
+
     my $e = client.get(ENDPOINTS_URI).trim;
     if $e ~~ /^ <-[{[]> / {
 	say 'No endpoints endpoint!';
