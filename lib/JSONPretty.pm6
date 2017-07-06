@@ -34,7 +34,7 @@ grammar Grammar {
 }
 
 
-class Actions {
+class PrettyActions {
     has Int $.step = 2;
 
     method indent(Str $json) {
@@ -70,6 +70,6 @@ class Actions {
 
 
 our sub prettify($json, $indent) {
-    Grammar.parse($json, :actions(Actions.new(step => $indent))).made;
+    Grammar.parse($json, :actions(PrettyActions.new(step => $indent))).made;
 }
 

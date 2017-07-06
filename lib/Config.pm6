@@ -75,7 +75,7 @@ class Config {
 
 
     method json {
-        JSONPretty::Grammar.parse(to-json(self.stripped), :actions(JSONPretty::Actions.new)).made;
+        JSONPretty::Grammar.parse(to-json(self.stripped), :actions(JSONPretty::PrettyActions.new)).made;
     }
 
 
