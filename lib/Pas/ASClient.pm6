@@ -3,6 +3,7 @@ use Pas::Logger;
 
 use Net::HTTP::GET;
 use Net::HTTP::POST;
+use URI::Encode;
 use JSON::Tiny;
 
 
@@ -58,9 +59,7 @@ class Pas::ASClient {
     method build_url($uri, @pairs) {
 	my $url = $!config.attr<url> ~ $uri;
 	$url ~= '?' ~ @pairs.join('&') if @pairs;
-	# FIXME: escape this properly
-	$url ~~ s:g/\s/\%20/;
-	$url;
+	uri_encode($url);
     }
     
     method post($uri, @pairs, $data) {
