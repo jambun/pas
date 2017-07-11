@@ -19,6 +19,10 @@ class Pas::ASClient {
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
     method !http { $!http //= HTTP::UserAgent.new; }
 
+    method !handle_get($url, %header) {
+	self!http.request(HTTP::Request.new(:GET($url), |%header));
+    }
+    
     method !handle_delete($url, %header) {
 	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
     }
@@ -37,7 +41,7 @@ class Pas::ASClient {
 	my $response;
         try {
 	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! self!handle_get($url, %header);
         
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -54,7 +58,7 @@ class Pas::ASClient {
 
 	    # and try the request again
        	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! self!handle_get($url, %header);
 	}
     
 	self.log.blurt($response.status-line);
