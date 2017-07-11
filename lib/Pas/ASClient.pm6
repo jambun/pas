@@ -23,25 +23,30 @@ class Pas::ASClient {
 	self!http.request(HTTP::Request.new(:GET($url), |%header));
     }
     
+    method !handle_post($url, %header, $body) {
+	my $request = HTTP::Request.new(:POST($url), |%header);
+	$request.add-content($body);
+	self!http.request($request);
+    }
+    
     method !handle_delete($url, %header) {
 	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
     }
     
     method !request($uri, @pairs, $body?, Bool :$delete) {
 	my $url = self.build_url($uri, @pairs);
-	my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
-
-        %header<X-ArchivesSpace-Priority> = 'high';
+	my %header = 'X-ArchivesSpace-Priority' => 'high';
 	%header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 	%header<Content-Type> = 'text/json' if $body;
 
 	self.log.blurt(%header);
 	self.log.blurt($url);
+	self.log.blurt($body) if $body;
 
 	my $response;
         try {
 	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! self!handle_get($url, %header);
+	                $body ?? self!handle_post($url, %header, $body) !! self!handle_get($url, %header);
         
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -58,7 +63,7 @@ class Pas::ASClient {
 
 	    # and try the request again
        	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! self!handle_get($url, %header);
+	                $body ?? self!handle_post($url, %header, $body) !! self!handle_get($url, %header);
 	}
     
 	self.log.blurt($response.status-line);
@@ -68,7 +73,7 @@ class Pas::ASClient {
 	    say "Say 'login.prompt' to re-enter login details, or 'session' to find a good session";
 	}
 
-	$response.WHAT ~~ HTTP::Response ??  $response.decoded-content !! $response.body.decode('utf-8');
+	$response.decoded-content;
     }
 
 
@@ -78,8 +83,7 @@ class Pas::ASClient {
 	uri_encode($url);
     }
     
-    method post($uri, @pairs, $data) {
-	my $body = Buf.new($data.ords);
+    method post($uri, @pairs, $body) {
 	self!request($uri, @pairs, $body);
     }
 
