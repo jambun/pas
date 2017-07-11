@@ -16,7 +16,7 @@ class Pas::ASClient {
 
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
 
-    method !request($uri, @pairs, $body?) {
+    method !request($uri, @pairs, $body?, Bool :$delete) {
 	my $url = self.build_url($uri, @pairs);
 	my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
 
@@ -29,9 +29,13 @@ class Pas::ASClient {
 
 	my $response;
         try {
-	    $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+	    $response = $delete ?? Net::HTTP::DELETE($url, :%header) !!
+	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
         
-            CATCH { self.log.blurt("Sadly, nobody seems to be listening at $url"); return '{"error": "No backend"}' }
+            CATCH {
+                self.log.blurt("Sadly, something went wrong: " ~ .Str);
+		self.log.blurt(.backtrace);
+		return '{"error": "' ~ .Str ~ '"}' }
         }
 
 	# there's something wrong with the session
@@ -72,6 +76,10 @@ class Pas::ASClient {
 	self!request($uri, @pairs);
     }
 
+    
+    method delete($uri) {
+	self!request($uri, [], :delete);
+    }
 
     # FIXME: this session handling stuff should probably move
     #        to Config, and probably wants a Session class

@@ -16,8 +16,8 @@ class Command {
     has     $!first;
     has     @.args;
     
-    my constant ACTIONS = <show update create edit stub post search nav
-                           login logout run
+    my constant ACTIONS = <show update create edit stub post delete
+                           search nav login logout run
                            endpoints schemas config session user who
                            history last set ls help quit>;
 
@@ -98,6 +98,11 @@ class Command {
     method post {
 	my $post_file = @!args.pop;
 	pretty extract_uris client.post($!first, @!args, slurp($post_file));
+    }
+
+
+    method delete {
+	pretty extract_uris client.delete($!first);
     }
 
 
