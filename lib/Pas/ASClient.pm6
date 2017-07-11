@@ -4,10 +4,12 @@ use Pas::Logger;
 use Net::HTTP::GET;
 use Net::HTTP::POST;
 use URI::Encode;
+use HTTP::UserAgent;
 use JSON::Tiny;
 
 
 class Pas::ASClient {
+    has HTTP::UserAgent $!http;
     has Config $.config;
     has Pas::Logger $.log;
 
@@ -15,7 +17,12 @@ class Pas::ASClient {
     our constant ANON_USER     = 'anon';
 
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
+    method !http { $!http //= HTTP::UserAgent.new; }
 
+    method !handle_delete($url, %header) {
+	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
+    }
+    
     method !request($uri, @pairs, $body?, Bool :$delete) {
 	my $url = self.build_url($uri, @pairs);
 	my %header = 'Connection' => 'close';   # << this works around a bug in Net::HTTP
@@ -29,7 +36,7 @@ class Pas::ASClient {
 
 	my $response;
         try {
-	    $response = $delete ?? Net::HTTP::DELETE($url, :%header) !!
+	    $response = $delete ?? self!handle_delete($url, %header) !!
 	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
         
             CATCH {
@@ -46,7 +53,8 @@ class Pas::ASClient {
 	    %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 
 	    # and try the request again
-       	    $response = $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
+       	    $response = $delete ?? self!handle_delete($url, %header) !!
+	                $body ?? Net::HTTP::POST($url, :%header, :$body) !! Net::HTTP::GET($url, :%header);
 	}
     
 	self.log.blurt($response.status-line);
@@ -56,7 +64,7 @@ class Pas::ASClient {
 	    say "Say 'login.prompt' to re-enter login details, or 'session' to find a good session";
 	}
 
-	$response.body.decode('utf-8');
+	$response.WHAT ~~ HTTP::Response ??  $response.decoded-content !! $response.body.decode('utf-8');
     }
 
 
