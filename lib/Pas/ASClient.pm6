@@ -1,10 +1,8 @@
 use Config;
 use Pas::Logger;
 
-use Net::HTTP::GET;
-use Net::HTTP::POST;
-use URI::Encode;
 use HTTP::UserAgent;
+use URI::Encode;
 use JSON::Tiny;
 
 

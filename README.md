@@ -6,7 +6,7 @@ Needs Perl6. Currently developing against:
       This is Rakudo version 2017.04.3 built on MoarVM version 2017.04-53-g66c6dda
       implementing Perl 6.c.
 
-With Net::HTTP, URI::Encode, HTTP::UserAgent and Crypt::Random.
+With URI::Encode, HTTP::UserAgent and Crypt::Random.
 
 And an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints) to make `endpoints` and `stub` work.
 
