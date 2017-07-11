@@ -23,9 +23,9 @@ class Pas::ASClient {
 	self!http.request(HTTP::Request.new(:GET($url), |%header));
     }
     
-    method !handle_post($url, %header, $body) {
+    method !handle_post($url, %header, $body?) {
 	my $request = HTTP::Request.new(:POST($url), |%header);
-	$request.add-content($body);
+	$request.add-content($body) if $body;
 	self!http.request($request);
     }
     
@@ -159,10 +159,10 @@ class Pas::ASClient {
 	my $uri      = '/users/' ~ $!config.attr<user> ~ '/login';
 	my @pairs    = ["password={$!config.attr<pass>}"];
 	my %header   = 'Connection' => 'close';
-	my $resp     = Net::HTTP::POST(self.build_url($uri, @pairs), :%header);
+	my $resp     = self!handle_post(self.build_url($uri, @pairs), %header);
 
 	if $resp.status-line ~~ /200/ {
-            $!config.attr<token> = (from-json $resp.body.decode('utf-8'))<session>;
+            $!config.attr<token> = (from-json $resp.decoded-content)<session>;
 	    $!config.attr<time> = time;
 	    self.add_session;
 	    'Successfully logged in to ' ~ $!config.attr<url> ~ ' as ' ~ $!config.attr<user>;
