@@ -7,7 +7,8 @@ class Pas::Store {
     }
 
 
-    method load($file) {
+    method load($file, Bool :$make) {
+	$make && !self.path($file).IO.e && spurt(self.path($file), '');
 	slurp self.path($file);
     }
     

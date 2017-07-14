@@ -1,5 +1,6 @@
 use Config;
 use Pas::ASClient;
+use Pas::Help;
 use Functions;
 use Navigation;
 
@@ -274,7 +275,19 @@ class Command {
 
 
     method help {
-	shell_help;
+	if $!first {
+	    if @!args > 0 && @!args[0].starts-with('w') {
+		if edit(store.path(Pas::Help.new(:store(store)).file($!first))) {
+		    "Help saved.";
+		} else {
+		    'No changes to save.';
+		}
+	    } else {
+		Pas::Help.new(:store(store)).topic($!first);
+	    }
+	} else {
+	    shell_help;
+	}
     }
 
 
