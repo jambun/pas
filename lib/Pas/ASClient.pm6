@@ -30,6 +30,12 @@ class Pas::ASClient {
     method !handle_delete($url, %header) {
 	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
     }
+
+    method !handle_request($url, %header, $body, Bool :$delete) {
+	$delete ?? self!handle_delete($url, %header) !!
+    	           $body ?? self!handle_post($url, %header, $body) !!
+	                    self!handle_get($url, %header);
+    }
     
     method !request($uri, @pairs, $body?, Bool :$delete) {
 	my $url = self.build_url($uri, @pairs);
@@ -43,8 +49,7 @@ class Pas::ASClient {
 
 	my $response;
         try {
-	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? self!handle_post($url, %header, $body) !! self!handle_get($url, %header);
+	    $response = self!handle_request($url, %header, $body, :$delete);
         
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -60,8 +65,7 @@ class Pas::ASClient {
 	    %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 
 	    # and try the request again
-       	    $response = $delete ?? self!handle_delete($url, %header) !!
-	                $body ?? self!handle_post($url, %header, $body) !! self!handle_get($url, %header);
+	    $response = self!handle_request($url, %header, $body, :$delete);
 	}
     
 	self.log.blurt($response.status-line);
