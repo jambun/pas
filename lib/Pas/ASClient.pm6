@@ -17,22 +17,25 @@ class Pas::ASClient {
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
     method !http { $!http //= HTTP::UserAgent.new; }
 
-    method !handle_get($url, %header) {
-	self!http.request(HTTP::Request.new(:GET($url), |%header));
+    method !get_request($url, %header) {
+	HTTP::Request.new(:GET($url), |%header);
     }
     
-    method !handle_post($url, %header, $body?) {
+    method !post_request($url, %header, $body?) {
 	my $request = HTTP::Request.new(:POST($url), |%header);
 	$request.add-content($body) if $body;
-	self!http.request($request);
+	$request;
     }
 
-    method !handle_multipart($url, %header, %files is copy) {
+    method !delete_request($url, %header) {
+	HTTP::Request.new(:DELETE($url), |%header);
+    }
+
+    method !multipart_request($url, %header, %files is copy) {
 	for %files.kv -> $name, $file {
 	    my ($filename, $type) = $file.split('::');
 	    unless $filename.IO.e {
 		self.log.blurt("File not found: $filename");
-		# %bad_parts{$name} = $filename;
 		next;
 	    }
 	    unless $type {
@@ -46,20 +49,16 @@ class Pas::ASClient {
 	}
 	my $request = HTTP::Request.new(:POST($url), |%header);
 	$request.add-form-data(%files, :multipart);
-	self.log.blurt($request.Str);
-	self!http.request($request);
+	$request;
     }
     
-    method !handle_delete($url, %header) {
-	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
-    }
-
     method !handle_request($url, %header, $body, %files = {}, Bool :$delete) {
-	self.log.blurt(%files.perl);
-	$delete ?? self!handle_delete($url, %header) !!
-	           %files ?? self!handle_multipart($url, %header, %files) !!
-    	                     $body ?? self!handle_post($url, %header, $body) !!
-	                              self!handle_get($url, %header);
+	my $request = $delete ?? self!delete_request($url, %header) !!
+	                         %files ?? self!multipart_request($url, %header, %files) !!
+    	                                   $body ?? self!post_request($url, %header, $body) !!
+	                                            self!get_request($url, %header);
+	self.log.blurt($request.Str);
+	self!http.request($request);
     }
     
     method !request($uri, @pairs, $body?, Bool :$delete) {
@@ -67,10 +66,6 @@ class Pas::ASClient {
 	my %header = 'X-ArchivesSpace-Priority' => 'high';
 	%header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 	%header<Content-Type> = 'text/json' if $body;
-
-	self.log.blurt(%header);
-	self.log.blurt($url);
-	self.log.blurt($body) if $body;
 
 	my %files = (flat @pairs.grep(/'=<<'/).map: { .split('=<<')  }).Hash;
 
@@ -190,7 +185,7 @@ class Pas::ASClient {
 	my $uri      = '/users/' ~ $!config.attr<user> ~ '/login';
 	my @pairs    = ["password={$!config.attr<pass>}"];
 	my %header   = 'Connection' => 'close';
-	my $resp     = self!handle_post(self.build_url($uri, @pairs), %header);
+	my $resp     = self!http.request(self!post_request(self.build_url($uri, @pairs), %header));
 
 	if $resp.status-line ~~ /200/ {
             $!config.attr<token> = (from-json $resp.decoded-content)<session>;
