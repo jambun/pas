@@ -26,15 +26,40 @@ class Pas::ASClient {
 	$request.add-content($body) if $body;
 	self!http.request($request);
     }
+
+    method !handle_multipart($url, %header, %files is copy) {
+	for %files.kv -> $name, $file {
+	    my ($filename, $type) = $file.split('::');
+	    unless $filename.IO.e {
+		self.log.blurt("File not found: $filename");
+		# %bad_parts{$name} = $filename;
+		next;
+	    }
+	    unless $type {
+		if $filename ~~ /\.(<-[.]>+)$/ {
+		    $type = 'text/' ~ $0.Str;
+		}
+	    }
+	    $type ||= 'text/plain';
+	    my %h = 'Content-Type' => $type;
+	    %files{$name} = [$file, $file, |%h];
+	}
+	my $request = HTTP::Request.new(:POST($url), |%header);
+	$request.add-form-data(%files, :multipart);
+	self.log.blurt($request.Str);
+	self!http.request($request);
+    }
     
     method !handle_delete($url, %header) {
 	self!http.request(HTTP::Request.new(:DELETE($url), |%header));
     }
 
-    method !handle_request($url, %header, $body, Bool :$delete) {
+    method !handle_request($url, %header, $body, %files = {}, Bool :$delete) {
+	self.log.blurt(%files.perl);
 	$delete ?? self!handle_delete($url, %header) !!
-    	           $body ?? self!handle_post($url, %header, $body) !!
-	                    self!handle_get($url, %header);
+	           %files ?? self!handle_multipart($url, %header, %files) !!
+    	                     $body ?? self!handle_post($url, %header, $body) !!
+	                              self!handle_get($url, %header);
     }
     
     method !request($uri, @pairs, $body?, Bool :$delete) {
@@ -47,9 +72,11 @@ class Pas::ASClient {
 	self.log.blurt($url);
 	self.log.blurt($body) if $body;
 
+	my %files = (flat @pairs.grep(/'=<<'/).map: { .split('=<<')  }).Hash;
+
 	my $response;
         try {
-	    $response = self!handle_request($url, %header, $body, :$delete);
+	    $response = self!handle_request($url, %header, $body, %files, :$delete);
         
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -65,7 +92,7 @@ class Pas::ASClient {
 	    %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 
 	    # and try the request again
-	    $response = self!handle_request($url, %header, $body, :$delete);
+	    $response = self!handle_request($url, %header, $body, %files, :$delete);
 	}
     
 	self.log.blurt($response.status-line);
@@ -79,7 +106,9 @@ class Pas::ASClient {
     }
 
 
-    method build_url($uri, @pairs) {
+    method build_url($uri, @pairs is copy) {
+	# remove any file upload pairs
+	@pairs = @pairs.grep: {! .Str.comb('=<<')}
 	my $url = $!config.attr<url> ~ $uri;
 	$url ~= '?' ~ @pairs.join('&') if @pairs;
 	uri_encode($url);
