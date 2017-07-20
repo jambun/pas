@@ -106,14 +106,21 @@ method start {
 		}
 	    }
 	} else {
+	    my $yix = $y - $y_offset;
+	    my %selected = @uris[$yix];
 	    given $c {
 		when ' ' {
-		    page(pretty client.get(@uris[$y-$y_offset]<uri>,
+		    page(pretty client.get(%selected<uri>,
 					   to_resolve_params(@resolves)));
 		}
 		when "\r" {
 		    page(stripped pretty client.get(@uris[$y-$y_offset]<uri>,
 						    to_resolve_params(@resolves)));
+		}
+		when 'e' {
+		    plot_edit(%selected<uri>, @resolves) || ($message = "No record for $uri");
+		    get_char;
+		    plot_uri($uri, @resolves) || ($message = "No record for $uri");
 		}
 		when 'r' {
 		    if @resolves.grep(%current_refs{$y-$y_offset}) {
@@ -198,6 +205,26 @@ sub to_resolve_params(@args) {
     @args.map: { / '=' / ?? $_ !! 'resolve[]=' ~ $_};
 }
 
+sub edit_uri($uri) {
+
+}
+
+sub plot_edit(Str $uri, @args = (), Bool :$reload) {
+    my %rec = from-json client.get($uri);
+    my $c = '';
+    my $refresh = True;
+    while $c ne 'q' {
+	print_at(%rec.map({ .perl.say }), 4, 2) if $refresh;
+	$refresh = False;
+	$c = get_char;
+	given $c {
+	    when "\r" {
+		client.post($uri, @args, to-json %rec);
+		$refresh = True;
+	    }
+	}
+    }
+}
 
 sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     %uri_cache ||= Hash.new;
