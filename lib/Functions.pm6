@@ -8,8 +8,6 @@ use Digest::MD5;
 use Crypt::Random;
 use Terminal::ANSIColor;
 
-use MONKEY-SEE-NO-EVAL;
-
 
 my constant   LAST_DIR           = 'last';
 my constant   TMP_FILE           = 'last.json';
@@ -94,26 +92,16 @@ sub modify_json($json, @pairs) is export {
 	$v = True if $v eq 'true';
 	$v = False if $v eq 'false';
 
-# FIXME: trying to avoid the EVAL ...
-#	my @binder;
-#	@binder[0] = %hash;
-#        for $k.split('.').kv -> $ix, $t {
-#	    if $t ~~ /^ \d+ $/ {
-#	       @binder[$ix + 1] := @binder[$ix][$t];       
-#	    } else {
-#	       @binder[$ix + 1] := @binder[$ix]{$t};
-#	    }
-#	}
-# doesn't work :( - says Str is immutable
-#	@binder.tail.first = $v;
-
-	# pure dodginess
-	# terms.0.term > %hash{'terms'}[0]{'term'}
-	$k ~~ s:g/<:L><[\w_]>*/\{'{$/}'\}/;
-	$k ~~ s:g/ \. (\d+) \. /\[$0\]/;
-	$k = '%hash' ~ $k;
-
-	EVAL $k ~ ' = $v';
+	my @binder;
+	@binder[0] = %hash;
+        for $k.split('.').kv -> $ix, $t {
+	    if $t ~~ /^ \d+ $/ {
+	       @binder[$ix + 1] := @binder[$ix][$t];       
+	    } else {
+	       @binder[$ix + 1] := @binder[$ix]{$t};
+	    }
+	}
+	@binder[*-1] = $v;
     }
     to-json(%hash);
 }
