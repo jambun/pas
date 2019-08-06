@@ -2,6 +2,7 @@ use Config;
 use Pas::ASClient;
 use Pas::Store;
 use JSONPretty;
+use XMLPretty;
 
 use JSON::Tiny;
 use Digest::MD5;
@@ -45,11 +46,20 @@ sub client is export { $CLIENT ||= Pas::ASClient.new(config => config) }
 sub cmd_prompt is export { 'pas ' ~ config.attr<user> ~ '> ' }
 
 
-sub pretty($json) is export {
-    if config.attr<properties><compact> || $json !~~ /^<[\{\[]>/ {
-	$json;
-    } else {
+sub pretty($json is copy) is export {
+    return $json if config.attr<properties><compact>;
+
+    if $json ~~ /^<[\{\[]>/ {
 	JSONPretty::prettify($json, config.attr<properties><indent>);
+    } elsif $json ~~ /^<[\<]>/ {
+	XMLPretty::prettify($json, config.attr<properties><indent>);
+	# a rare xml response - hack it
+#	$json ~~ s:g/ ('</' <-[\>]>+ '>') /$0\n/;
+#	$json ~~ s:g/ ('<?' <-[\>]>+ '>') /$0\n/;
+#	$json ~~ s:g/ ('<' \w <-[\>]>+ '>') /\n$0/;
+#	$json;
+    } else {
+	$json;
     }
 }
 

@@ -1,12 +1,16 @@
 #!/usr/bin/env perl6
 
+#my $lib = $?FILE;
+#$lib  ~~ s|<-[/]>*$||;
+
 use lib 'lib';
+#use lib '/Users/james/projects/perl6/lib';
+#use lib '/Users/james/projects/perl6/http-useragent/lib';
 use Config;
 use Command;
 use Functions;
 
 use Linenoise;
-
 
 sub MAIN(Str :$e?, Bool :$h) {
 
