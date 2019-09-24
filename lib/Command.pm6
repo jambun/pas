@@ -49,7 +49,11 @@ class Command {
 
 
     method update {
-	pretty extract_uris client.post($!first, @!args, modify_json(client.get($!first), @!args));
+        if ($!qualifier eq 'no_get') {
+            pretty extract_uris client.post($!first, @!args, 'nothing');
+        } else {
+            pretty extract_uris client.post($!first, @!args, modify_json(client.get($!first), @!args));
+        }
     }
 
 
@@ -59,7 +63,11 @@ class Command {
 
 
     method edit {
-        save_tmp(pretty extract_uris client.get($!first)) unless $!qualifier eq 'last';
+        if ($!qualifier eq 'no_get') {
+            save_tmp('');
+        } else {
+            save_tmp(pretty extract_uris client.get($!first)) unless $!qualifier eq 'last';
+        }
 	edit(tmp_file) ?? pretty extract_uris client.post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
     }
 
@@ -352,9 +360,11 @@ sub shell_help {
 
     uri actions:    show      show (default)
                     update    update with the pairs
+                     .no_get  post a nonce body
                     create    create using the pairs
                     edit      edit to update
                      .last    using last edited record
+                     .no_get  using an empty file
                     stub      create from an edited stub
                      .[n]     post n times
                     post      post a file (default if last arg is a file)
