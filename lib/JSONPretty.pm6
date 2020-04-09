@@ -39,14 +39,15 @@ class PrettyActions {
 
     method indent(Str $json) {
     	my Int $indent = 0;
-	my Str $out = '';
-	for $json.split("\n")>>.trim -> $line {
-	    next unless $line ~~ /./;
-	    $indent -= $!step if $line ~~ /^<[ \} \] ]>/;
-            $out ~= ' ' x $indent ~ $line ~ "\n";
-	    $indent += $!step if $line ~~ /^<[ \{ \[ ]>/;
-	}
-	$out;
+	    my Str $out = '';
+	    for $json.split("\n")>>.trim -> $line {
+	        next unless $line ~~ /./;
+	        $indent -= $!step if $line ~~ /^<[ \} \] ]>/;
+          $out ~= ' ' x $indent ~ $line ~ "\n";
+	        $indent -= $!step if $line eq '[],';
+	        $indent += $!step if $line ~~ /^<[ \{ \[ ]>/;
+	    }
+	    $out;
     }
 
     method TOP ($/)        { make self.indent($<value>.made)                  }
