@@ -41,7 +41,8 @@ class Config {
 
 
     method prompt(@attrs = <url user pass>) {
-	for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+	      for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+        %!attr<url> = 'http://localhost:' ~ %!attr<url> if %!attr<url> ~~ /^\d/;
     }
 
 
