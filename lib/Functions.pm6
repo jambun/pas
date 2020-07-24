@@ -43,7 +43,15 @@ sub config is export { $CFG ||= Config.new(:store(store)) }
 my Pas::ASClient $CLIENT;
 sub client is export { $CLIENT ||= Pas::ASClient.new(config => config) }
 
-sub cmd_prompt is export { 'pas ' ~ config.attr<user> ~ '> ' }
+sub cmd_prompt is export {
+    my $host = config.attr<url>;
+    if ($host ~~ /localhost\:(\d+)$/) {
+        $host = $0;
+    } else {
+        $host ~~ s/ 'http://' (<-[\.\:]>+) .* /$0/;
+    }
+    'pas ' ~ $host ~ ' ' ~ config.attr<user> ~ '> ';
+}
 
 
 sub pretty($json is copy) is export {
