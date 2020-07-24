@@ -156,6 +156,7 @@ class Pas::ASClient {
             time  => $!config.attr<time>
         };
         $!config.attr<sessions>{ANON_USER}<url> = $!config.attr<url>;
+        $!config.attr<sessions>{ANON_USER}<user> = ANON_USER;
         $!config.save;
     }
     
