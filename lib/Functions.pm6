@@ -50,7 +50,7 @@ sub cmd_prompt is export {
     } else {
         $host ~~ s/ 'http://' (<-[\.\:]>+) .* /$0/;
     }
-    'pas ' ~ $host ~ ' ' ~ config.attr<user> ~ '> ';
+    sprintf("pas %s %s > ", $host, config.attr<user>);
 }
 
 
