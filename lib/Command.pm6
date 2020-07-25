@@ -183,11 +183,11 @@ class Command {
             my $out = (for config.attr<sessions>.kv -> $k, $v {
                               client.switch_to_session($k);
                               my $version = (from-json client.get('/'))<archivesSpaceVersion> || 'down';
-                              $version = colored($version, $version eq 'down' ?? 'yellow' !! 'bold yellow');
-                              sprintf("%-25s  %-30s  %s  (%s)",
+                              my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
+                              my $user_fmt = colored('%-20s', config.attr<user> eq $current_user ?? 'bold green' !! 'bold white');
+                              sprintf("%-25s  $user_fmt  $version_fmt  %s",
                                       $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
-                                      colored($k, config.attr<user> eq $current_user ?? 'bold green' !! 'bold white'),
-                                      $v<url>, $version);
+                                      $k, $version, $v<url>);
                           }).join("\n");
             client.switch_to_session($current_user);
             $out;
