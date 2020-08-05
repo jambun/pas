@@ -6,24 +6,24 @@ use JSONPretty;
 
 class Config {
     has %.attr =
-        url  => 'http://localhost:4567',
-        user => 'admin',
-        pass => 'admin',
-	sessions => {anon => {url => '', user => 'anon', pass => '', token => '', time => 0}},
-	properties => {};
+    url  => 'http://localhost:4567',
+    user => 'admin',
+    pass => 'admin',
+    sessions => {anon => {url => '', user => 'anon', pass => '', token => '', time => 0}},
+    properties => {};
 
     has %.prop_defaults =
-        loud     => False,
-        compact  => False,
-        page     => True,
-        time     => False,
-        savepwd  => False,
-        indent   => 2;
+    loud     => False,
+    compact  => False,
+    page     => True,
+    time     => False,
+    savepwd  => False,
+    indent   => 2;
 
     has %!prompts =
-        url  => 'ArchivesSpace backend URL',
-        user => 'Username',
-        pass => 'Password';
+    url  => 'ArchivesSpace backend URL',
+    user => 'Username',
+    pass => 'Password';
 
     has $!file = 'config.json';
 
@@ -34,14 +34,14 @@ class Config {
         if $!store.path($!file).IO.e {
             %!attr = from-json $!store.load($!file);
         } else {
-	    self.prompt;
-	    self.save;
+            self.prompt;
+            self.save;
         }
     }
 
 
     method prompt(@attrs = <url user pass>) {
-	      for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+        for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
         %!attr<url> = 'http://localhost:' ~ %!attr<url> if %!attr<url> ~~ /^\d/;
         %!attr<url> = 'http://' ~ %!attr<url> if %!attr<url> !~~ /^http/;
         %!attr<url> = %!attr<url> ~ ':8089' if %!attr<url> !~~ /\d$/;
@@ -49,7 +49,7 @@ class Config {
 
 
     method prompt_for($k, $prompt) {
-	%!attr{$k} = self.prompt_default($prompt, %!attr{$k});
+        %!attr{$k} = self.prompt_default($prompt, %!attr{$k});
     }
 
 
@@ -60,7 +60,7 @@ class Config {
 
 
     method prop {
-	%!attr<properties>;
+        %!attr<properties>;
     }
 
 
@@ -73,7 +73,7 @@ class Config {
 
     method set($k, $v) {
         %!attr{$k} = $v;
-	self.save;
+        self.save;
     }
 
 
@@ -83,18 +83,18 @@ class Config {
 
 
     method save {
-	$!store.save($!file, self.json);
+        $!store.save($!file, self.json);
     }
 
     
     method stripped {
-	return %!attr if self.prop<savepwd>;
+        return %!attr if self.prop<savepwd>;
 
-	my %h = %!attr;
+        my %h = %!attr;
 
-	%h<pass> = '';
-	for %h<sessions>.values { $_<pass> = '' }
-	%h;
+        %h<pass> = '';
+        for %h<sessions>.values { $_<pass> = '' }
+        %h;
     }
 
 }
