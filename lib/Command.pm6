@@ -179,19 +179,29 @@ class Command {
                 $out;
             }
         } else {
-            my $current_user = config.attr<user>;
+            my $current_session = config.attr<url> ~ '|' ~ config.attr<user>;
+            my $last_url = False;
             my $out = (for config.attr<sessions>.sort -> $pair {
                               my $k = $pair.key;
                               my $v = $pair.value;
-                              client.switch_to_session($k);
-                              my $version = (from-json client.get('/'))<archivesSpaceVersion> || 'down';
-                              my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
-                              my $user_fmt = colored('%-20s', config.attr<user> eq $current_user ?? 'bold green' !! 'bold white');
-                              sprintf("%-25s  $user_fmt  $version_fmt  %s",
-                                      $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
-                                      $k, $version, $v<url>);
-                          }).join("\n");
-            client.switch_to_session($current_user);
+
+                              my $user_fmt = colored('%-20s', $k eq $current_session ?? 'bold green' !! 'bold white');
+
+                              if $v<url> eq $last_url {
+                                  sprintf("%-25s  $user_fmt",
+                                          $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
+                                          $v<user>);
+                              } else {
+                                  $last_url = $v<url>;
+                                  client.switch_to_session($k);
+                                  my $version = (from-json client.get('/'))<archivesSpaceVersion> || 'down';
+                                  my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
+                                  sprintf("\n%-25s  $user_fmt  $version_fmt  %s",
+                                          $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
+                                          $v<user>, $version, $v<url>);
+                              }
+                          }).join("\n") ~ "\n";
+            client.switch_to_session($current_session);
             $out;
         }
     }

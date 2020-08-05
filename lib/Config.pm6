@@ -9,7 +9,7 @@ class Config {
     url  => 'http://localhost:4567',
     user => 'admin',
     pass => 'admin',
-    sessions => {anon => {url => '', user => 'anon', pass => '', token => '', time => 0}},
+    sessions => {'http://localhost:4567|anon' => {url => 'http://localhost:4567', user => 'anon', pass => '', token => '', time => 0}},
     properties => {};
 
     has %.prop_defaults =

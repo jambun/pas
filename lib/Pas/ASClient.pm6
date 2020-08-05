@@ -147,16 +147,16 @@ class Pas::ASClient {
     }
     
 
-    method add_session(Str $name = $!config.attr<user>) {
-        $!config.attr<sessions>{$name} = {
+    method add_session {
+        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ $!config.attr<user>} = {
             url   => $!config.attr<url>,
             user  => $!config.attr<user>,
             pass  => $!config.attr<pass>,
             token => $!config.attr<token>,
             time  => $!config.attr<time>
         };
-        $!config.attr<sessions>{ANON_USER}<url> = $!config.attr<url>;
-        $!config.attr<sessions>{ANON_USER}<user> = ANON_USER;
+        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ ANON_USER}<url> = $!config.attr<url>;
+        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ ANON_USER}<user> = ANON_USER;
         $!config.save;
     }
     
