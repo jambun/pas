@@ -61,10 +61,10 @@ class Pas::ASClient {
         self!http.request($request);
     }
     
-    method !request($uri, @pairs, $body?, Bool :$delete) {
+    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session) {
         my $url = self.build_url($uri, @pairs);
         my %header = 'X-ArchivesSpace-Priority' => 'high';
-        %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
+        %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session;
         %header<Content-Type> = 'text/json' if $body;
 
         my %files = (flat @pairs.grep(/'=<<'/).map: { .split('=<<')  }).Hash;
@@ -109,6 +109,7 @@ class Pas::ASClient {
         uri_encode($url);
     }
     
+
     method post($uri, @pairs, $body) {
         self!request($uri, @pairs, $body);
     }
@@ -116,6 +117,11 @@ class Pas::ASClient {
 
     method get($uri, @pairs = []) {
         self!request($uri, @pairs);
+    }
+
+    
+    method get_anon($uri, @pairs = []) {
+        self!request($uri, @pairs, :no_session);
     }
 
     

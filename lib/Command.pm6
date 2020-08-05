@@ -194,7 +194,7 @@ class Command {
                               } else {
                                   $last_url = $v<url>;
                                   client.switch_to_session($k);
-                                  my $version = (from-json client.get('/'))<archivesSpaceVersion> || 'down';
+                                  my $version = (from-json client.get_anon('/'))<archivesSpaceVersion> || 'down';
                                   my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
                                   sprintf("\n%-25s  $user_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
