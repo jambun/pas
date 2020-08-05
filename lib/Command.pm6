@@ -180,7 +180,9 @@ class Command {
             }
         } else {
             my $current_user = config.attr<user>;
-            my $out = (for config.attr<sessions>.kv -> $k, $v {
+            my $out = (for config.attr<sessions>.sort -> $pair {
+                              my $k = $pair.key;
+                              my $v = $pair.value;
                               client.switch_to_session($k);
                               my $version = (from-json client.get('/'))<archivesSpaceVersion> || 'down';
                               my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
