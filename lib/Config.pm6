@@ -97,4 +97,8 @@ class Config {
         %h;
     }
 
+
+    method session_key(%sess = %!attr) {
+        %sess<url> ~ '|' ~ %sess<user>;
+    }
 }

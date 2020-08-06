@@ -61,8 +61,8 @@ class Pas::ASClient {
         self!http.request($request);
     }
     
-    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session) {
-        my $url = self.build_url($uri, @pairs);
+    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?) {
+        my $url = self.build_url($uri, @pairs, :$host);
         my %header = 'X-ArchivesSpace-Priority' => 'high';
         %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session;
         %header<Content-Type> = 'text/json' if $body;
@@ -101,10 +101,10 @@ class Pas::ASClient {
     }
 
 
-    method build_url($uri, @pairs is copy) {
+    method build_url($uri, @pairs is copy, Str :$host?) {
         # remove any file upload pairs
         @pairs = @pairs.grep: {! .Str.comb('=<<')}
-        my $url = $!config.attr<url> ~ $uri;
+        my $url = ($host || $!config.attr<url>) ~ $uri;
         $url ~= '?' ~ @pairs.join('&') if @pairs;
         uri_encode($url);
     }
@@ -115,11 +115,11 @@ class Pas::ASClient {
     }
 
 
-    method get($uri, @pairs = []) {
-        self!request($uri, @pairs);
+    method get($uri, @pairs = [], Bool :$no_session, Str :$host?) {
+        self!request($uri, @pairs, :no_session, :$host);
     }
 
-    
+
     method get_anon($uri, @pairs = []) {
         self!request($uri, @pairs, :no_session);
     }
@@ -129,10 +129,20 @@ class Pas::ASClient {
         self!request($uri, [], :delete);
     }
 
+
+    method find_session(Str $name) {
+        if $name ~~ /^ \d+ $/ {
+            $!config.attr<sessions>.sort[$name.Int - 1].value;
+        } else {
+            $!config.attr<sessions>{$name};
+        }
+    }
+
+
     # FIXME: this session handling stuff should probably move
     #        to Config, and probably wants a Session class
     method switch_to_session(Str $name) {
-        my $sess = $!config.attr<sessions>{$name};
+        my $sess = self.find_session($name);
         return 'Unknown session: ' ~ $name unless $sess;
 
         for <url user pass time token> {
@@ -140,7 +150,7 @@ class Pas::ASClient {
         }
         $!config.save;
         
-        'Switched to session: ' ~ $name;
+        'Switched to session: ' ~ $!config.attr<user> ~ ' on ' ~ $!config.attr<url>;
     }
 
 
@@ -154,29 +164,38 @@ class Pas::ASClient {
     
 
     method add_session {
-        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ $!config.attr<user>} = {
+        $!config.attr<sessions>{$!config.session_key} = {
             url   => $!config.attr<url>,
             user  => $!config.attr<user>,
             pass  => $!config.attr<pass>,
             token => $!config.attr<token>,
             time  => $!config.attr<time>
         };
-        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ ANON_USER}<url> = $!config.attr<url>;
-        $!config.attr<sessions>{$!config.attr<url> ~ '|' ~ ANON_USER}<user> = ANON_USER;
+
+        $!config.attr<sessions>{$!config.session_key({url => $!config.attr<url>, user => ANON_USER})}<url> = $!config.attr<url>;
+        $!config.attr<sessions>{$!config.session_key({url => $!config.attr<url>, user => ANON_USER})}<user> = ANON_USER;
+
         $!config.save;
     }
     
 
     method delete_session(Str $name) {
-        my $sess = $!config.attr<sessions>{$name};
-        return 'Unknown session: ' ~ $name unless $sess;
+        my %sess = self.find_session($name);
+        return 'Unknown session: ' ~ $name unless %sess;
 
-        return "Can't delete current session!" if $sess<token> eq $!config.attr<token>;
+        return "Can't delete current session!" if %sess<token> && %sess<token> eq $!config.attr<token>;
 
-        $!config.attr<sessions>{$name}:delete;
+        $!config.attr<sessions>{$!config.session_key(%sess)}:delete;
+
+        # delete anon if it's the only session left for url
+        my @sess_keys = grep {.Str.starts-with(%sess<url>)}, $!config.attr<sessions>.keys;
+        if @sess_keys.elems == 1 && @sess_keys.head.ends-with(ANON_USER) {
+            $!config.attr<sessions>{@sess_keys.head}:delete;
+        }
+
         $!config.save;
 
-        'Deleted session: ' ~ $name;
+        'Deleted session: ' ~ %sess<user> ~ ' on ' ~ %sess<url>;
     }
 
 

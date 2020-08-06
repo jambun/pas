@@ -179,29 +179,28 @@ class Command {
                 $out;
             }
         } else {
-            my $current_session = config.attr<url> ~ '|' ~ config.attr<user>;
             my $last_url = False;
+            my $ix = 0;
             my $out = (for config.attr<sessions>.sort -> $pair {
                               my $k = $pair.key;
                               my $v = $pair.value;
-
-                              my $user_fmt = colored('%-20s', $k eq $current_session ?? 'bold green' !! 'bold white');
+                              $ix += 1;
+                              my $user_fmt = colored('%-20s', $k eq config.session_key ?? 'bold green' !! 'bold white');
+                              my $ix_fmt = colored('%02d', 'cyan');
 
                               if $v<url> eq $last_url {
-                                  sprintf("%-25s  $user_fmt",
+                                  sprintf("%-25s  [$ix_fmt]  $user_fmt",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
-                                          $v<user>);
+                                          $ix, $v<user>);
                               } else {
                                   $last_url = $v<url>;
-                                  client.switch_to_session($k);
-                                  my $version = (from-json client.get_anon('/'))<archivesSpaceVersion> || 'down';
+                                  my $version = (from-json client.get('/', :no_session, host => $v<url>))<archivesSpaceVersion> || 'down';
                                   my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold yellow');
-                                  sprintf("\n%-25s  $user_fmt  $version_fmt  %s",
+                                  sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
-                                          $v<user>, $version, $v<url>);
+                                          $ix, $v<user>, $version, $v<url>);
                               }
                           }).join("\n") ~ "\n";
-            client.switch_to_session($current_session);
             $out;
         }
     }
