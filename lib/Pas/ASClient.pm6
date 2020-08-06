@@ -116,7 +116,7 @@ class Pas::ASClient {
 
 
     method get($uri, @pairs = [], Bool :$no_session, Str :$host?) {
-        self!request($uri, @pairs, :no_session, :$host);
+        self!request($uri, @pairs, :$no_session, :$host);
     }
 
 
