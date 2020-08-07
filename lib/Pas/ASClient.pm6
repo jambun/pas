@@ -15,7 +15,7 @@ class Pas::ASClient {
     our constant ANON_USER     = 'anon';
 
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
-    method !http { $!http //= HTTP::UserAgent.new; }
+    method !http { $!http //= HTTP::UserAgent.new(:timeout(10)); }
 
     method !get_request($url, %header) {
         HTTP::Request.new(:GET($url), |%header);
@@ -54,9 +54,9 @@ class Pas::ASClient {
     
     method !handle_request($url, %header, $body, %files = {}, Bool :$delete) {
         my $request = $delete ?? self!delete_request($url, %header) !!
-        %files ?? self!multipart_request($url, %header, %files) !!
-        $body ?? self!post_request($url, %header, $body) !!
-        self!get_request($url, %header);
+                                 %files ?? self!multipart_request($url, %header, %files) !!
+                                           $body ?? self!post_request($url, %header, $body) !!
+                                                    self!get_request($url, %header);
         self.log.blurt($request.Str);
         self!http.request($request);
     }
@@ -161,7 +161,7 @@ class Pas::ASClient {
             self.login;
         }
     }
-    
+
 
     method add_session {
         $!config.attr<sessions>{$!config.session_key} = {
