@@ -18,6 +18,7 @@ class Config {
     page     => True,
     time     => False,
     savepwd  => False,
+    timeout   => 5,
     indent   => 2;
 
     has %!prompts =

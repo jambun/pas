@@ -15,7 +15,7 @@ class Pas::ASClient {
     our constant ANON_USER     = 'anon';
 
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
-    method !http { $!http //= HTTP::UserAgent.new(:timeout(10)); }
+    method !http { $!http //= HTTP::UserAgent.new(:timeout($!config.attr<properties><timeout>)); }
 
     method !get_request($url, %header) {
         HTTP::Request.new(:GET($url), |%header);
@@ -58,7 +58,17 @@ class Pas::ASClient {
                                            $body ?? self!post_request($url, %header, $body) !!
                                                     self!get_request($url, %header);
         self.log.blurt($request.Str);
-        self!http.request($request);
+
+        my $resp;
+        self!http.timeout = $!config.attr<properties><timeout>;
+        await Promise.anyof(
+            # add a second to give the request a chance to timeout first
+            # this timeout is to handle zombies!
+            Promise.in($!config.attr<properties><timeout> + 1),
+            start {
+                $resp = self!http.request($request);
+            });
+        $resp;
     }
     
     method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?) {
@@ -71,8 +81,8 @@ class Pas::ASClient {
 
         my $response;
         try {
-            $response = self!handle_request($url, %header, $body, %files, :$delete);
-            
+            $response = self!handle_request($url, %header, $body, %files, :$delete) || die "Timed out";
+
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
                 self.log.blurt(.backtrace);
@@ -86,8 +96,15 @@ class Pas::ASClient {
             self.login;
             %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token>;
 
-            # and try the request again
-            $response = self!handle_request($url, %header, $body, %files, :$delete);
+            try {
+                # and try the request again
+                $response = self!handle_request($url, %header, $body, %files, :$delete) || die "Timed out";
+
+                CATCH {
+                    self.log.blurt("Sadly, something went wrong: " ~ .Str);
+                    self.log.blurt(.backtrace);
+                    return '{"error": "' ~ .Str ~ '"}' }
+            }
         }
         
         self.log.blurt($response.status-line);
