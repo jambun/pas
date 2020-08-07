@@ -254,8 +254,9 @@ class Command {
             } else {
                 return (for %prop.kv -> $k, $v {
                                my $out = $v;
-                               $out = colored('on', 'green') if $out.WHAT ~~ Bool && $out;
-                               $out = colored('off', 'red') if $out.WHAT ~~ Bool && !$out;
+                               $out = colored('on', 'bold green') if $out.WHAT ~~ Bool && $out;
+                               $out = colored('off', 'bold red') if $out.WHAT ~~ Bool && !$out;
+                               $out = colored($out.Str, 'bold white') if $out.WHAT ~~ Int;
                                sprintf("  %-10s %s", $k, $out);
                            }).join("\n");
             }
@@ -270,24 +271,24 @@ class Command {
                 if $!first eq '0' | 'off' | 'false' {
                     %prop{$!qualifier} = False;
                     config.save;
-                    $!qualifier ~ colored(' off', 'red');
+                    $!qualifier ~ colored(' off', 'bold red');
                 } elsif $!first ~~ /./ {
                     %prop{$!qualifier} = True;
                     config.save;
-                    $!qualifier ~ colored(' on', 'green');
+                    $!qualifier ~ colored(' on', 'bold green');
                 } else {
-                    $!qualifier ~ (%prop{$!qualifier} ?? colored(' on', 'green') !! colored(' off', 'red'));
+                    $!qualifier ~ (%prop{$!qualifier} ?? colored(' on', 'bold green') !! colored(' off', 'bold red'));
                 }
             }
             when Int {
                 if so $!first.Int {
                     %prop{$!qualifier} = $!first.Int;
                     config.save;
-                    $!qualifier ~ ' ' ~ %prop{$!qualifier};
+                    $!qualifier ~ ' ' ~ colored(%prop{$!qualifier}.Str, 'bold white');
                 } elsif $!first ~~ /./ {
                     $!qualifier ~ ' must be a number';
                 } else {
-                    $!qualifier ~ ' ' ~ %prop{$!qualifier};
+                    $!qualifier ~ ' ' ~ colored(%prop{$!qualifier}.Str, 'bold white');
                 }
             }
         }
