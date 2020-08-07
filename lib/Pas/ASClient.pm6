@@ -52,7 +52,7 @@ class Pas::ASClient {
         $request;
     }
     
-    method !handle_request($url, %header, $body, %files = {}, Bool :$delete) {
+    method !handle_request($url, %header, $body, %files = {}, Bool :$delete, Int :$timeout?) {
         my $request = $delete ?? self!delete_request($url, %header) !!
                                  %files ?? self!multipart_request($url, %header, %files) !!
                                            $body ?? self!post_request($url, %header, $body) !!
@@ -60,18 +60,18 @@ class Pas::ASClient {
         self.log.blurt($request.Str);
 
         my $resp;
-        self!http.timeout = $!config.attr<properties><timeout>;
+        self!http.timeout = $timeout || $!config.attr<properties><timeout>;
         await Promise.anyof(
             # add a second to give the request a chance to timeout first
             # this timeout is to handle zombies!
-            Promise.in($!config.attr<properties><timeout> + 1),
+            Promise.in(($timeout || $!config.attr<properties><timeout>) + 1),
             start {
                 $resp = self!http.request($request);
             });
         $resp;
     }
     
-    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?) {
+    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?, Int :$timeout?) {
         my $url = self.build_url($uri, @pairs, :$host);
         my %header = 'X-ArchivesSpace-Priority' => 'high';
         %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session;
@@ -81,7 +81,7 @@ class Pas::ASClient {
 
         my $response;
         try {
-            $response = self!handle_request($url, %header, $body, %files, :$delete) || die "Timed out";
+            $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout) || die "Timed out";
 
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -98,7 +98,7 @@ class Pas::ASClient {
 
             try {
                 # and try the request again
-                $response = self!handle_request($url, %header, $body, %files, :$delete) || die "Timed out";
+                $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout) || die "Timed out";
 
                 CATCH {
                     self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -132,8 +132,8 @@ class Pas::ASClient {
     }
 
 
-    method get($uri, @pairs = [], Bool :$no_session, Str :$host?) {
-        self!request($uri, @pairs, :$no_session, :$host);
+    method get($uri, @pairs = [], Bool :$no_session, Str :$host?, Int :$timeout?) {
+        self!request($uri, @pairs, :$no_session, :$host, :$timeout);
     }
 
 

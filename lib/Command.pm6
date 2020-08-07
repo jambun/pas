@@ -194,7 +194,7 @@ class Command {
                                           $ix, $v<user>);
                               } else {
                                   $last_url = $v<url>;
-                                  my $version = (from-json client.get('/', :no_session, host => $v<url>))<archivesSpaceVersion> || 'down';
+                                  my $version = (from-json client.get('/', :no_session, host => $v<url>, timeout => 1))<archivesSpaceVersion> || 'down';
                                   my $version_fmt = colored('%-20s', $version eq 'down' ?? 'white' !! 'bold white');
                                   sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
