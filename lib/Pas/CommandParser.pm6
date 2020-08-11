@@ -18,12 +18,13 @@ grammar Grammar {
     token uri           { '/' <[\/\w]>* }
     rule  pairlist      { <pairitem>* }
     rule  pairitem      { <pair> }
-    token pair          { <key> '=' <value> }
-    token action        { \w+ }
+    token pair          { <arg> '=' <value> }
+    token action        { <type=.arg> ('.' <qualifier=.arg>)? }
+#    token qualifier     { \w+ }
+#    token action        { \w+ }
     rule  arglist       { <argitem>* }
     rule  argitem       { <arg> }
     token arg           { \w+ }
-    token key           { \w+ }
     token value         { [ <str> | <singlequoted> | <doublequoted> ] }
     token str           { <-['"\\\s]>+ }
     token singlequoted  { "'" ~ "'" <-[']>* }
@@ -36,14 +37,23 @@ grammar Grammar {
 class Actions {
     method TOP($/)        { make $<uricmd> ?? $<uricmd>.made !! $<actioncmd>.made }
 
-    method uricmd($/)     { make { uri => $<uri>.made, pairs => $<pairlist>.made, action => ($<action>.made || 'show'), redirect => $<redirect>.made } }
-    method actioncmd($/)  { make { action => $<action>.made, args => $<arglist>.made, redirect => $<redirect>.made } }
+    method uricmd($/)     { make { uri => $<uri>.made,
+                                   qualifier => $<action>[0]<qualifier>.made,
+                                   args => $<pairlist>.made,
+                                   action => ($<action>.made || 'show'),
+                                   redirect => $<redirect>.made } }
+
+    method actioncmd($/)  { make { action => $<action>.made,
+                                   qualifier => $<action>[0]<qualifier>.made,
+                                   args => $<arglist>.made,
+                                   redirect => $<redirect>.made } }
 
     method uri($/)        { make $/.Str }
     method pairlist($/)   { make $<pairitem>>>.made }
     method pairitem($/)   { make $<pair>.made }
     method pair($/)       { make $/.Str }
-    method action($/)     { make $/.Str }
+    method action($/)     { make $/<type>.made }
+    method qualifier($/)  { make $/.Str }
     method arglist($/)    { make $<argitem>>>.made }
     method argitem($/)    { make $<arg>.made }
     method arg($/)        { make $/.Str }
