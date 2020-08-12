@@ -106,20 +106,22 @@ sub modify_json($json, @pairs) is export {
     my %hash = from-json $json;
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
+#        my $k = $q[0].key;
+#        my $v = $q[0].value;
 
-	$v = True if $v eq 'true';
-	$v = False if $v eq 'false';
+	      $v = True if $v eq 'true';
+	      $v = False if $v eq 'false';
 
-	my @binder;
-	@binder[0] = %hash;
+	      my @binder;
+	      @binder[0] = %hash;
         for $k.split('.').kv -> $ix, $t {
-	    if $t ~~ /^ \d+ $/ {
-	       @binder[$ix + 1] := @binder[$ix][$t];       
-	    } else {
-	       @binder[$ix + 1] := @binder[$ix]{$t};
-	    }
-	}
-	@binder[*-1] = $v;
+	          if $t ~~ /^ \d+ $/ {
+	              @binder[$ix + 1] := @binder[$ix][$t];       
+	          } else {
+	              @binder[$ix + 1] := @binder[$ix]{$t};
+	          }
+	      }
+	      @binder[*-1] = $v;
     }
     to-json(%hash);
 }

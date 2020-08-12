@@ -1,4 +1,5 @@
 use Config;
+use Pas::CommandParser;
 use Pas::ASClient;
 use Pas::Help;
 use Functions;
@@ -12,8 +13,9 @@ use JSON::Tiny;
 class Command {
     has     $.client;
     has Str $.line;
+    has     $.uri;
     has Str $.action;
-    has Str $.qualifier = '';
+    has     $.qualifier;
     has     $!first;
     has     @.args;
     
@@ -29,9 +31,7 @@ class Command {
 
 
     method execute {
-        ($!action, $!qualifier) = $!action.split('.', 2);
-        @!args ||= [''];
-        $!first = @!args.shift;
+        $!first = $!uri || (@!args || ['']).shift;
         for @!args -> $arg is rw {
             $arg ~~ s/^ 'p='/page=/;
             $arg ~~ s/^ 'r='/resolve[]=/;
@@ -359,10 +359,12 @@ sub run_cmd(Str $line) is export {
 
     return if $line ~~ /^ '#' /;
 
-    my %cmd = parse_cmd($line);
+    my %cmd = Pas::CommandParser::parse($line);
+
+    save_file(%cmd<redirect>);
 
     my $intime = now;
-    display Command.new(line => $line, action => %cmd<action>, args => %cmd<args>.list).execute;
+    display Command.new(line => $line, action => %cmd<action>, args => %cmd<args>.flat.Array, uri => %cmd<uri>, qualifier => %cmd<qualifier>).execute;
     say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 

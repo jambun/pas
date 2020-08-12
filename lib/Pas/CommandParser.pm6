@@ -22,7 +22,7 @@ grammar Grammar {
     token action        { <type=.arg> ('.' <qualifier=.arg>)? }
     rule  arglist       { <argitem>* }
     rule  argitem       { <arg> }
-    token arg           { \w+ }
+    token arg           { <[\w\.\d]>+ }
     token value         { [ <str> | <singlequoted> | <doublequoted> ] }
     token str           { <-['"\\\s]>+ }
     token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -35,13 +35,15 @@ grammar Grammar {
 class Actions {
     method TOP($/)        { make $<uricmd> ?? $<uricmd>.made !! $<actioncmd>.made }
 
-    method uricmd($/)     { make { uri => $<uri>.made,
+    method uricmd($/)     { make { line => $/.Str,
+                                   uri => $<uri>.made,
                                    qualifier => $<action>[0]<qualifier>.made,
                                    args => $<pairlist>.made,
                                    action => ($<action>.made || 'show'),
                                    redirect => $<redirect>.made } }
 
-    method actioncmd($/)  { make { action => $<action>.made,
+    method actioncmd($/)  { make { line => $/.Str,
+                                   action => $<action>.made,
                                    qualifier => $<action>[0]<qualifier>.made,
                                    args => $<arglist>.made,
                                    redirect => $<redirect>.made } }
@@ -49,7 +51,7 @@ class Actions {
     method uri($/)        { make $/.Str }
     method pairlist($/)   { make $<pairitem>>>.made }
     method pairitem($/)   { make $<pair>.made }
-    method pair($/)       { make $/<key>.made => ($/<value><str>.Str || $/<value><singlequoted>[0].Str || $/<value><doublequoted>[0].Str) }
+    method pair($/)       { make self.pairkey($/<key>) ~ '=' ~ ($/<value><str> || $/<value><singlequoted>[0] || $/<value><doublequoted>[0]).Str }
     method action($/)     { make $/<type>.made }
     method qualifier($/)  { make $/.Str }
     method arglist($/)    { make $<argitem>>>.made }
@@ -57,6 +59,13 @@ class Actions {
     method arg($/)        { make $/.Str }
     method redirect($/)   { make $<file>.made }
     method file($/)       { make $/.Str }
+
+    method pairkey($s) {
+        $s eq 'p' ?? 'page' !! $s;
+#        $arg ~~ s/^ 'r='/resolve[]=/;
+#        $arg ~~ s/^ 't='/type[]=/;
+#        $arg ~~ s/^ 'u='/uri[]=/;
+    }
 }
 
 
