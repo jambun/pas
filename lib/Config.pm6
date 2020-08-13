@@ -9,7 +9,7 @@ class Config {
     url  => 'http://localhost:4567',
     user => 'admin',
     pass => 'admin',
-    sessions => {'http://localhost:4567|anon' => {url => 'http://localhost:4567', user => 'anon', pass => '', token => '', time => 0}},
+    sessions => {},
     properties => {};
 
     has %.prop_defaults =
@@ -18,6 +18,7 @@ class Config {
     page     => True,
     time     => False,
     savepwd  => False,
+    anon     => False,
     timeout   => 5,
     indent   => 2;
 

@@ -18,11 +18,12 @@ grammar Grammar {
     token uri           { '/' <[\/\w]>* }
     rule  pairlist      { <pairitem>* }
     rule  pairitem      { <pair> }
-    token pair          { <key=.arg> '=' <value> }
+    token pair          { <key=.refpath> '=' <value> }
+    token refpath       { <[\w\.\d]>+ }
     token action        { <type=.arg> ('.' <qualifier=.arg>)? }
     rule  arglist       { <argitem>* }
     rule  argitem       { <arg> }
-    token arg           { <[\w\.\d]>+ }
+    token arg           { <[\w\d]>+ }
     token value         { [ <str> | <singlequoted> | <doublequoted> ] }
     token str           { <-['"\\\s]>+ }
     token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -52,6 +53,7 @@ class Actions {
     method pairlist($/)   { make $<pairitem>>>.made }
     method pairitem($/)   { make $<pair>.made }
     method pair($/)       { make self.pairkey($/<key>) ~ '=' ~ ($/<value><str> || $/<value><singlequoted>[0] || $/<value><doublequoted>[0]).Str }
+    method refpath($/)    { make $/.Str }
     method action($/)     { make $/<type>.made }
     method qualifier($/)  { make $/.Str }
     method arglist($/)    { make $<argitem>>>.made }

@@ -12,7 +12,6 @@ class Pas::ASClient {
     has Pas::Logger $.log;
 
     my constant LOGOUT_URI     = '/logout';
-    our constant ANON_USER     = 'anon';
 
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
     method !http { $!http //= HTTP::UserAgent.new(:timeout($!config.attr<properties><timeout>)); }
@@ -74,7 +73,7 @@ class Pas::ASClient {
     method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?, Int :$timeout?) {
         my $url = self.build_url($uri, @pairs, :$host);
         my %header = 'X-ArchivesSpace-Priority' => 'high';
-        %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session;
+        %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session && !$!config.attr<properties><anon>;
         %header<Content-Type> = 'text/json' if $body;
 
         my %files = (flat @pairs.grep(/'=<<'/).map: { .split('=<<')  }).Hash;
@@ -189,9 +188,6 @@ class Pas::ASClient {
             time  => $!config.attr<time>
         };
 
-        $!config.attr<sessions>{$!config.session_key({url => $!config.attr<url>, user => ANON_USER})}<url> = $!config.attr<url>;
-        $!config.attr<sessions>{$!config.session_key({url => $!config.attr<url>, user => ANON_USER})}<user> = ANON_USER;
-
         $!config.save;
     }
     
@@ -204,12 +200,6 @@ class Pas::ASClient {
 
         $!config.attr<sessions>{$!config.session_key(%sess)}:delete;
 
-        # delete anon if it's the only session left for url
-        my @sess_keys = grep {.Str.starts-with(%sess<url>)}, $!config.attr<sessions>.keys;
-        if @sess_keys.elems == 1 && @sess_keys.head.ends-with(ANON_USER) {
-            $!config.attr<sessions>{@sess_keys.head}:delete;
-        }
-
         $!config.save;
 
         'Deleted session: ' ~ %sess<user> ~ ' on ' ~ %sess<url>;
@@ -217,7 +207,7 @@ class Pas::ASClient {
 
 
     method login {
-        return if $!config.attr<user> eq ANON_USER;
+        return if $!config.attr<properties><anon>;
         
         self.log.blurt('Logging in to ' ~ $!config.attr<url> ~ ' as ' ~ $!config.attr<user>);
 
@@ -245,9 +235,11 @@ class Pas::ASClient {
 
     method logout {
         my $out = self.post(LOGOUT_URI, [], 'byebye');
-        my $user = $!config.attr<user>;
-        self.switch_to_session(ANON_USER);
-        self.delete_session($user);
+        # FIXME: probably should switch to another on current host or something else
+        #        and what about no sessions left
+        # my $user = $!config.attr<user>;
+        # self.switch_to_session(ANON_USER);
+        # self.delete_session($user);
         $out;
     }
 }

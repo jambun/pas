@@ -151,7 +151,7 @@ class Command {
 
     
     method login {
-        config.prompt if $!qualifier eq 'prompt' || config.attr<user> eq ANON_USER;
+        config.prompt if $!qualifier eq 'prompt';
         client.login;
     }
 

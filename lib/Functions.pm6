@@ -20,7 +20,6 @@ our constant  USER_URI           = '/users/current-user';
 our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
-our constant  ANON_USER          = 'anon';
 
 my $SAVE_FILE;
 my $SCHEMAS;
@@ -50,7 +49,8 @@ sub cmd_prompt is export {
     } else {
         $host ~~ s/ 'http://' (<-[\.\:]>+) .* /$0/;
     }
-    sprintf("pas %s %s > ", $host, config.attr<user>);
+    my $anon = config.attr<properties><anon> ?? "(anon)" !! '';
+    sprintf("pas %s %s%s > ", $host, config.attr<user>, $anon);
 }
 
 
