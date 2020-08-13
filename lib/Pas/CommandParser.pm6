@@ -12,7 +12,7 @@ unit module Pas::CommandParser;
 grammar Grammar {
     token TOP           { <.ws> [ <uricmd> | <actioncmd> ] <.ws> }
 
-    rule  uricmd        { <uri> <pairlist> <action>? <redirect>? }
+    rule  uricmd        { <uri> <pairlist> <action>? <postfile>? <redirect>? }
     rule  actioncmd     { <action> <arglist> <redirect>? }
 
     token uri           { '/' <[\/\w]>* }
@@ -29,6 +29,7 @@ grammar Grammar {
     token singlequoted  { "'" ~ "'" (<-[']>*) }
     token doublequoted  { '"' ~ '"' (<-["]>*) }
 
+    rule  postfile      { '<' <file> }
     rule  redirect      { '>' <file> }
     token file          { <[\w/\.\-]>+ }
 }
@@ -41,6 +42,7 @@ class Actions {
                                    qualifier => $<action>[0]<qualifier>.made,
                                    args => $<pairlist>.made,
                                    action => ($<action>.made || 'show'),
+                                   postfile => $<postfile>.made,
                                    redirect => $<redirect>.made } }
 
     method actioncmd($/)  { make { line => $/.Str,
@@ -59,6 +61,7 @@ class Actions {
     method arglist($/)    { make $<argitem>>>.made }
     method argitem($/)    { make $<arg>.made }
     method arg($/)        { make $/.Str }
+    method postfile($/)   { make $<file>.made }
     method redirect($/)   { make $<file>.made }
     method file($/)       { make $/.Str }
 

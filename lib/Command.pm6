@@ -324,36 +324,6 @@ class Command {
 }
 
 
-sub parse_cmd(Str $cmd) {
-    my %out;
-    my $c = $cmd.trim;
-    $c ~~ s/\s* \> \s* (\S+) $/{save_file($0.Str); ''}/;
-    my ($first, @args) = $c.split(/\s+/);
-    if $first ~~ /^<[./]>/ { # a uri
-        %out<uri> = $first;
-        my $action = 'show';
-        my $trailing_non_pair = @args.elems > 0 && (@args.tail.first !~~ /\=/ ?? @args.pop !! '');
-
-        if $trailing_non_pair {
-            if $trailing_non_pair.IO.e {
-                $action = 'post';
-                @args.push($trailing_non_pair);
-            } else {
-                $action = $trailing_non_pair;
-            }
-        }
-
-        %out<action> = $action;
-        @args.unshift(%out<uri>);
-        %out<args> = @args;
-    } else {
-        %out<action> = $first;
-        %out<args> = @args;
-    }
-    %out;
-}
-
-
 sub run_cmd(Str $line) is export {
     return unless $line.trim;
 
@@ -369,6 +339,15 @@ sub run_cmd(Str $line) is export {
     }
 
     save_file($cmd<redirect>);
+
+    if $cmd<postfile> {
+        if $cmd<postfile>.IO.e {
+            $cmd<action> = 'post';
+            $cmd<args>.unshift($cmd<postfile>);
+        } else {
+            say "No file to post: " ~ $cmd<postfile>;
+        }
+    }
 
     my $intime = now;
     display Command.new(line => $line, action => $cmd<action>, args => $cmd<args>.flat.Array, uri => $cmd<uri>, qualifier => $cmd<qualifier>).execute;
