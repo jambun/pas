@@ -52,7 +52,12 @@ class Command {
         if ($!qualifier eq 'no_get') {
             pretty extract_uris client.post($!first, @!args, 'nothing');
         } else {
-            pretty extract_uris client.post($!first, @!args, modify_json(client.get($!first), @!args));
+            my $json = client.get($!first);
+            if (from-json($json)<error>) {
+                pretty $json;
+            } else {
+              pretty extract_uris client.post($!first, @!args, modify_json($json, @!args));
+            }
         }
     }
 
