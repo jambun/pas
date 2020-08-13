@@ -15,7 +15,7 @@ class Command {
     has Str $.line;
     has     $.uri;
     has Str $.action;
-    has     $.qualifier = '';
+    has     $.qualifier;
     has     $!first;
     has     @.args;
     
@@ -32,6 +32,7 @@ class Command {
 
     method execute {
         $!first = $!uri || (@!args || ['']).shift;
+        $!qualifier ||= '';
         (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
     }
 
@@ -124,8 +125,9 @@ class Command {
                 'No record in search index for ' ~ $!first;
             }
         } else {
+            my $page = @!args.head || '1';
             @!args.push("q=$!first");
-            @!args.push('page=1') unless @!args.grep(/^ 'page='/);
+            @!args.push("page=$page");
             my $results = client.get(SEARCH_URI, @!args);
             if $!qualifier ~~ /^ 'p'/ { # parse
                 my $parsed = from-json $results;
@@ -409,6 +411,7 @@ sub shell_help {
       search    perform a search (page defaults to 1)
        .parse   parse the 'json' property
        q        the query string
+       [n]      page number (defaults to 1)
       config    show pas config
       last      show the last saved temp file
       set       show pas properties
