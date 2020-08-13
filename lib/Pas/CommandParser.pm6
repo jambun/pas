@@ -63,10 +63,13 @@ class Actions {
     method file($/)       { make $/.Str }
 
     method pairkey($s) {
-        $s eq 'p' ?? 'page' !! $s;
-#        $arg ~~ s/^ 'r='/resolve[]=/;
-#        $arg ~~ s/^ 't='/type[]=/;
-#        $arg ~~ s/^ 'u='/uri[]=/;
+        given $s {
+            when 'p' { 'page' }
+            when 'r' { 'resolve[]' }
+            when 't' { 'type[]' }
+            when 'u' { 'uri[]' }
+            default  { $s }
+        }
     }
 }
 

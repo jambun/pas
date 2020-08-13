@@ -15,7 +15,7 @@ class Command {
     has Str $.line;
     has     $.uri;
     has Str $.action;
-    has     $.qualifier;
+    has     $.qualifier = '';
     has     $!first;
     has     @.args;
     
@@ -32,13 +32,6 @@ class Command {
 
     method execute {
         $!first = $!uri || (@!args || ['']).shift;
-        for @!args -> $arg is rw {
-            $arg ~~ s/^ 'p='/page=/;
-            $arg ~~ s/^ 'r='/resolve[]=/;
-            $arg ~~ s/^ 't='/type[]=/;
-            $arg ~~ s/^ 'u='/uri[]=/;
-        }
-        $!qualifier ||= '';
         (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
     }
 
