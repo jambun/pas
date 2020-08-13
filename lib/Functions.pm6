@@ -1,6 +1,7 @@
 use Config;
 use Pas::ASClient;
 use Pas::Store;
+use Pas::Logger;
 use JSONPretty;
 use XMLPretty;
 
@@ -39,8 +40,11 @@ sub store is export { $STORE ||= Pas::Store.new(:dir(%*ENV<HOME> ~ '/.pas')) }
 my Config $CFG;
 sub config is export { $CFG ||= Config.new(:store(store)) }
 
+my Pas::Logger $LOGGER;
+sub logger is export { $LOGGER ||= Pas::Logger.new(:config(config)); }
+
 my Pas::ASClient $CLIENT;
-sub client is export { $CLIENT ||= Pas::ASClient.new(config => config) }
+sub client is export { $CLIENT ||= Pas::ASClient.new(:config(config), :log(logger)) }
 
 sub cmd_prompt is export {
     my $host = config.attr<url>;

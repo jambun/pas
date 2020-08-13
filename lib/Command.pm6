@@ -361,6 +361,8 @@ sub run_cmd(Str $line) is export {
 
     my $cmd = Pas::CommandParser::parse($line);
 
+    logger.blurt($cmd.gist);
+
     unless ($cmd) {
         say 'What?';
         return;
