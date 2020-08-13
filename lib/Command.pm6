@@ -357,12 +357,17 @@ sub run_cmd(Str $line) is export {
 
     return if $line ~~ /^ '#' /;
 
-    my %cmd = Pas::CommandParser::parse($line);
+    my $cmd = Pas::CommandParser::parse($line);
 
-    save_file(%cmd<redirect>);
+    unless ($cmd) {
+        say 'What?';
+        return;
+    }
+
+    save_file($cmd<redirect>);
 
     my $intime = now;
-    display Command.new(line => $line, action => %cmd<action>, args => %cmd<args>.flat.Array, uri => %cmd<uri>, qualifier => %cmd<qualifier>).execute;
+    display Command.new(line => $line, action => $cmd<action>, args => $cmd<args>.flat.Array, uri => $cmd<uri>, qualifier => $cmd<qualifier>).execute;
     say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 
