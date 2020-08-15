@@ -1,5 +1,4 @@
 use Config;
-use Pas::CommandParser;
 use Pas::ASClient;
 use Pas::Help;
 use Functions;
@@ -11,13 +10,26 @@ use JSON::Tiny;
 
 class Command {
     has     $.client;
-    has Str $.line;
-    has     $.uri;
-    has Str $.action;
-    has     $.qualifier;
+    has Str $.line is rw;
+    has     $.uri is rw;
+    has Str $.action is rw;
+    has     $.qualifier is rw;
+    has     $.postfile is rw;
+    has     $.savefile is rw;
     has     $!first;
-    has     @.args;
-    
+    has     @.args is rw;
+
+
+    method do(Str $line) {
+        return unless $line.trim;
+        return if $line ~~ /^ '#' /;
+
+        my $intime = now;
+        display Command.new(:$line).execute;
+        say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
+    }
+
+
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout run
                            endpoints schemas config session user who
@@ -26,39 +38,77 @@ class Command {
     method actions { ACTIONS }
 
 
-    method do(Str $line) {
-        return unless $line.trim;
-        return if $line ~~ /^ '#' /;
+    grammar Grammar {
+        token TOP           { <.ws> [ <uricmd> | <actioncmd> ] <.ws> }
 
-        my $cmd = Pas::CommandParser::parse($line);
+        rule  uricmd        { <uri> <pairlist> <action>? <postfile>? <redirect>? }
+        rule  actioncmd     { <action> <arglist> <redirect>? }
 
-        logger.blurt($cmd.gist);
+        token uri           { '/' <[\/\w]>* }
+        rule  pairlist      { <pairitem>* }
+        rule  pairitem      { <pair> }
+        token pair          { <key=.refpath> '=' <value> }
+        token refpath       { <[\w\.\d]>+ }
+        token action        { <arg> <qualifier>? }
+        token qualifier     { '.' <arg> }
+        rule  arglist       { <argitem>* }
+        rule  argitem       { <arg> }
+        token arg           { <[\w\d]>+ }
+        token value         { [ <str> | <singlequoted> | <doublequoted> ] }
+        token str           { <-['"\\\s]>+ }
+        token singlequoted  { "'" ~ "'" (<-[']>*) }
+        token doublequoted  { '"' ~ '"' (<-["]>*) }
 
-        unless ($cmd) {
+        rule  postfile      { '<' <file> }
+        rule  redirect      { '>' <file> }
+        token file          { <[\w/\.\-]>+ }
+    }
+
+    class ParseActions {
+        has Command $.cmd;
+
+        method TOP($/)        { $!cmd.line = $/.Str; $!cmd.action ||= 'show' }
+
+        method uri($/)        { $!cmd.uri = $/.Str }
+        method pair($/)       { $!cmd.args.push(self.pairkey($/<key>) ~ '=' ~ ($/<value><str> ||
+                                                                               $/<value><singlequoted>[0] ||
+                                                                               $/<value><doublequoted>[0]).Str) }
+
+        method action($/)     { $!cmd.action = $/<arg>.Str; }
+        method qualifier($/)  { $!cmd.qualifier = $/<arg>.Str; }
+        method argitem($/)    { $!cmd.args.push($<arg>.Str) }
+
+        method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
+        method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
+
+        method pairkey($s) {
+            given $s {
+                when 'p' { 'page' }
+                when 'r' { 'resolve[]' }
+                when 't' { 'type[]' }
+                when 'u' { 'uri[]' }
+                default  { $s }
+            }
+        }
+    }
+
+
+    submethod BUILD(:$line) {
+        Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
+
+        $!first = $!uri || (@!args || ['']).shift;
+        $!qualifier ||= '';
+
+        logger.blurt(self.gist);
+    }
+    
+
+    method execute {
+        unless $!action {
             say 'What?';
             return;
         }
 
-        save_file($cmd<redirect>);
-
-        if $cmd<postfile> {
-            if $cmd<postfile>.IO.e {
-                $cmd<action> = 'post';
-                $cmd<args>.unshift($cmd<postfile>);
-            } else {
-                say "No file to post: " ~ $cmd<postfile>;
-            }
-        }
-
-        my $intime = now;
-        display Command.new(line => $line, action => $cmd<action>, args => $cmd<args>.flat.Array, uri => $cmd<uri>, qualifier => $cmd<qualifier>).execute;
-        say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
-    }
-
-
-    method execute {
-        $!first = $!uri || (@!args || ['']).shift;
-        $!qualifier ||= '';
         (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
     }
 
@@ -130,8 +180,11 @@ class Command {
 
 
     method post {
-        my $post_file = @!args.pop;
-        pretty extract_uris client.post($!first, @!args, slurp($post_file));
+        if $!postfile.IO.e {
+            pretty extract_uris client.post($!first, @!args, slurp($!postfile));
+        } else {
+            'No file to post: ' ~ $!postfile;
+        }
     }
 
 
