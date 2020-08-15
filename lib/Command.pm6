@@ -9,7 +9,6 @@ use Linenoise;
 use Terminal::ANSIColor;
 use JSON::Tiny;
 
-
 class Command {
     has     $.client;
     has Str $.line;
@@ -27,7 +26,34 @@ class Command {
     method actions { ACTIONS }
 
 
-    #    method client { $!client ||= client; }
+    method do(Str $line) {
+        return unless $line.trim;
+        return if $line ~~ /^ '#' /;
+
+        my $cmd = Pas::CommandParser::parse($line);
+
+        logger.blurt($cmd.gist);
+
+        unless ($cmd) {
+            say 'What?';
+            return;
+        }
+
+        save_file($cmd<redirect>);
+
+        if $cmd<postfile> {
+            if $cmd<postfile>.IO.e {
+                $cmd<action> = 'post';
+                $cmd<args>.unshift($cmd<postfile>);
+            } else {
+                say "No file to post: " ~ $cmd<postfile>;
+            }
+        }
+
+        my $intime = now;
+        display Command.new(line => $line, action => $cmd<action>, args => $cmd<args>.flat.Array, uri => $cmd<uri>, qualifier => $cmd<qualifier>).execute;
+        say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
+    }
 
 
     method execute {
@@ -161,7 +187,7 @@ class Command {
             for slurp($!first).lines -> $line {
                 next unless $line;
                 say cmd_prompt() ~ $line;
-                run_cmd $line;
+                Command.do($line);
             }
         } else {
             'Script file not found: ' ~ $!first;
@@ -321,37 +347,6 @@ class Command {
         say 'Goodbye';    
         exit;
     }
-}
-
-
-sub run_cmd(Str $line) is export {
-    return unless $line.trim;
-
-    return if $line ~~ /^ '#' /;
-
-    my $cmd = Pas::CommandParser::parse($line);
-
-    logger.blurt($cmd.gist);
-
-    unless ($cmd) {
-        say 'What?';
-        return;
-    }
-
-    save_file($cmd<redirect>);
-
-    if $cmd<postfile> {
-        if $cmd<postfile>.IO.e {
-            $cmd<action> = 'post';
-            $cmd<args>.unshift($cmd<postfile>);
-        } else {
-            say "No file to post: " ~ $cmd<postfile>;
-        }
-    }
-
-    my $intime = now;
-    display Command.new(line => $line, action => $cmd<action>, args => $cmd<args>.flat.Array, uri => $cmd<uri>, qualifier => $cmd<qualifier>).execute;
-    say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
 }
 
 

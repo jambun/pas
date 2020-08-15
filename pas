@@ -15,7 +15,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     client.ensure_session;
     
-    if $e { run_cmd $e; exit; }
+    if $e { Command.do($e); exit; }
 
     load_endpoints;
 
@@ -58,7 +58,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     while (my $line = linenoise cmd_prompt).defined {
 	      linenoiseHistoryAdd($line.trim) if $line.trim;
-		    run_cmd $line;
+        Command.do($line);
 	      linenoiseHistorySave(store.path(HISTORY_FILE));
     }
 }
