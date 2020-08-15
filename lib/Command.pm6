@@ -360,8 +360,7 @@ sub shell_help {
 
     pas shell help
 
-    uri pairs* action? [ > file ]
-    uri pairs* file
+    uri pairs* action? [ < file ] [ > file ]
     action args* [ > file ]
 
     uri actions:
