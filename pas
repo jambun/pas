@@ -58,7 +58,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     while (my $line = linenoise cmd_prompt).defined {
 	      linenoiseHistoryAdd($line.trim) if $line.trim;
-        Command.do($line);
+        Command.new(:$line);
 	      linenoiseHistorySave(store.path(HISTORY_FILE));
     }
 }

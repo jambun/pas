@@ -20,21 +20,6 @@ class Command {
     has     @.args is rw;
 
 
-    method do($line) {
-        return unless $line.trim;
-
-        my $cmd = Command.new(:$line);
-
-        logger.blurt($cmd.gist);
-
-        if $cmd.action {
-            display (Command.actions.grep: $cmd.action) ?? $cmd."{$cmd.action}"() !! "Unknown action: " ~ $cmd.action;
-        } else {
-            display 'What?';
-        }
-    }
-
-
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout run
                            endpoints schemas config session user who
@@ -106,7 +91,15 @@ class Command {
 
 
     submethod BUILD(:$line) {
-        Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
+        if $line.trim {
+            Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
+            logger.blurt(self.gist);
+            if self.action {
+                display (ACTIONS.grep: self.action) ?? self."{self.action}"() !! "Unknown action: " ~ self.action;
+            } else {
+                say 'What?';
+            }
+        }
     }
 
 
