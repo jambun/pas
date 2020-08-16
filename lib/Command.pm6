@@ -51,7 +51,7 @@ class Command {
         rule  pairlist      { <pairitem>* }
         rule  pairitem      { <pair> }
         token pair          { <key=.refpath> '=' <value> }
-        token refpath       { <[\w\.\d]>+ }
+        token refpath       { <[\w\.\d\[\]]>+ }
         token action        { <arg> <qualifier>? }
         token qualifier     { '.' <arg> }
         rule  arglist       { <argitem>* }
