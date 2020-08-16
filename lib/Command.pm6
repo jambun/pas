@@ -381,6 +381,9 @@ class Command {
         my $asam = from-json client.get('/plugins/activity_monitor', @!args);
 
         my $longest_name = max($asam<statuses>.keys>>.chars);
+        my $days = 60*60*24;
+        my $hours = 60*60;
+        my $mins = 60;
         
         my $out = "\n";
         for $asam<groups>.keys.sort -> $group {
@@ -388,14 +391,31 @@ class Command {
             $out ~= "$group\n";
             for @$statuses -> $name {
                 my $status = $asam<statuses>{$name};
-                my $name_fmt = colored("%-{$longest_name + 1}s", 'bold white');
+                my $name_fmt = colored("%-{$longest_name}s", 'bold white');
 
-                $out ~= sprintf("  $name_fmt %s  %s\n",
+                my $age = $status<age>;
+
+                given $age {
+                    when $_ > $days {
+                        $age = ($age / $days).round ~ 'd';
+                    }
+                    when $_ > $hours {
+                        $age = ($age / $hours).round ~ 'h';
+                    }
+                    when $_ > $mins {
+                        $age = ($age / $mins).round ~ 'm';
+                    }
+                    default {
+                        $age = $age ~ 's';
+                    }
+                }
+
+                $out ~= sprintf("  $name_fmt  %s  %s\n",
                                 $name,
                                 colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
                                                            ($status<status> ~~ 'busy' ?? 'bold blue' !!
                                                             ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
-                                colored($status<age>.Str ~ 's', 'cyan'));
+                                colored($age, 'cyan'));
             }
         }
 
