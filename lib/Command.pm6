@@ -43,6 +43,18 @@ class Command {
     method actions { ACTIONS }
 
 
+    my constant ALIAS = {
+        p => 'page',
+        r => 'resolve[]',
+        t => 'type[]',
+        u => 'uri[]'
+    }
+
+    method alias($k) {
+        ALIAS{$k} || $k;
+    }
+
+
     grammar Grammar {
         token TOP           { <.ws> [ <uricmd> | <actioncmd> | <comment> ] <.ws> }
 
@@ -80,7 +92,7 @@ class Command {
 
         method comment($/)    { $!cmd.action = 'comment' }
         method uri($/)        { $!cmd.uri = $/.Str }
-        method pair($/)       { $!cmd.args.push(self.pairkey($/<key>) ~ '=' ~ ($/<value><str> ||
+        method pair($/)       { $!cmd.args.push($!cmd.alias($/<key>) ~ '=' ~ ($/<value><str> ||
                                                                                $/<value><singlequoted>[0] ||
                                                                                $/<value><doublequoted>[0]).Str) }
 
@@ -90,16 +102,6 @@ class Command {
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
-
-        method pairkey($s) {
-            given $s {
-                when 'p' { 'page' }
-                when 'r' { 'resolve[]' }
-                when 't' { 'type[]' }
-                when 'u' { 'uri[]' }
-                default  { $s }
-            }
-        }
     }
 
 
