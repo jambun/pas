@@ -4,6 +4,7 @@ use Pas::Logger;
 use HTTP::UserAgent;
 use URI::Encode;
 use JSON::Tiny;
+use Terminal::ANSIColor;
 
 
 class Pas::ASClient {
@@ -52,6 +53,7 @@ class Pas::ASClient {
     }
     
     method !handle_request($url, %header, $body, %files = {}, Bool :$delete, Int :$timeout?) {
+        my $intime = now;
         my $request = $delete ?? self!delete_request($url, %header) !!
                                  %files ?? self!multipart_request($url, %header, %files) !!
                                            $body ?? self!post_request($url, %header, $body) !!
@@ -67,6 +69,7 @@ class Pas::ASClient {
             start {
                 $resp = self!http.request($request);
             });
+        say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if $!config.attr<properties><time>;
         $resp;
     }
     

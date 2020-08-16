@@ -23,7 +23,6 @@ class Command {
     method do($line) {
         return unless $line.trim;
 
-        my $intime = now;
         my $cmd = Command.new(:$line);
 
         logger.blurt($cmd.gist);
@@ -33,8 +32,6 @@ class Command {
         } else {
             display 'What?';
         }
-
-        say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
     }
 
 
