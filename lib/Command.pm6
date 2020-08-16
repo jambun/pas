@@ -11,13 +11,13 @@ use JSON::Tiny;
 class Command {
     has     $.client;
     has Str $.line is rw;
-    has     $.uri is rw;
+    has Str $.uri is rw;
     has Str $.action is rw;
-    has     $.qualifier is rw;
-    has     $.postfile is rw;
-    has     $.savefile is rw;
-    has     $.first is rw;
-    has     @.args is rw;
+    has Str $.qualifier is rw;
+    has Str $.postfile is rw;
+    has Str $.savefile is rw;
+    has Str $.first is rw;
+    has Str @.args is rw;
 
 
     my constant ACTIONS = <show update create edit stub post delete
@@ -111,26 +111,26 @@ class Command {
 
 
     method show {
-        pretty extract_uris client.get($!first, @!args);
+        pretty extract_uris client.get($!uri, @!args);
     }
 
 
     method update {
         if ($!qualifier eq 'no_get') {
-            pretty extract_uris client.post($!first, @!args, 'nothing');
+            pretty extract_uris client.post($!uri, @!args, 'nothing');
         } else {
-            my $json = client.get($!first);
+            my $json = client.get($!uri);
             if (from-json($json)<error>) {
                 pretty $json;
             } else {
-              pretty extract_uris client.post($!first, @!args, modify_json($json, @!args));
+              pretty extract_uris client.post($!uri, @!args, modify_json($json, @!args));
             }
         }
     }
 
 
     method create {
-        pretty extract_uris client.post($!first, @!args, modify_json('{}', @!args));
+        pretty extract_uris client.post($!uri, @!args, modify_json('{}', @!args));
     }
 
 
@@ -138,14 +138,14 @@ class Command {
         if ($!qualifier eq 'no_get') {
             save_tmp('');
         } else {
-            save_tmp(pretty extract_uris client.get($!first)) unless $!qualifier eq 'last';
+            save_tmp(pretty extract_uris client.get($!uri)) unless $!qualifier eq 'last';
         }
-        edit(tmp_file) ?? pretty extract_uris client.post($!first, @!args, slurp(tmp_file)) !! 'No changes to post.';
+        edit(tmp_file) ?? pretty extract_uris client.post($!uri, @!args, slurp(tmp_file)) !! 'No changes to post.';
     }
 
 
     method stub {
-        my $puri = $!first;
+        my $puri = $!uri;
         $puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
         $puri ~~ s:g/\d+/:id/;
         my $e = from-json client.get(ENDPOINTS_URI, ['uri=' ~ $puri, 'method=post']);
@@ -165,7 +165,7 @@ class Command {
             my $json = slurp(tmp_file);
             for ^$times -> $c {
                 $out ~= $c+1 ~ ' ' ~
-                pretty extract_uris client.post($!first,
+                pretty extract_uris client.post($!uri,
                                                 @!args,
                                                 interpolate(remove_comments($json), $c+1))
             }
@@ -178,7 +178,7 @@ class Command {
 
     method post {
         if $!postfile.IO.e {
-            pretty extract_uris client.post($!first, @!args, slurp($!postfile));
+            pretty extract_uris client.post($!uri, @!args, slurp($!postfile));
         } else {
             'No file to post: ' ~ $!postfile;
         }
@@ -186,7 +186,7 @@ class Command {
 
 
     method delete {
-        pretty extract_uris client.delete($!first);
+        pretty extract_uris client.delete($!uri);
     }
 
 
@@ -201,7 +201,7 @@ class Command {
                 'No record in search index for ' ~ $!first;
             }
         } else {
-            my $page = @!args.head || '1';
+            my $page = @!args.tail || '1';
             @!args.push("q=$!first");
             @!args.push("page=$page");
             my $results = client.get(SEARCH_URI, @!args);
@@ -217,7 +217,7 @@ class Command {
 
 
     method nav {
-        Navigation.new(uri =>$!first, args =>@!args, line => $!line).start;
+        Navigation.new(uri =>$!uri, args =>@!args, line => $!line).start;
     }
 
     
