@@ -380,6 +380,10 @@ class Command {
     method asam {
         my $asam = from-json client.get('/plugins/activity_monitor', @!args);
 
+        if $asam<error> {
+            return pretty to-json $asam;
+        }
+
         my $longest_name = max($asam<statuses>.keys>>.chars);
         my $days = 60*60*24;
         my $hours = 60*60;
