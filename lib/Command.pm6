@@ -16,16 +16,24 @@ class Command {
     has     $.qualifier is rw;
     has     $.postfile is rw;
     has     $.savefile is rw;
-    has     $!first;
+    has     $.first is rw;
     has     @.args is rw;
 
 
-    method do(Str $line) {
+    method do($line) {
         return unless $line.trim;
-        return if $line ~~ /^ '#' /;
 
         my $intime = now;
-        display Command.new(:$line).execute;
+        my $cmd = Command.new(:$line);
+
+        logger.blurt($cmd.gist);
+
+        if $cmd.action {
+            display (Command.actions.grep: $cmd.action) ?? $cmd."{$cmd.action}"() !! "Unknown action: " ~ $cmd.action;
+        } else {
+            display 'What?';
+        }
+
         say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if config.attr<properties><time>;
     }
 
@@ -33,16 +41,17 @@ class Command {
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout run
                            endpoints schemas config session user who
-                           history last set ls help quit>;
+                           history last set ls help comment quit>;
 
     method actions { ACTIONS }
 
 
     grammar Grammar {
-        token TOP           { <.ws> [ <uricmd> | <actioncmd> ] <.ws> }
+        token TOP           { <.ws> [ <uricmd> | <actioncmd> | <comment> ] <.ws> }
 
         rule  uricmd        { <uri> <pairlist> <action>? <postfile>? <redirect>? }
         rule  actioncmd     { <action> <arglist> <redirect>? }
+        token comment       { '#' .* }
 
         token uri           { '/' <[\/\w]>* }
         rule  pairlist      { <pairitem>* }
@@ -67,8 +76,12 @@ class Command {
     class ParseActions {
         has Command $.cmd;
 
-        method TOP($/)        { $!cmd.line = $/.Str; $!cmd.action ||= 'show' }
+        method TOP($/)        { $!cmd.line = $/.Str;
+                                $!cmd.action ||= 'show';
+                                $!cmd.qualifier ||= '';
+                                $!cmd.first = $!cmd.uri || ($!cmd.args || ['']).shift; }
 
+        method comment($/)    { $!cmd.action = 'comment' }
         method uri($/)        { $!cmd.uri = $/.Str }
         method pair($/)       { $!cmd.args.push(self.pairkey($/<key>) ~ '=' ~ ($/<value><str> ||
                                                                                $/<value><singlequoted>[0] ||
@@ -95,21 +108,13 @@ class Command {
 
     submethod BUILD(:$line) {
         Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
-
-        $!first = $!uri || (@!args || ['']).shift;
-        $!qualifier ||= '';
-
-        logger.blurt(self.gist);
     }
-    
 
-    method execute {
-        unless $!action {
-            say 'What?';
-            return;
-        }
 
-        (ACTIONS.grep: $!action) ?? self."$!action"() !! "Unknown action: $!action";
+    # action methods
+
+    method comment {
+        # no op
     }
 
 
