@@ -22,7 +22,8 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout run
-                           endpoints schemas config session user who
+                           endpoints schemas config
+                           session user who asam
                            history last set ls help comment quit>;
 
     method actions { ACTIONS }
@@ -373,6 +374,32 @@ class Command {
 
     method ls {
         qq:x/$!line/.trim;
+    }
+
+
+    method asam {
+        my $asam = from-json client.get('/plugins/activity_monitor', @!args);
+
+        my $longest_name = max($asam<statuses>.keys>>.chars);
+        
+        my $out = "\n";
+        for $asam<groups>.keys.sort -> $group {
+            my $statuses = $asam<groups>{$group};
+            $out ~= "$group\n";
+            for @$statuses -> $name {
+                my $status = $asam<statuses>{$name};
+                my $name_fmt = colored("%-{$longest_name + 1}s", 'bold white');
+
+                $out ~= sprintf("  $name_fmt %s  %s\n",
+                                $name,
+                                colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
+                                                           ($status<status> ~~ 'busy' ?? 'bold blue' !!
+                                                            ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
+                                colored($status<age>.Str ~ 's', 'cyan'));
+            }
+        }
+
+        $out
     }
 
 
