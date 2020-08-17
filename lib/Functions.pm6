@@ -95,7 +95,7 @@ sub display($text is copy) is export {
     my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
 
     if $SAVE_FILE {
-	      spurt $SAVE_FILE, ($text, $stamp).join("\n") ~ "\n", append => $SAVE_APPEND;
+	      spurt $SAVE_FILE, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $SAVE_APPEND;
 	      $SAVE_FILE = '';
 	      return;
     }
@@ -104,7 +104,7 @@ sub display($text is copy) is export {
         page $text;
         say $stamp;
     } else {
-        say ($text, $stamp).join("\n");
+        say ($text, $stamp).grep(/./).join("\n");
     }
 }
 
