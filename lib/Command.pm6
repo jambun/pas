@@ -61,7 +61,7 @@ class Command {
         token action        { <arg> <qualifier>? }
         token qualifier     { '.' <arg> }
         rule  arglist       { <argitem>* }
-        rule  argitem       { <arg> }
+        token argitem       { [ <arg> | <singlequoted> | <doublequoted> ] }
         token arg           { <[\w\d]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
@@ -94,7 +94,7 @@ class Command {
 
         method action($/)     { $!cmd.action = $/<arg>.Str; }
         method qualifier($/)  { $!cmd.qualifier = $/<arg>.Str; }
-        method argitem($/)    { $!cmd.args.push($<arg>.Str) }
+        method argitem($/)    { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
@@ -414,11 +414,12 @@ class Command {
         my $days = 60*60*24;
         my $hours = 60*60;
         my $mins = 60;
-        
-        my $out = "\n";
+        my $out = '';
+        $out ~= "\n" unless $!first;
+        my $indent = $!first ?? '' !! '  ';
         for $asam<groups>.keys.sort -> $group {
             my $statuses = $asam<groups>{$group};
-            $out ~= "$group\n";
+            $out ~= "$group\n" unless $!first;
             for @$statuses -> $name {
                 my $status = $asam<statuses>{$name};
                 my $name_fmt = colored("%-{$longest_name}s", 'bold white');
@@ -440,12 +441,12 @@ class Command {
                     }
                 }
 
-                $out ~= sprintf("  $name_fmt  %s  %s\n",
+                $out ~= sprintf("{$indent}$name_fmt  %s  %s\n",
                                 $name,
                                 colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
                                                            ($status<status> ~~ 'busy' ?? 'bold blue' !!
                                                             ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
-                                colored($age, 'cyan'));
+                                colored($age, 'cyan')) if !$!first || $!first eq $name;
             }
         }
 
