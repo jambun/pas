@@ -29,10 +29,13 @@ my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
 
+my @SCHEDULES = [];
+
 sub last_uris(@uris = ()) is export { @LAST_URIS = @uris if @uris; @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 sub save_file($file) is export { $SAVE_FILE = $file }
+sub schedules is export { @SCHEDULES = grep {.status !~~ Kept}, @SCHEDULES }
 
 my Pas::Store $STORE;
 sub store is export { $STORE ||= Pas::Store.new(:dir(%*ENV<HOME> ~ '/.pas')) }

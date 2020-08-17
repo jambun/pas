@@ -18,11 +18,12 @@ class Command {
     has Str $.savefile is rw;
     has Str $.first is rw;
     has Str @.args is rw;
-    has Str $.schedule is rw;
+    has Num $.delay is rw;
+    has Num $.times is rw;
 
 
     my constant ACTIONS = <show update create edit stub post delete
-                           search nav login logout run
+                           search nav login logout run schedules
                            endpoints schemas config
                            session user who asam
                            history last set ls help comment quit>;
@@ -71,7 +72,10 @@ class Command {
         rule  redirect      { '>' <file> }
         token file          { <[\w/\.\-]>+ }
 
-        rule  schedule      { '@' <arg> }
+        token schedule      { '@' <delay> <repeats>? }
+        token delay         { <[\d]>+ }
+        token repeats       { 'x' <times> }
+        token times         { [ <[\d]>+ | '*'] }
     }
 
     class ParseActions {
@@ -95,7 +99,8 @@ class Command {
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
 
-        method schedule($/)   { $!cmd.schedule = $<arg>.Str; }
+        method delay($/)      { $!cmd.delay = $/.Num; $!cmd.times ||= 1.Num; }
+        method repeats($/)    { $!cmd.times = $<times>.Str ~~ '*' ?? Inf !! $<times>.Num; }
     }
 
 
@@ -105,8 +110,13 @@ class Command {
             logger.blurt(self.gist);
             if self.action {
                 if ACTIONS.grep: self.action {
-                    if self.schedule {
-                        Promise.start({sleep self.schedule.Num; display self."{self.action}"();})
+                    if self.delay {
+                        schedules.push(start {
+                            for 1..self.times {
+                                sleep self.delay;
+                                display self."{self.action}"();
+                            }
+                        });
                     } else {
                         display self."{self.action}"();
                     }
@@ -440,6 +450,11 @@ class Command {
         }
 
         $out
+    }
+
+
+    method schedules {
+        schedules>>.status.join("\n");
     }
 
 
