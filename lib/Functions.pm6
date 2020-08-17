@@ -92,18 +92,19 @@ sub display($text is copy) is export {
     $text = $text.chomp;
     return unless $text;
 
-    $text ~= "\n" ~ colored(now.DateTime.Str, 'yellow') if config.attr<properties><stamp>;
+    my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
 
     if $SAVE_FILE {
-	      spurt $SAVE_FILE, $text, append => $SAVE_APPEND;
+	      spurt $SAVE_FILE, ($text, $stamp).join("\n") ~ "\n", append => $SAVE_APPEND;
 	      $SAVE_FILE = '';
 	      return;
     }
 
     if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
         page $text;
+        say $stamp;
     } else {
-        say $text;
+        say ($text, $stamp).join("\n");
     }
 }
 
