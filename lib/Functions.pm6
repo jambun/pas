@@ -88,8 +88,11 @@ sub edit($file) is export {
 }
 
 
-sub display($text) is export {
+sub display($text is copy) is export {
+    $text = $text.chomp;
     return unless $text;
+
+    $text ~= "\n" ~ colored(now.DateTime.Str, 'yellow') ~ "\n" if config.attr<properties><stamp>;
 
     if $SAVE_FILE {
 	      spurt $SAVE_FILE, $text, append => $SAVE_APPEND;
@@ -115,9 +118,6 @@ sub modify_json($json, @pairs) is export {
     my %hash = from-json $json;
     for @pairs -> $q {
         my ($k, $v) = $q.split('=', 2);
-#        my $k = $q[0].key;
-#        my $v = $q[0].value;
-
 	      $v = True if $v eq 'true';
 	      $v = False if $v eq 'false';
 

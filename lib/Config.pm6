@@ -19,7 +19,8 @@ class Config {
     time     => False,
     savepwd  => False,
     anon     => False,
-    timeout   => 5,
+    timeout  => 5,
+    stamp    => False,
     indent   => 2;
 
     has %!prompts =
