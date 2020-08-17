@@ -18,6 +18,7 @@ class Command {
     has Str $.savefile is rw;
     has Str $.first is rw;
     has Str @.args is rw;
+    has Str $.schedule is rw;
 
 
     my constant ACTIONS = <show update create edit stub post delete
@@ -42,10 +43,13 @@ class Command {
 
 
     grammar Grammar {
-        token TOP           { <.ws> [ <uricmd> | <actioncmd> | <comment> ] <.ws> }
+        token TOP           { <.ws> [ <command> | <comment> ] <.ws> }
 
-        rule  uricmd        { <uri> <pairlist> <action>? <postfile>? <redirect>? }
-        rule  actioncmd     { <action> <arglist> <redirect>? }
+        rule  command       { [ <uricmd> | <actioncmd> ] <redirect>? <schedule>? }
+
+        rule  uricmd        { <uri> <pairlist> <action>? <postfile>? }
+        rule  actioncmd     { <action> <arglist> }
+
         token comment       { '#' .* }
 
         token uri           { '/' <[\/\w]>* }
@@ -66,6 +70,8 @@ class Command {
         rule  postfile      { '<' <file> }
         rule  redirect      { '>' <file> }
         token file          { <[\w/\.\-]>+ }
+
+        rule  schedule      { '@' <arg> }
     }
 
     class ParseActions {
@@ -88,6 +94,8 @@ class Command {
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
+
+        method schedule($/)   { $!cmd.schedule = $<arg>.Str; }
     }
 
 
@@ -96,7 +104,15 @@ class Command {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
             logger.blurt(self.gist);
             if self.action {
-                display (ACTIONS.grep: self.action) ?? self."{self.action}"() !! "Unknown action: " ~ self.action;
+                if ACTIONS.grep: self.action {
+                    if self.schedule {
+                        Promise.start({sleep self.schedule.Num; display self."{self.action}"();})
+                    } else {
+                        display self."{self.action}"();
+                    }
+                } else {
+                    display "Unknown action: " ~ self.action;
+                }
             } else {
                 say 'What?';
             }
