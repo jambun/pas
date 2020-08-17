@@ -419,7 +419,6 @@ class Command {
         my $hours = 60*60;
         my $mins = 60;
         my $out = '';
-        $out ~= "\n" unless $!first;
         my $indent = $!first ?? '' !! '  ';
         for $asam<groups>.keys.sort -> $group {
             my $statuses = $asam<groups>{$group};

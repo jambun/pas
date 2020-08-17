@@ -92,7 +92,7 @@ sub display($text is copy) is export {
     $text = $text.chomp;
     return unless $text;
 
-    $text ~= "\n" ~ colored(now.DateTime.Str, 'yellow') ~ "\n" if config.attr<properties><stamp>;
+    $text ~= "\n" ~ colored(now.DateTime.Str, 'yellow') if config.attr<properties><stamp>;
 
     if $SAVE_FILE {
 	      spurt $SAVE_FILE, $text, append => $SAVE_APPEND;
