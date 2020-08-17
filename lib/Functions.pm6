@@ -23,6 +23,7 @@ our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
 
 my $SAVE_FILE;
+my $SAVE_APPEND;
 my $SCHEMAS;
 my $SCHEMAS_PARSED;
 my @LAST_URIS = [];
@@ -34,7 +35,7 @@ my @SCHEDULES = [];
 sub last_uris(@uris = ()) is export { @LAST_URIS = @uris if @uris; @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
-sub save_file($file) is export { $SAVE_FILE = $file }
+sub save_file($file, $append) is export { $SAVE_FILE = $file; $SAVE_APPEND = $append; }
 
 sub schedules is export { @SCHEDULES = grep { $_<promise>.status !~~ Kept }, @SCHEDULES }
 
@@ -91,9 +92,9 @@ sub display($text) is export {
     return unless $text;
 
     if $SAVE_FILE {
-	spurt $SAVE_FILE, $text;
-	$SAVE_FILE = '';
-	return;
+	      spurt $SAVE_FILE, $text, append => $SAVE_APPEND;
+	      $SAVE_FILE = '';
+	      return;
     }
 
     if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {

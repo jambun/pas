@@ -16,6 +16,7 @@ class Command {
     has Str $.qualifier is rw;
     has Str $.postfile is rw;
     has Str $.savefile is rw;
+    has Bool $.saveappend is rw;
     has Str $.first is rw;
     has Str @.args is rw;
     has Num $.delay is rw;
@@ -69,7 +70,8 @@ class Command {
         token doublequoted  { '"' ~ '"' (<-["]>*) }
 
         rule  postfile      { '<' <file> }
-        rule  redirect      { '>' <file> }
+        rule  redirect      { <saveappend> <file> }
+        token saveappend    { '>' ** 1..2 }
         token file          { <[\w/\.\-]>+ }
 
         token schedule      { '@' <delay> <repeats>? }
@@ -97,7 +99,9 @@ class Command {
         method argitem($/)    { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
-        method redirect($/)   { $!cmd.savefile = $<file>.Str; save_file($!cmd.savefile) }
+        method redirect($/)   { $!cmd.savefile = $<file>.Str;
+                                $!cmd.saveappend = $<saveappend>.Str eq '>>';
+                                save_file($!cmd.savefile, $!cmd.saveappend) }
 
         method delay($/)      { $!cmd.delay = $/.Num; $!cmd.times ||= 1.Num; }
         method repeats($/)    { $!cmd.times = $<times>.Str ~~ '*' ?? Inf !! $<times>.Num; }
