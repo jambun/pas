@@ -111,12 +111,12 @@ class Command {
             if self.action {
                 if ACTIONS.grep: self.action {
                     if self.delay {
-                        schedules.push(start {
+                        schedules.push({command => self, promise => start {
                             for 1..self.times {
                                 sleep self.delay;
                                 display self."{self.action}"();
                             }
-                        });
+                        }});
                     } else {
                         display self."{self.action}"();
                     }
@@ -455,7 +455,7 @@ class Command {
 
 
     method schedules {
-        schedules>>.status.join("\n");
+        schedules>><command>>>.line.join("\n");
     }
 
 
