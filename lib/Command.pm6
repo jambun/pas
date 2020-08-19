@@ -104,8 +104,9 @@ class Command {
         method redirect($/)   { $!cmd.savefile = $<file>.Str;
                                 $!cmd.saveappend = $<saveappend>.Str eq '>>'; }
 
+        method schedule($/)   { $!cmd.times = 1 unless $/<repeats>; }
         method delay($/)      { $!cmd.delay = $/.Num; }
-        method repeats($/)    { $!cmd.times = $<times>.Int unless $<times>.Str ~~ '*'; }
+        method repeats($/)    { $!cmd.times = $<times>.Str ~~ '*' ?? 0 !! $<times>.Int; }
     }
 
 
@@ -117,12 +118,8 @@ class Command {
         $!cancelled = True;
     }
 
-    method runs_remaining {
-        $!times - $!timesrun;
-    }
-
     method done {
-        $!cancelled || $!times - $!timesrun == 0;
+        $!cancelled || $!times && $!times - $!timesrun == 0;
     }
 
     method state {
@@ -158,7 +155,7 @@ class Command {
 
 
     submethod BUILD(:$line) {
-        $!times ||= 1;
+        $!times //= 1;
         $!timesrun = 0;
         if $line.trim {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
@@ -166,6 +163,9 @@ class Command {
             if self.action {
                 if ACTIONS.grep: self.action {
                     if self.delay {
+                        # rakudo seems to treat :times=1 as infinity, no :times as 1
+                        # i'm using 0 (zero) to indicate infinity
+                        # hence the following nonsense
                         if self.times == 1 {
                             schedules.push({command => self,
                                             status => scheduler.cue({self.run},
@@ -175,7 +175,7 @@ class Command {
                                             status => scheduler.cue({self.run},
                                                                     :in(self.delay),
                                                                     :every(self.delay),
-                                                                    :times(self.times))});
+                                                                    :times(self.times || 1))});
                         }
                     } else {
                         self.run;
@@ -520,13 +520,13 @@ class Command {
             return '' unless $s;
             my $ix_fmt = colored("%02d", 'cyan');
             my $status_fmt = colored("%-10s", 'bold white');
-            my $runs_fmt = colored("%d/%d", 'magenta');
+            my $runs_fmt = colored("%d/%s", 'magenta');
             sprintf("[$ix_fmt]  $status_fmt  %s  ($runs_fmt)\n",
                     $ix+1,
                     $s<command>.state,
                     $s<command>.line,
                     $s<command>.timesrun,
-                    $s<command>.times);
+                    $s<command>.times || '*');
         }
 
         if $!first {
