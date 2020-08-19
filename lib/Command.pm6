@@ -20,11 +20,13 @@ class Command {
     has Str $.first is rw;
     has Str @.args is rw;
     has Num $.delay is rw;
-    has Num $.times is rw;
+    has Int $.times is rw;
+    has Int $.timesrun;
+    has Bool $.cancelled;
 
 
     my constant ACTIONS = <show update create edit stub post delete
-                           search nav login logout run schedules
+                           search nav login logout script schedules
                            endpoints schemas config
                            session user who asam
                            history last set ls help comment quit>;
@@ -103,26 +105,60 @@ class Command {
                                 $!cmd.saveappend = $<saveappend>.Str eq '>>';
                                 save_file($!cmd.savefile, $!cmd.saveappend) }
 
-        method delay($/)      { $!cmd.delay = $/.Num; $!cmd.times ||= 1.Num; }
-        method repeats($/)    { $!cmd.times = $<times>.Str ~~ '*' ?? Inf !! $<times>.Num; }
+        method delay($/)      { $!cmd.delay = $/.Num; }
+        method repeats($/)    { $!cmd.times = $<times>.Int unless $<times>.Str ~~ '*'; }
     }
 
 
+    method ran {
+        $!timesrun += 1;
+    }
+
+    method cancel {
+        $!cancelled = True;
+    }
+
+    method runs_remaining {
+        $!times - $!timesrun;
+    }
+
+    method done {
+        $!cancelled || $!times - $!timesrun == 0;
+    }
+
+    method state {
+        $!cancelled ?? 'Cancelled' !! self.done ?? 'Done' !! 'Running';
+    }
+
+    method run {
+        unless self.done {
+            display self."{self.action}"();
+            self.ran;
+        }
+    }
+
     submethod BUILD(:$line) {
+        $!times ||= 1;
+        $!timesrun = 0;
         if $line.trim {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
             logger.blurt(self.gist);
             if self.action {
                 if ACTIONS.grep: self.action {
                     if self.delay {
-                        schedules.push({command => self, promise => start {
-                            for 1..self.times {
-                                sleep self.delay;
-                                display self."{self.action}"();
-                            }
-                        }});
+                        if self.times == 1 {
+                            schedules.push({command => self,
+                                            status => scheduler.cue({self.run},
+                                                                    :in(self.delay))});
+                        } else {
+                            schedules.push({command => self,
+                                            status => scheduler.cue({self.run},
+                                                                    :in(self.delay),
+                                                                    :every(self.delay),
+                                                                    :times(self.times))});
+                        }
                     } else {
-                        display self."{self.action}"();
+                        self.run;
                     }
                 } else {
                     display "Unknown action: " ~ self.action;
@@ -263,7 +299,7 @@ class Command {
     }
     
 
-    method run {
+    method script {
         if $!first.IO.e {
             for slurp($!first).lines -> $line {
                 next unless $line;
@@ -458,7 +494,53 @@ class Command {
 
 
     method schedules {
-        schedules>><command>>>.line.join("\n");
+
+        sub render-schedule($ix) {
+            my $s = schedules[$ix];
+            return '' unless $s;
+            my $ix_fmt = colored("%02d", 'cyan');
+            my $status_fmt = colored("%-10s", 'bold white');
+            my $runs_fmt = colored("%d/%d", 'cyan');
+            sprintf("[$ix_fmt]  $status_fmt  %s  ($runs_fmt)\n",
+                    $ix+1,
+                    $s<command>.state,
+                    $s<command>.line,
+                    $s<command>.timesrun,
+                    $s<command>.times);
+        }
+
+        if $!first {
+            unless $!first.Int {
+                return 'Argument must be an integer';
+            }
+            my $ix = $!first.Int - 1;
+            unless schedules[$ix] {
+                return 'Argument must reference an existing schedule';
+            }
+
+            if $!qualifier eq 'cancel' {
+                if schedules[$ix]<command>.cancelled {
+                    "Schedule {$ix + 1} is already cancelled";
+                } elsif schedules[$ix]<command>.done {
+                    "Schedule {$ix + 1} is already done";
+                } else {
+                    schedules[$ix]<status>.cancel;
+                    schedules[$ix]<command>.cancel;
+                    "Schedule {$ix + 1} cancelled";
+                }
+            } else {
+                render-schedule($ix);
+            }
+        } else {
+            if $!qualifier eq 'clean' {
+                clean_schedules;
+            }
+            gather {
+                for (0..schedules.elems - 1) -> $ix {
+                    take render-schedule($ix);
+                }
+            }.join || 'No current schedules';
+        }
     }
 
 
@@ -487,11 +569,11 @@ class Command {
 
 
 sub shell_help {
-    qq:heredoc/END/;
+    q:heredoc/END/;
 
     pas shell help
 
-    uri pairs* action? [ < file ] [ > file ]
+    uri pairs* action? [ < file ] [ > file ] [ @d[xt] ]
     action args* [ > file ]
 
     uri actions:
@@ -513,7 +595,11 @@ sub shell_help {
       user      show the current user
       session   show sessions or switch to a session
        .delete  delete a session
-      run       run a pas script file
+      schedules show current schedules
+        .cancel cancel numbered schedule
+        .clean  remove all completed schedules
+        [n]     show or cancel numbered schedule
+      script    run a pas script file
       endpoints show the available endpoints
        .reload  force a reload
       schemas   show all record schemas
@@ -531,6 +617,12 @@ sub shell_help {
        [n]      show the last n commands 
       help      this
       quit      exit pas (^d works too)
+
+      < file    post file to uri
+      > file    redirect output to file instead of displaying
+                if file is 'null' then don't display or save
+
+      @d[xt]      schedule command to run t times (default 1) every d seconds
 
     Say 'help [action]' for detailed help. ... well, not yet
 

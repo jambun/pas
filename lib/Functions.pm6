@@ -37,7 +37,8 @@ sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 sub save_file($file, $append) is export { $SAVE_FILE = $file; $SAVE_APPEND = $append; }
 
-sub schedules is export { @SCHEDULES = grep { $_<promise>.status !~~ Kept }, @SCHEDULES }
+sub schedules is export { @SCHEDULES }
+sub clean_schedules is export { @SCHEDULES .= grep({none $_<command>.done}) }
 
 my Pas::Store $STORE;
 sub store is export { $STORE ||= Pas::Store.new(:dir(%*ENV<HOME> ~ '/.pas')) }
@@ -50,6 +51,10 @@ sub logger is export { $LOGGER ||= Pas::Logger.new(:config(config)); }
 
 my Pas::ASClient $CLIENT;
 sub client is export { $CLIENT ||= Pas::ASClient.new(:config(config), :log(logger)) }
+
+my ThreadPoolScheduler $SCHEDULER;
+sub scheduler is export { $SCHEDULER ||= ThreadPoolScheduler.new }
+
 
 sub cmd_prompt is export {
     my $host = config.attr<url>;
@@ -95,7 +100,7 @@ sub display($text is copy) is export {
     my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
 
     if $SAVE_FILE {
-	      spurt $SAVE_FILE, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $SAVE_APPEND;
+	      spurt($SAVE_FILE, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $SAVE_APPEND) unless $SAVE_FILE eq 'null';
 	      $SAVE_FILE = '';
 	      return;
     }
