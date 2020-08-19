@@ -500,7 +500,7 @@ class Command {
             return '' unless $s;
             my $ix_fmt = colored("%02d", 'cyan');
             my $status_fmt = colored("%-10s", 'bold white');
-            my $runs_fmt = colored("%d/%d", 'cyan');
+            my $runs_fmt = colored("%d/%d", 'magenta');
             sprintf("[$ix_fmt]  $status_fmt  %s  ($runs_fmt)\n",
                     $ix+1,
                     $s<command>.state,
