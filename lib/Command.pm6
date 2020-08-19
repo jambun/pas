@@ -102,8 +102,7 @@ class Command {
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str;
-                                $!cmd.saveappend = $<saveappend>.Str eq '>>';
-                                save_file($!cmd.savefile, $!cmd.saveappend) }
+                                $!cmd.saveappend = $<saveappend>.Str eq '>>'; }
 
         method delay($/)      { $!cmd.delay = $/.Num; }
         method repeats($/)    { $!cmd.times = $<times>.Int unless $<times>.Str ~~ '*'; }
@@ -132,10 +131,31 @@ class Command {
 
     method run {
         unless self.done {
-            display self."{self.action}"();
+            self.output(self."{self.action}"());
             self.ran;
         }
     }
+
+
+    method output($text is copy) {
+        $text = $text.chomp;
+        return unless $text;
+
+        my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
+
+        if $!savefile {
+	          spurt($!savefile, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $!saveappend) unless $!savefile eq 'null';
+	          return;
+        }
+
+        if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
+            page $text;
+            say $stamp;
+        } else {
+            say ($text, $stamp).grep(/./).join("\n");
+        }
+    }
+
 
     submethod BUILD(:$line) {
         $!times ||= 1;
@@ -161,7 +181,7 @@ class Command {
                         self.run;
                     }
                 } else {
-                    display "Unknown action: " ~ self.action;
+                    say "Unknown action: " ~ self.action;
                 }
             } else {
                 say 'What?';

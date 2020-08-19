@@ -22,8 +22,6 @@ our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
 
-my $SAVE_FILE;
-my $SAVE_APPEND;
 my $SCHEMAS;
 my $SCHEMAS_PARSED;
 my @LAST_URIS = [];
@@ -35,7 +33,6 @@ my @SCHEDULES = [];
 sub last_uris(@uris = ()) is export { @LAST_URIS = @uris if @uris; @LAST_URIS }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
-sub save_file($file, $append) is export { $SAVE_FILE = $file; $SAVE_APPEND = $append; }
 
 sub schedules is export { @SCHEDULES }
 sub clean_schedules is export { @SCHEDULES .= grep({none $_<command>.done}) }
@@ -90,27 +87,6 @@ sub edit($file) is export {
     my $mtime = $file.IO.modified;
     shell (%*ENV<EDITOR> || 'emacs') ~ ' ' ~ $file;
     $mtime != $file.IO.modified;
-}
-
-
-sub display($text is copy) is export {
-    $text = $text.chomp;
-    return unless $text;
-
-    my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
-
-    if $SAVE_FILE {
-	      spurt($SAVE_FILE, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $SAVE_APPEND) unless $SAVE_FILE eq 'null';
-	      $SAVE_FILE = '';
-	      return;
-    }
-
-    if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
-        page $text;
-        say $stamp;
-    } else {
-        say ($text, $stamp).grep(/./).join("\n");
-    }
 }
 
 
