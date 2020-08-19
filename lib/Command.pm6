@@ -77,7 +77,7 @@ class Command {
         token file          { <[\w/\.\-]>+ }
 
         token schedule      { '@' <delay> <repeats>? }
-        token delay         { <[\d]>+ }
+        token delay         { <[\d\.]>+ }
         token repeats       { 'x' <times> }
         token times         { [ <[\d]>+ | '*'] }
     }
