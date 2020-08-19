@@ -324,8 +324,9 @@ class Command {
             for slurp($!first).lines -> $line {
                 next unless $line;
                 say cmd_prompt() ~ $line;
-                Command.do($line);
+                Command.new(:$line);
             }
+            'Script complete';
         } else {
             'Script file not found: ' ~ $!first;
         }

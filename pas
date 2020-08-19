@@ -15,7 +15,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 
     client.ensure_session;
     
-    if $e { Command.do($e); exit; }
+    if $e { Command.new(:line($e)); exit; }
 
     load_endpoints;
 
@@ -70,7 +70,7 @@ sub help {
 pas - a terminal client for ArchivesSpace
 
     pas             Start pas interactive shell
-    pas -e cmd      Evaluate cmd and write output to stdout
+    pas -e=cmd      Evaluate cmd and write output to stdout
     pas -h          This.
 
 END
