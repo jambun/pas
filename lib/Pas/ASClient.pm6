@@ -215,7 +215,7 @@ class Pas::ASClient {
         self.log.blurt('Logging in to ' ~ $!config.attr<url> ~ ' as ' ~ $!config.attr<user>);
 
         unless $!config.attr<pass> {
-            $!config.prompt_for('pass', 'Enter password for ' ~ $!config.attr<user>);
+            $!config.prompt_for('pass', 'Enter password for ' ~ $!config.attr<user>, :pass);
         }
         
         my $uri      = '/users/' ~ $!config.attr<user> ~ '/login';

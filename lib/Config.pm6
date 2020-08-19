@@ -44,20 +44,22 @@ class Config {
 
 
     method prompt(@attrs = <url user pass>) {
-        for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}) }
+        for @attrs { %!attr{$_} = $::($_) || self.prompt_default(%!prompts{$_}, %!attr{$_}, :pass($_ ~~ <pass>)) }
         %!attr<url> = 'http://localhost:' ~ %!attr<url> if %!attr<url> ~~ /^\d/;
         %!attr<url> = 'http://' ~ %!attr<url> if %!attr<url> !~~ /^http/;
         %!attr<url> = %!attr<url> ~ ':8089' if %!attr<url> !~~ /\d$/;
     }
 
 
-    method prompt_for($k, $prompt) {
-        %!attr{$k} = self.prompt_default($prompt, %!attr{$k});
+    method prompt_for($k, $prompt, :$pass) {
+        %!attr{$k} = self.prompt_default($prompt, %!attr{$k}, :$pass);
     }
 
 
-    method prompt_default($prompt, $default) {
+    method prompt_default($prompt, $default, :$pass) {
+        run 'stty', '-echo' if $pass;
         my $response = prompt $prompt ~ ($default ?? " ({$default}): " !! ': ');
+        run 'stty', 'echo' if $pass;
         $response ~~ /\w/ ?? $response !! $default;
     }
 
