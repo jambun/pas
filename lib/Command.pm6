@@ -27,7 +27,7 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout script schedules
-                           endpoints schemas config
+                           endpoints schemas config groups
                            session user who asam
                            history last set ls help comment quit>;
 
@@ -561,6 +561,16 @@ class Command {
                     take render-schedule($ix);
                 }
             }.join || 'No current schedules';
+        }
+    }
+
+
+    method groups {
+        if $!first {
+            my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
+            $groups.map({ $_<group_code> ~ ' ' ~ $_<uri> }).join("\n");
+        } else {
+            "Give a repo id like this:\n> groups 2"
         }
     }
 
