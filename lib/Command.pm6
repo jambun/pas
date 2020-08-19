@@ -320,15 +320,19 @@ class Command {
     
 
     method script {
-        if $!first.IO.e {
-            for slurp($!first).lines -> $line {
-                next unless $line;
-                say cmd_prompt() ~ $line;
-                Command.new(:$line);
+        if $!first {
+            if $!first.IO.e {
+                for slurp($!first).lines -> $line {
+                    next unless $line;
+                    say cmd_prompt() ~ $line;
+                    Command.new(:$line);
+                }
+                'Script complete';
+            } else {
+                'Script file not found: ' ~ $!first;
             }
-            'Script complete';
         } else {
-            'Script file not found: ' ~ $!first;
+            'Give a file path like this: script foo.txt';
         }
     }
     
