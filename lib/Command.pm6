@@ -27,8 +27,8 @@ class Command {
 
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout script schedules
-                           endpoints schemas config groups
-                           session user who asam
+                           endpoints schemas config groups users
+                           session who asam
                            history last set ls help comment quit>;
 
     method actions { ACTIONS }
@@ -392,8 +392,28 @@ class Command {
     }
 
 
-    method user {
-        pretty extract_uris client.get(USER_URI);
+    method users {
+        given $!qualifier {
+            when <create> {
+                if $!first {
+                    my $resp = from-json(client.post('/users', ["password=$!first"],
+                                                     to-json({username => $!first, name => $!first})));
+                    if $resp<error> {
+                        pretty to-json $resp;
+                    } else {
+                        "User '$!first' created";
+                    }
+                } else {
+                    'Give a username to create';
+                }
+            }
+            when <me> {
+                pretty extract_uris client.get(USER_URI);
+            }
+            default {
+                pretty extract_uris client.get('/users', ['page=1']);
+            }
+        }
     }
 
 
@@ -592,9 +612,23 @@ class Command {
 
 
     method groups {
-        if $!first {
-            my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
-            $groups.map({ $_<group_code> ~ ' ' ~ $_<uri> }).join("\n");
+        if $!qualifier {
+            my $groups = from-json(extract_uris client.get("/repositories/$!qualifier/groups"));
+            if $!first {
+                my $uri = ($!first.Int ?? $groups[$!first - 1] !! $groups.grep(.value ~~ $!first).head)<uri>;
+                my $g = from-json(extract_uris client.get($uri));
+                $g<group_code>, $g<member_usernames>;
+            } else {
+                my $ix_fmt = colored("%02d", 'cyan');
+                gather {
+                    for $groups.pairs -> $g {
+                        take sprintf("[$ix_fmt]  %-30s  %s",
+                                     $g.key + 1,
+                                     $g.value<group_code>,
+                                     $g.value<uri>);
+                    }
+                }.join("\n");
+            }
         } else {
             "Give a repo id like this:\n> groups 2"
         }
