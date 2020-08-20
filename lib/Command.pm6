@@ -537,12 +537,16 @@ class Command {
 
 
     method schedules {
+        my %state_color =
+            Running => 'bold green',
+            Complete => 'bold white',
+            Cancelled => 'bold red';
 
         sub render-schedule($ix) {
             my $s = schedules[$ix];
             return '' unless $s;
             my $ix_fmt = colored("%02d", 'cyan');
-            my $status_fmt = colored("%-10s", 'bold white');
+            my $status_fmt = colored("%-10s", %state_color{$s<command>.state});
             my $runs_fmt = colored("%d/%s", 'magenta');
             sprintf("[$ix_fmt]  $status_fmt  %s  ($runs_fmt)\n",
                     $ix+1,
