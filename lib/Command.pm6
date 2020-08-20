@@ -123,18 +123,32 @@ class Command {
     }
 
     method state {
-        $!cancelled ?? 'Cancelled' !! self.done ?? 'Done' !! 'Running';
+        $!cancelled ?? 'Cancelled' !! self.done ?? 'Complete' !! 'Running';
     }
 
-    method run {
-        unless self.done {
-            self.output(self."{self.action}"());
-            self.ran;
+
+    my @SPOOL = [];
+    sub unspool {
+        while (my $unspooled = @SPOOL.shift) {
+            $unspooled.head.output($unspooled.tail, :spooled);
         }
     }
 
 
-    method output($text is copy) {
+    method run(:$spool) {
+        if $spool {
+            @SPOOL.push((self, self."{self.action}"()));
+        } else {
+            unspool;
+            unless self.done {
+                self.output(self."{self.action}"());
+                self.ran;
+            }
+        }
+    }
+
+
+    method output($text is copy, :$spooled) {
         $text = $text.chomp;
         return unless $text;
 
@@ -145,7 +159,7 @@ class Command {
 	          return;
         }
 
-        if config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
+        if !$spooled && config.attr<properties><page> && q:x/tput lines/.chomp.Int < $text.lines {
             page $text;
             say $stamp;
         } else {
@@ -168,11 +182,11 @@ class Command {
                         # hence the following nonsense
                         if self.times == 1 {
                             schedules.push({command => self,
-                                            status => scheduler.cue({self.run},
+                                            status => scheduler.cue({self.run(:spool)},
                                                                     :in(self.delay))});
                         } else {
                             schedules.push({command => self,
-                                            status => scheduler.cue({self.run},
+                                            status => scheduler.cue({self.run(:spool)},
                                                                     :in(self.delay),
                                                                     :every(self.delay),
                                                                     :times(self.times || 1))});
@@ -186,6 +200,8 @@ class Command {
             } else {
                 say 'What?';
             }
+        } else {
+            unspool;            
         }
     }
 
