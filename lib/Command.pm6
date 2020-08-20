@@ -77,7 +77,7 @@ class Command {
         token file          { <[\w/\.\-]>+ }
 
         token schedule      { '@' <delay> <repeats>? }
-        token delay         { <[\d\.]>+ }
+        token delay         { <[\d\.]>+ | '*' }
         token repeats       { 'x' <times> }
         token times         { [ <[\d]>+ | '*'] }
     }
@@ -105,7 +105,7 @@ class Command {
                                 $!cmd.saveappend = $<saveappend>.Str eq '>>'; }
 
         method schedule($/)   { $!cmd.times = 1 unless $/<repeats>; }
-        method delay($/)      { $!cmd.delay = $/.Num; }
+        method delay($/)      { $!cmd.delay = $/.Str ~~ '*' ?? 0.01.Num !! $/.Num; }
         method repeats($/)    { $!cmd.times = $<times>.Str ~~ '*' ?? 0 !! $<times>.Int; }
     }
 
