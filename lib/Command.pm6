@@ -135,16 +135,17 @@ class Command {
     }
 
 
-    method run(:$spool) {
-        if $spool {
-            @SPOOL.push((self, self."{self.action}"()));
-            self.ran;
-        } else {
-            unspool;
-            unless self.done {
-                self.output(self."{self.action}"());
-                self.ran;
+    method run(:$spool is copy) {
+        $spool &&= !$!savefile;
+        $spool || unspool;
+        unless self.done {
+            my $output = self."{self.action}"();
+            if $spool {
+                @SPOOL.push((self, $output));
+            } else {
+                self.output($output);
             }
+            self.ran;
         }
     }
 
