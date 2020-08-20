@@ -621,7 +621,7 @@ class Command {
             if $resp<error> {
                 pretty to-json $resp;
             } else {
-                "Users updated for group {$g<group_code>}";
+                "Users updated for group {$g<group_code>} in {$g<repository><ref>}";
             }
         }
 
