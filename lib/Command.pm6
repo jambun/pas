@@ -64,7 +64,8 @@ class Command {
         token action        { <arg> <qualifier>? }
         token qualifier     { '.' <arg> }
         rule  arglist       { <argitem>* }
-        token argitem       { [ <arg> | <singlequoted> | <doublequoted> ] }
+        rule  argitem       { <argvalue> }
+        token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
         token arg           { <[\w\d]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
@@ -98,7 +99,7 @@ class Command {
 
         method action($/)     { $!cmd.action = $/<arg>.Str; }
         method qualifier($/)  { $!cmd.qualifier = $/<arg>.Str; }
-        method argitem($/)    { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
+        method argvalue($/)   { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str;
@@ -612,12 +613,47 @@ class Command {
 
 
     method groups {
-        if $!qualifier {
-            my $groups = from-json(extract_uris client.get("/repositories/$!qualifier/groups"));
-            if $!first {
-                my $uri = ($!first.Int ?? $groups[$!first - 1] !! $groups.grep(.value ~~ $!first).head)<uri>;
+        sub update-users($g, :$add, :$remove, :$removeall) {
+            $g<member_usernames> = [] if $removeall;
+            $g<member_usernames> = $g<member_usernames>.push(|$add).Set.keys.sort if $add;
+            $g<member_usernames> = $g<member_usernames>.grep(none $remove.grep($_)) if $remove;
+            my $resp = from-json client.post($g<uri>, [], to-json($g));
+            if $resp<error> {
+                pretty to-json $resp;
+            } else {
+                "Users updated for group {$g<group_code>}";
+            }
+        }
+
+        if $!first {
+            my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
+            my $ix_or_name = @!args.shift;
+            if $ix_or_name {
+                my $uri = ($ix_or_name.Int ?? $groups[$ix_or_name - 1] !! $groups.grep(.value ~~ $ix_or_name).head)<uri>;
                 my $g = from-json(extract_uris client.get($uri));
-                $g<group_code>, $g<member_usernames>;
+
+                given $!qualifier {
+                    when <add> {
+                        if @!args {
+                            update-users($g, :add(@!args));
+                        } else {
+                            'Give one or more usernames to add to the group';
+                        }
+                    }
+                    when <remove> {
+                        if @!args {
+                            update-users($g, :remove(@!args));
+                        } else {
+                            'Give one or more usernames to remove from the group';
+                        }
+                    }
+                    when <removeall> {
+                        update-users($g, :removeall);
+                    }
+                    default {
+                        $g<group_code>, $g<member_usernames>;
+                    }
+                }
             } else {
                 my $ix_fmt = colored("%02d", 'cyan');
                 gather {
