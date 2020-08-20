@@ -138,6 +138,7 @@ class Command {
     method run(:$spool) {
         if $spool {
             @SPOOL.push((self, self."{self.action}"()));
+            self.ran;
         } else {
             unspool;
             unless self.done {
