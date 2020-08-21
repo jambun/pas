@@ -308,9 +308,7 @@ class Command {
             }
         } else {
             my $page = @!args.tail || '1';
-            @!args.push("q=$!first");
-            @!args.push("page=$page");
-            my $results = client.get(SEARCH_URI, @!args);
+            my $results = client.get(SEARCH_URI, ["q=$!first", "page=$page"]);
             if $!qualifier ~~ /^ 'p'/ { # parse
                 my $parsed = from-json $results;
                 $parsed<results>.map: { $_<json> = from-json $_<json>; }
