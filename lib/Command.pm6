@@ -32,7 +32,16 @@ class Command {
                            session who asam
                            history last set ls help comment quit>;
 
+    my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last 
+                                      stub.n search.parse login.prompt
+                                      ession.delete users.create users.me
+                                      endpoints.reload schemas.reload
+                                      {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
+                                      schedules.cancel schedules.clean
+                                      groups.add groups.remove groups.removeall>>;
+
     method actions { ACTIONS }
+    method qualified_actions { QUALIFIED_ACTIONS }
 
 
     my constant ALIAS = {

@@ -35,7 +35,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 	      my @m = $last.split('/');
 	      my $mf = @m.pop;
         #	for tab_targets.map({
-	      for (|last_uris, |Command.actions, |tab_targets).map({
+	      for (|last_uris, |Command.actions, |Command.qualified_actions, |tab_targets).map({
             my @t = .split('/');
 	          if @m.elems >= @t.elems {
 		            '';
