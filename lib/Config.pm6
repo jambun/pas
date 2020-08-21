@@ -60,6 +60,7 @@ class Config {
         run 'stty', '-echo' if $pass;
         my $response = prompt $prompt ~ ($default ?? " ({$default}): " !! ': ');
         run 'stty', 'echo' if $pass;
+        say "" if $pass;
         $response ~~ /\w/ ?? $response !! $default;
     }
 
