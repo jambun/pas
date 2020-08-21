@@ -22,6 +22,7 @@ class Command {
     has Num $.delay is rw;
     has Int $.times is rw;
     has Int $.timesrun;
+    has Channel $.timesrunlock;
     has Bool $.cancelled;
 
 
@@ -111,8 +112,11 @@ class Command {
     }
 
 
+    # this needs to be atomic ... anoyingly atomicint isn't working
     method ran {
+        $!timesrunlock.receive;
         $!timesrun += 1;
+        $!timesrunlock.send(<lock>);
     }
 
     method cancel {
@@ -120,7 +124,7 @@ class Command {
     }
 
     method done {
-        $!cancelled || $!times && $!times - $!timesrun == 0;
+        $!cancelled || $!times && $!times - $!timesrun < 1;
     }
 
     method state {
@@ -174,6 +178,9 @@ class Command {
     submethod BUILD(:$line) {
         $!times //= 1;
         $!timesrun = 0;
+        $!timesrunlock = Channel.new;
+        $!timesrunlock.send(<lock>);
+
         if $line.trim {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
             logger.blurt(self.gist);
