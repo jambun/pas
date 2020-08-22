@@ -37,7 +37,7 @@ class Command {
                                       ession.delete users.create users.me
                                       endpoints.reload schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
-                                      schedules.cancel schedules.clean
+                                      schedules.cancel schedules.clean asam.reset
                                       groups.add groups.remove groups.removeall>>;
 
     method actions { ACTIONS }
@@ -522,52 +522,88 @@ class Command {
 
 
     method asam {
+        if $!qualifier ~~ <reset> && !$!first.Int {
+            return "Give a status number to reset like this:\n  > asam.reset 2";
+        }
+
         my $asam = from-json client.get('/plugins/activity_monitor', @!args);
 
         if $asam<error> {
             return pretty to-json $asam;
         }
 
+        sub groups {
+           $asam<groups>.keys.sort;
+        }
+
+        sub statuses {
+           groups.map({ |$asam<groups>{$_} });
+        }
+
         my $longest_name = max($asam<statuses>.keys>>.chars);
+        my $name_fmt = colored("%-{$longest_name}s", 'bold white');
+        my $n_fmt = colored("%02d", 'cyan');
         my $days = 60*60*24;
         my $hours = 60*60;
         my $mins = 60;
-        my $out = '';
-        my $indent = $!first ?? '' !! '  ';
-        for $asam<groups>.keys.sort -> $group {
-            my $statuses = $asam<groups>{$group};
-            $out ~= "$group\n" unless $!first;
-            for @$statuses -> $name {
-                my $status = $asam<statuses>{$name};
-                my $name_fmt = colored("%-{$longest_name}s", 'bold white');
 
-                my $age = $status<age>;
+        sub render-status($n, $name, $status) {
+            my $age = $status<age>;
 
-                given $age {
-                    when $_ > $days {
-                        $age = ($age / $days).round ~ 'd';
-                    }
-                    when $_ > $hours {
-                        $age = ($age / $hours).round ~ 'h';
-                    }
-                    when $_ > $mins {
-                        $age = ($age / $mins).round ~ 'm';
-                    }
-                    default {
-                        $age = $age ~ 's';
-                    }
+            given $age {
+                when $_ > $days {
+                    $age = ($age / $days).round ~ 'd';
                 }
-
-                $out ~= sprintf("{$indent}$name_fmt  %s  %s\n",
-                                $name,
-                                colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
-                                                           ($status<status> ~~ 'busy' ?? 'bold blue' !!
-                                                            ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
-                                colored($age, 'cyan')) if !$!first || $name.lc.contains($!first.lc);
+                when $_ > $hours {
+                    $age = ($age / $hours).round ~ 'h';
+                }
+                when $_ > $mins {
+                    $age = ($age / $mins).round ~ 'm';
+                }
+                default {
+                    $age = $age ~ 's';
+                }
             }
+
+            sprintf("  [$n_fmt]  $name_fmt  %s  %s",
+                    $n,
+                    $name,
+                    colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
+                                               ($status<status> ~~ 'busy' ?? 'bold blue' !!
+                                                ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
+                    colored($age, 'blue')) if !$!first || $!first.Int || $name.lc.contains($!first.lc);
         }
 
-        $out
+
+        if $!first && $!first.Int {
+            my $ix = $!first - 1;
+            if $!qualifier ~~ <reset> {
+                my $resp = from-json client.post('/plugins/system_status',
+                                                 ['name=' ~ statuses[$ix],
+                                                  'status=no',
+                                                  'message=[reset on console]'],
+                                                 'nothing');
+                if $resp<error> {
+                    $resp<error>
+                } else {
+                    $asam = from-json client.get('/plugins/activity_monitor', @!args);
+                    $longest_name = max($asam<statuses>.keys>>.chars);
+                }
+            }
+
+            render-status($!first, statuses[$!first - 1], $asam<statuses>{statuses[$!first - 1]});
+        } else {
+            my $n = 1;
+            gather {
+                for groups() -> $group {
+                    my $statuses = $asam<groups>{$group};
+                    take $group unless $!first;
+                    for @$statuses -> $name {
+                        take render-status $n++, $name, $asam<statuses>{$name};
+                    }
+                }
+            }.join("\n");
+        }
     }
 
 
