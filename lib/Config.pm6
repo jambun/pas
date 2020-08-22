@@ -21,6 +21,7 @@ class Config {
     anon     => False,
     timeout  => 5,
     stamp    => False,
+    spool    => True,
     indent   => 2;
 
     has %!prompts =

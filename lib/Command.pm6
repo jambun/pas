@@ -150,7 +150,7 @@ class Command {
 
 
     method run(:$spool is copy) {
-        $spool &&= !$!savefile;
+        $spool &&= config.attr<properties><spool> && !$!savefile;
         $spool || unspool;
         unless self.done {
             my $output = self."{self.action}"();
@@ -563,7 +563,7 @@ class Command {
                                 colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
                                                            ($status<status> ~~ 'busy' ?? 'bold blue' !!
                                                             ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
-                                colored($age, 'cyan')) if !$!first || $!first eq $name;
+                                colored($age, 'cyan')) if !$!first || $name.lc.contains($!first.lc);
             }
         }
 
@@ -627,6 +627,17 @@ class Command {
 
 
     method groups {
+        sub render-group($groups, $ix) {
+            # have to reget it to get the member_usernames
+            my $g = from-json(client.get($groups[$ix]<uri>));
+            my $ix_fmt = colored("%02d", 'cyan');
+            my $code_fmt = colored("%-30s", "bold white");
+            sprintf("[$ix_fmt]  $code_fmt  %s",
+                    $ix + 1,
+                    $g<group_code>,
+                    colored($g<member_usernames>.join(' '), "bold green"));
+        }
+
         sub update-users($g, :$add, :$remove, :$removeall) {
             $g<member_usernames> = [] if $removeall;
             $g<member_usernames> = $g<member_usernames>.push(|$add).Set.keys.sort if $add;
@@ -641,10 +652,16 @@ class Command {
 
         if $!first {
             my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
-            my $ix_or_name = @!args.shift;
-            if $ix_or_name {
-                my $uri = ($ix_or_name.Int ?? $groups[$ix_or_name - 1] !! $groups.grep(.value ~~ $ix_or_name).head)<uri>;
-                my $g = from-json(extract_uris client.get($uri));
+            if $groups<error> {
+                return pretty to-json $groups
+            }
+
+            my $ix = @!args.shift;
+            if $ix {
+                unless ($ix = $ix.Int) {
+                    return 'Give an integer to select a group';
+                }
+                my $g = from-json(client.get($groups[$ix - 1]<uri>));
 
                 given $!qualifier {
                     when <add> {
@@ -665,17 +682,13 @@ class Command {
                         update-users($g, :removeall);
                     }
                     default {
-                        $g<group_code>, $g<member_usernames>;
+                        render-group($groups, $ix - 1);
                     }
                 }
             } else {
-                my $ix_fmt = colored("%02d", 'cyan');
                 gather {
                     for $groups.pairs -> $g {
-                        take sprintf("[$ix_fmt]  %-30s  %s",
-                                     $g.key + 1,
-                                     $g.value<group_code>,
-                                     $g.value<uri>);
+                        take render-group($groups, $g.key);
                     }
                 }.join("\n");
             }
