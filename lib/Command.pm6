@@ -686,11 +686,7 @@ class Command {
                     }
                 }
             } else {
-                gather {
-                    for $groups.pairs -> $g {
-                        take render-group($groups, $g.key);
-                    }
-                }.join("\n");
+                (await (start { render-group($groups, $_) } for ^$groups)).join("\n");
             }
         } else {
             "Give a repo id like this:\n> groups 2"
