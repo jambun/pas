@@ -23,6 +23,7 @@ class Command {
     has Int $.times is rw;
     has Int $.timesrun;
     has Channel $.timesrunlock;
+    has Str $.output is rw;
     has Bool $.cancelled;
 
 
@@ -141,11 +142,9 @@ class Command {
     }
 
 
-    my @SPOOL = [];
+    my Channel $SPOOL = Channel.new;
     sub unspool {
-        while (my $unspooled = @SPOOL.shift) {
-            $unspooled.head.output($unspooled.tail, :spooled);
-        }
+        while $SPOOL.poll -> $cmd { $cmd.print }
     }
 
 
@@ -153,19 +152,21 @@ class Command {
         $spool &&= config.attr<properties><spool> && !$!savefile;
         $spool || unspool;
         unless self.done {
-            my $output = self."{self.action}"();
+            $!output = self."{self.action}"();
             if $spool {
-                @SPOOL.push((self, $output));
+                $SPOOL.send(self);
             } else {
-                self.output($output);
+                self.print;
             }
             self.ran;
         }
     }
 
 
-    method output($text is copy, :$spooled) {
-        $text = $text.chomp;
+    method print(:$spooled) {
+        $!output || say 'No output' && return;
+
+        my $text = $!output.chomp;
         return unless $text;
 
         my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
