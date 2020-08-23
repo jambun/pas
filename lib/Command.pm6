@@ -37,7 +37,7 @@ class Command {
                                       ession.delete users.create users.me
                                       endpoints.reload schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
-                                      schedules.cancel schedules.clean asam.reset
+                                      schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall>>;
 
     method actions { ACTIONS }
