@@ -688,6 +688,11 @@ class Command {
         }
 
         if $!first {
+            my $repo = from-json(client.get("/repositories/$!first"));
+            if $repo<error> {
+                return pretty to-json $repo
+            }
+
             my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
             if $groups<error> {
                 return pretty to-json $groups
@@ -723,7 +728,10 @@ class Command {
                     }
                 }
             } else {
-                (await (start { render-group($groups, $_) } for ^$groups)).join("\n");
+                (('Groups for repository:',
+                  colored($repo<repo_code>, 'bold yellow'),
+                  colored($repo<name>, 'bold white')).join(' '),
+                 |(await (start { render-group($groups, $_) } for ^$groups))).join("\n");
             }
         } else {
             "Give a repo id like this:\n> groups 2"
