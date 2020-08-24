@@ -35,7 +35,7 @@ class Command {
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last 
                                       stub.n search.parse login.prompt
-                                      ession.delete users.create users.me
+                                      ession.delete users.create users.me users.pass
                                       endpoints.reload schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
@@ -426,6 +426,24 @@ class Command {
             when <me> {
                 pretty extract_uris client.get(USER_URI);
             }
+            when <pass> {
+                my $username = $!first || config.attr<user>;
+                my $user = from-json client.get('/users/byusername/' ~ $username);               
+                my $pwd = config.prompt_for('pass', 'Enter new password for ' ~ $username, :pass, :no_set);
+                my $pwdchk = config.prompt_for('pass', 'Confirm new password for ' ~ $username, :pass, :no_set);
+
+                if $pwd eq $pwdchk {
+                    my $resp = client.post($user<uri>, ["password=$pwd"], to-json($user));
+
+                    if $resp<error> {
+                        pretty to-json $resp;
+                    } else {
+                        "Password updated for $username";
+                    }
+                } else {
+                    'Password not confirmed correctly. No changes made.'
+                }
+            }
             default {
                 pretty extract_uris client.get('/users', ['page=1']);
             }
@@ -787,7 +805,12 @@ sub shell_help {
     other actions:
       login     force a login
        .prompt  prompt for details
-      user      show the current user
+      users     list users
+       .create  create a user
+         name   with username and password set to name
+       .me      show the current user
+       .pass    set password for current user
+         name   set password for user name
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules

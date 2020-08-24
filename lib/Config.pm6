@@ -52,8 +52,12 @@ class Config {
     }
 
 
-    method prompt_for($k, $prompt, :$pass) {
-        %!attr{$k} = self.prompt_default($prompt, %!attr{$k}, :$pass);
+    method prompt_for($k, $prompt, :$pass, :$no_set) {
+        if $no_set {
+            self.prompt_default($prompt, %!attr{$k}, :$pass);
+        } else {
+            %!attr{$k} = self.prompt_default($prompt, %!attr{$k}, :$pass);
+        }
     }
 
 
