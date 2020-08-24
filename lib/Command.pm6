@@ -430,7 +430,7 @@ class Command {
                 my $username = $!first || config.attr<user>;
                 my $user = from-json client.get('/users/byusername/' ~ $username);
                 if $user<error> {
-                    "User $username not found";
+                    pretty to-json $user;
                 } else {
                     my $pwd = config.prompt_for('pass', 'Enter new password for ' ~ $username, :pass, :no_set);
                     my $pwdchk = config.prompt_for('pass', 'Confirm new password for ' ~ $username, :pass, :no_set);
