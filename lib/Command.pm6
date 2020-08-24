@@ -428,20 +428,24 @@ class Command {
             }
             when <pass> {
                 my $username = $!first || config.attr<user>;
-                my $user = from-json client.get('/users/byusername/' ~ $username);               
-                my $pwd = config.prompt_for('pass', 'Enter new password for ' ~ $username, :pass, :no_set);
-                my $pwdchk = config.prompt_for('pass', 'Confirm new password for ' ~ $username, :pass, :no_set);
-
-                if $pwd eq $pwdchk {
-                    my $resp = client.post($user<uri>, ["password=$pwd"], to-json($user));
-
-                    if $resp<error> {
-                        pretty to-json $resp;
-                    } else {
-                        "Password updated for $username";
-                    }
+                my $user = from-json client.get('/users/byusername/' ~ $username);
+                if $user<error> {
+                    "User $username not found";
                 } else {
-                    'Password not confirmed correctly. No changes made.'
+                    my $pwd = config.prompt_for('pass', 'Enter new password for ' ~ $username, :pass, :no_set);
+                    my $pwdchk = config.prompt_for('pass', 'Confirm new password for ' ~ $username, :pass, :no_set);
+
+                    if $pwd eq $pwdchk {
+                        my $resp = client.post($user<uri>, ["password=$pwd"], to-json($user));
+
+                        if $resp<error> {
+                            pretty to-json $resp;
+                        } else {
+                            "Password updated for $username";
+                        }
+                    } else {
+                        'Password not confirmed correctly. No changes made.'
+                    }
                 }
             }
             default {
