@@ -686,15 +686,23 @@ class Command {
 
 
     method groups {
+        my $term_cols = q:x/tput cols/.chomp.Int;
         sub render-group($groups, $ix) {
             # have to reget it to get the member_usernames
             my $g = from-json(client.get($groups[$ix]<uri>));
             my $ix_fmt = colored("%02d", 'cyan');
-            my $code_fmt = colored("%-30s", "bold white");
-            sprintf("[$ix_fmt]  $code_fmt  %s",
-                    $ix + 1,
-                    $g<group_code>,
-                    colored($g<member_usernames>.join(' '), "bold green"));
+            my $code_fmt = colored("%-35s", "bold white");
+            my $out = sprintf("[$ix_fmt] $code_fmt %s",
+                              $ix + 1,
+                              $g<group_code>,
+                              colored($g<member_usernames>.join(' '), "bold green"));
+
+            if visible_length($out) > $term_cols {
+                my $snip;
+                $out.indices(' ').reverse.map({($snip = $_) && last if visible_length($out.substr(0..$_)) < $term_cols});
+                $out = $out.substr(0..$snip) ~ "\n" ~ (' ' x 41) ~ $out.substr($snip+1);
+            }
+            $out;
         }
 
         sub update-users($g, :$add, :$remove, :$removeall) {

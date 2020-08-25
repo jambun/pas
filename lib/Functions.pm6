@@ -228,3 +228,9 @@ sub tmp_file is export {
 sub save_tmp($data) is export {
     store.save(TMP_FILE, $data);
 }
+
+sub visible_length($string is copy) is export {
+    $string ~~ s:g/\e.+?\#//;
+    $string ~~ s:g/\e.+?m//;
+    $string.chars;
+}
