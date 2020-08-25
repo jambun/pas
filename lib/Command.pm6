@@ -402,7 +402,7 @@ class Command {
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
                                           $ix, $v<user>, $version, $v<url>);
                               }
-                          }).join("\n") ~ "\n";
+                          }).join("\n") ~ "\n\n";
             $out;
         }
     }
