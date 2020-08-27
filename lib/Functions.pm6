@@ -229,8 +229,26 @@ sub save_tmp($data) is export {
     store.save(TMP_FILE, $data);
 }
 
+
 sub visible_length($string is copy) is export {
     $string ~~ s:g/\e.+?\#//;
     $string ~~ s:g/\e.+?m//;
     $string.chars;
+}
+
+
+my Int $TERM_COLS;
+sub term_cols is export {
+    $TERM_COLS //= q:x/tput cols/.chomp.Int;
+
+    # return $TERM_COLS if $TERM_COLS;
+
+    # my $proc = run 'tput', 'cols', :out;
+    # $TERM_COLS = $proc.out.slurp.chomp.Int: :close;
+}
+
+
+my Int $TERM_LINES;
+sub term_lines is export {
+    $TERM_LINES //= q:x/tput lines/.chomp.Int;
 }

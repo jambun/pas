@@ -21,8 +21,7 @@ class Command {
     has Str @.args is rw;
     has Num $.delay is rw;
     has Int $.times is rw;
-    has Int $.timesrun;
-    has Channel $.timesrunlock;
+    has atomicint $.timesrun;
     has Str $.output is rw;
     has Bool $.cancelled;
 
@@ -122,11 +121,8 @@ class Command {
     }
 
 
-    # this needs to be atomic ... anoyingly atomicint isn't working
     method ran {
-        $!timesrunlock.receive;
-        $!timesrun += 1;
-        $!timesrunlock.send(<lock>);
+        atomic-fetch-add($!timesrun, 1);
     }
 
     method cancel {
@@ -187,9 +183,7 @@ class Command {
 
     submethod BUILD(:$line) {
         $!times //= 1;
-        $!timesrun = 0;
-        $!timesrunlock = Channel.new;
-        $!timesrunlock.send(<lock>);
+        atomic-assign($!timesrun, 0);
 
         if $line.trim {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));
@@ -686,7 +680,6 @@ class Command {
 
 
     method groups {
-        my $term_cols = q:x/tput cols/.chomp.Int;
         sub render-group($groups, $ix) {
             # have to reget it to get the member_usernames
             my $g = from-json(client.get($groups[$ix]<uri>));
@@ -695,11 +688,11 @@ class Command {
             my $out = sprintf("[$ix_fmt] $code_fmt %s",
                               $ix + 1,
                               $g<group_code>,
-                              colored($g<member_usernames>.join(' '), "bold green"));
+                              colored($g<member_usernames>.sort.join(', '), "bold green"));
 
-            if visible_length($out) > $term_cols {
+            if visible_length($out) > term_cols() {
                 my $snip;
-                $out.indices(' ').reverse.map({($snip = $_) && last if visible_length($out.substr(0..$_)) < $term_cols});
+                $out.indices(' ').reverse.map({($snip = $_) && last if visible_length($out.substr(0..$_)) < term_cols()});
                 $out = $out.substr(0..$snip) ~ "\n" ~ (' ' x 41) ~ $out.substr($snip+1);
             }
             $out;
@@ -852,7 +845,9 @@ sub shell_help {
       > file    redirect output to file instead of displaying
                 if file is 'null' then don't display or save
 
-      @d[xt]      schedule command to run t times (default 1) every d seconds
+      @d[xt]    schedule command to run t times (default 1) every d seconds
+                d of * means 0.01, t of * means forever
+                obviously take care with these and ensure set.spool is on
 
     Say 'help [action]' for detailed help. ... well, not yet
 
