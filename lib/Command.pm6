@@ -21,7 +21,8 @@ class Command {
     has Str @.args is rw;
     has Num $.delay is rw;
     has Int $.times is rw;
-    has atomicint $.timesrun;
+    has Int $.timesrun;
+    has Channel $.timesrunlock;
     has Str $.output is rw;
     has Bool $.cancelled;
 
@@ -122,7 +123,9 @@ class Command {
 
 
     method ran {
-        atomic-fetch-add($!timesrun, 1);
+        $!timesrunlock.receive;
+        $!timesrun += 1;
+        $!timesrunlock.send(<lock>);
     }
 
     method cancel {
@@ -183,7 +186,9 @@ class Command {
 
     submethod BUILD(:$line) {
         $!times //= 1;
-        atomic-assign($!timesrun, 0);
+        $!timesrun = 0;
+        $!timesrunlock = Channel.new;
+        $!timesrunlock.send(<lock>);
 
         if $line.trim {
             Grammar.parse($line, :actions(ParseActions.new(cmd => self)));

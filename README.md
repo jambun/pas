@@ -3,9 +3,12 @@ An ArchivesSpace commandline client
 
 Needs Perl6. Currently developing against:
 
-      % perl6 --version
-      This is Rakudo Star version 2018.10 built on MoarVM version 2018.10
-      implementing Perl 6.c.
+    % perl6 --version
+    This is Rakudo version 2017.04.3 built on MoarVM version 2017.04-53-g66c6dda
+    implementing Perl 6.c.
+
+Newer versions all have problems - can't parse URIs properly, threading lockups,
+can't compile HTTP::UserAgent. It's a bit ridiculous really. Losing faith.
 
 With URI::Encode, XML and Crypt::Random:
 
