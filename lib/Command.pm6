@@ -688,6 +688,8 @@ class Command {
         sub render-group($groups, $ix) {
             # have to reget it to get the member_usernames
             my $g = from-json(client.get($groups[$ix]<uri>));
+            return $g<error> if $g<error>;
+
             my $ix_fmt = colored("%02d", 'cyan');
             my $code_fmt = colored("%-35s", "bold white");
             my $out = sprintf("[$ix_fmt] $code_fmt %s",
