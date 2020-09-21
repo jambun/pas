@@ -128,9 +128,11 @@ sub interpolate($text, $count) is export {
 
     $out ~~ s:g/'(' [ ':' (<-[|]>+) '|' || <-[)]>+ '|:' (<-[|)]>+) ] .*?  ')'/{$0 ?? $0.Str !! $1.Str}/;
 
-    $out ~~ s:g/'(' (<-[)]>+ '|' <-[)]>+) ')' /{select_from($0.Str)}/;
     $out ~~ s:g/'(string)'/{random_hex(7)}/;
     $out ~~ s:g/'(date)' /{random_date()}/;
+    $out ~~ s:g/'"(boolean)"' /{random_truth()}/;
+
+    $out ~~ s:g/'(' (<-[)]>+ ('|' <-[)]>+)?) ')' /{select_from($0.Str)}/;
 
     $out;
 }
@@ -153,6 +155,7 @@ sub interpolate_help is export {
     #   (..|..)   -> Same as s:(..|..)
     #   (string)  -> A random hex value of 7 chars
     #   (date)    -> A random date
+    #   (boolean) -> A random true or false
     #
     END
 }
@@ -177,6 +180,11 @@ sub select_from($text) {
 sub random_date {
     # lazy, bad, never mind
     crypt_random_uniform(300)+1715 ~ '-0' ~ crypt_random_uniform(9)+1 ~ '-' ~ crypt_random_uniform(19)+10;
+}
+
+
+sub random_truth {
+    crypt_random_uniform(2) == 1 ?? 'true' !! 'false';
 }
 
 
