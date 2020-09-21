@@ -268,7 +268,8 @@ class Command {
 
     method stub {
         my $puri = $!uri;
-        $puri ~~ s:g/\/repositories\/\d+/\/repositories\/:repo_id/;
+        $puri ~~ s/\/repositories\/(\d+)/\/repositories\/:repo_id/;
+        my $repo_id = $0.Str if $0;
         $puri ~~ s:g/\d+/:id/;
         my $e = from-json client.get(ENDPOINTS_URI, ['uri=' ~ $puri, 'method=post']);
         return "Couldn't find endpoint definition" if @($e).elems == 0;
@@ -279,7 +280,7 @@ class Command {
             last if $model ~~ s/'JSONModel(:' (\w+) ')'/$0/;
         }
 
-        save_tmp(interpolate_help() ~ pretty(client.get('/stub/' ~ $model, @!args)));
+        save_tmp(interpolate_help() ~ pretty(client.get('/stub/' ~ $model, $repo_id ?? (|@!args, "repo_id=$repo_id") !! @!args)));
 
         my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
         if edit(tmp_file) {
