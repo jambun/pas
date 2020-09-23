@@ -134,6 +134,8 @@ sub interpolate($text, $count) is export {
 
     $out ~~ s:g/'(' (<-[)]>+ ('|' <-[)]>+)?) ')' /{select_from($0.Str)}/;
 
+    $out ~~ s:g/'/:id'/\/1/;
+
     $out;
 }
 
