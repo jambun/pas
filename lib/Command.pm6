@@ -49,7 +49,8 @@ class Command {
         p => 'page',
         r => 'resolve[]',
         t => 'type[]',
-        u => 'uri[]'
+        u => 'uri[]',
+        e => 'expand[]'
     }
 
     method alias($k) {
