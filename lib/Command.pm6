@@ -68,7 +68,7 @@ class Command {
 
         token comment       { '#' .* }
 
-        token uri           { '/' <[\/\w]>* }
+        token uri           { '/' <[\/\-_\w]>* }
         rule  pairlist      { <pairitem>* }
         rule  pairitem      { <pair> }
         token pair          { <key=.refpath> '=' <value> }
