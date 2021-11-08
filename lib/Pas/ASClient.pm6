@@ -125,7 +125,14 @@ class Pas::ASClient {
         @pairs = @pairs.grep: {! .Str.comb('=<<')}
         my $url = ($host || $!config.attr<url>) ~ $uri;
         $url ~= '?' ~ @pairs.join('&') if @pairs;
-        uri_encode($url);
+
+        # uri_encode drops # and anything after it
+        # if a # has got this far we want it - like with solr ids for pui docs
+        # so a bit of gross hackery to retain them
+        $url ~~ s:g/ '#' /_HASHME_/;
+        $url = uri_encode($url);
+        $url ~~ s:g/ '_HASHME_' /%23/;
+        $url;
     }
     
 

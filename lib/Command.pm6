@@ -34,7 +34,7 @@ class Command {
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last 
-                                      stub.n search.parse login.prompt
+                                      stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
@@ -316,6 +316,9 @@ class Command {
 
     method search {
         if $!first ~~ /^<[./]>/ { # a uri
+            if $!qualifier eq 'public' {
+                $!first ~= '#pui';
+            }
             my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $!first]);
             if $results<total_hits> == 1 {
                 my $record = $results<results>[0];
@@ -327,7 +330,7 @@ class Command {
         } else {
             my $page = @!args.tail || '1';
             my $results = client.get(SEARCH_URI, ["q=$!first", "page=$page"]);
-            if $!qualifier ~~ /^ 'p'/ { # parse
+            if $!qualifier eq 'parse' {
                 my $parsed = from-json $results;
                 $parsed<results>.map: { $_<json> = from-json $_<json>; }
                 pretty extract_uris to-json $parsed;
@@ -817,6 +820,7 @@ sub shell_help {
        .[n]     post n times
       post      post a file (default if last arg is a file)
       search    show search index document
+       .public  show pui document
 
     other actions:
       login     force a login
