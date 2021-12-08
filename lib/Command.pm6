@@ -78,7 +78,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d]>+ }
+        token arg           { <[\w\d\/\:]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -475,7 +475,14 @@ class Command {
     }
 
     method endpoints {
-        load_endpoints.join("\n");
+        if $!first {
+            my @args = ['uri=' ~ $!first];
+            my $method = @!args.shift;
+            @args.push('method=' ~ $method) if $method;
+            pretty client.get('/endpoints', @args);
+        } else {
+            load_endpoints.join("\n");
+        }
     }
 
 
