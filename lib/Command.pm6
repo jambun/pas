@@ -30,13 +30,14 @@ class Command {
     my constant ACTIONS = <show update create edit stub post delete
                            search nav login logout script schedules
                            endpoints schemas config groups users
-                           session who asam
+                           session who asam doc
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last 
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
-                                      endpoints.reload schemas.reload
+                                      endpoints.reload doc.get doc.post doc.delete
+                                      schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall>>;
@@ -474,6 +475,7 @@ class Command {
         }
     }
 
+
     method endpoints {
         if $!first {
             my @args = ['uri=' ~ $!first];
@@ -482,6 +484,41 @@ class Command {
             pretty client.get('/endpoints', @args);
         } else {
             load_endpoints.join("\n");
+        }
+    }
+
+
+    method doc {
+        my @u = $!uri.split('/');
+        my $endpoint = endpoint_for_uri($!uri);
+        my $method = $!qualifier || 'get';
+
+        if $endpoint && $method {
+            my $ep = (from-json client.get('/endpoints', ['uri=' ~ $endpoint, 'method=' ~ $method])).first;
+            if $ep {
+                my $out = '';
+                $out = colored($method.uc, 'bold green') ~ ' ' ~ colored($ep{'uri'}, 'bold');
+                if $ep{'permissions'}.elems > 0 {
+                    $out ~= '  [' ~ colored($ep{'permissions'}.join(' '), 'red') ~ ']';
+                }
+                $out ~= "\n" ~ colored($ep{'description'}, 'yellow');
+                $out ~= "\n" ~ ($ep{'params'}.map: {
+                                       my @opts = [];
+                                       if $_[3] {
+                                           @opts.push('body') if $_[3]{'body'};
+                                           @opts.push('optional') if $_[3]{'optional'};
+                                           @opts.push('default=' ~ $_[3]{'default'}) if !!$_[3].keys.grep('default')
+                                       }
+                                       my $opts = '';
+                                       $opts = '[' ~ colored(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
+                                       '  ' ~ (colored($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ colored($_[2], 'yellow');
+                                   }).join("\n");
+                $out;
+            } else {
+                "Method {colored($method.uc, 'bold green')} not supported";
+            }
+        } else {
+            "Oh dear. Can't find that endpoint!";
         }
     }
 

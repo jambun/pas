@@ -262,3 +262,21 @@ my Int $TERM_LINES;
 sub term_lines is export {
     $TERM_LINES //= q:x/tput lines/.chomp.Int;
 }
+
+
+sub endpoint_for_uri($uri) is export {
+        my @u = $uri.split('/');
+        (load_endpoints.grep: {
+                my $out = True;
+                my @e = .split('/');
+                if @e.elems == @u.elems {
+		                for zip @u, @e -> ($u, $e) {
+	       	              $out = False if $e !~~ /^ ':' / && $e ne $u;
+		                }
+                } else {
+                    $out = False;
+                }
+
+                $out;
+            }).first;
+}
