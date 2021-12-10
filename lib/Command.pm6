@@ -69,7 +69,7 @@ class Command {
 
         token comment       { '#' .* }
 
-        token uri           { '/' <[\/\-_\w]>* }
+        token uri           { '/' <[\/\-_\w\:]>* }
         rule  pairlist      { <pairitem>* }
         rule  pairitem      { <pair> }
         token pair          { <key=.refpath> '=' <value> }
@@ -79,7 +79,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d\/\:]>+ }
+        token arg           { <[\w\d]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -153,6 +153,7 @@ class Command {
         $spool &&= config.attr<properties><spool> && !$!savefile;
         $spool || unspool;
         unless self.done {
+            self.action = 'doc' if self.uri && self.uri ~~ /\:/;
             $!output = self."{self.action}"();
             if $spool {
                 $SPOOL.send(self);
@@ -478,10 +479,10 @@ class Command {
 
     method endpoints {
         if $!first {
-            my @args = ['uri=' ~ $!first];
-            my $method = @!args.shift;
-            @args.push('method=' ~ $method) if $method;
-            pretty client.get('/endpoints', @args);
+            my $f = $!first;
+            my @uris = load_endpoints.grep(/$f/);
+            last_uris(@uris);
+            @uris.join("\n");
         } else {
             load_endpoints.join("\n");
         }
@@ -889,7 +890,7 @@ sub shell_help {
       script    run a pas script file
       endpoints show the available endpoints
        .reload  force a reload
-       uri      detail for uri
+       [str]    show endpoints that include str
       schemas   show all record schemas
        .reload  force a reload
        [name]   show a named record schema
