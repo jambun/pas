@@ -866,6 +866,10 @@ sub shell_help {
       post      post a file (default if last arg is a file)
       search    show search index document
        .public  show pui document
+      doc       show endpoint documentation for uri
+       .get     GET method (default)
+       .post    POST method
+       .delete  DELETE method
 
     other actions:
       login     force a login
@@ -885,6 +889,7 @@ sub shell_help {
       script    run a pas script file
       endpoints show the available endpoints
        .reload  force a reload
+       uri      detail for uri
       schemas   show all record schemas
        .reload  force a reload
        [name]   show a named record schema
