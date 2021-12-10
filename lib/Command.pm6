@@ -510,6 +510,7 @@ class Command {
                                            @opts.push('default=' ~ $_[3]{'default'}) if !!$_[3].keys.grep('default')
                                        }
                                        my $opts = '';
+                                       $_[1] ~~ s/.* 'Boolean' .*/Boolean/;
                                        $opts = '[' ~ colored(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
                                        '  ' ~ (colored($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ colored($_[2], 'yellow');
                                    }).join("\n");
