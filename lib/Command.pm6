@@ -516,6 +516,7 @@ class Command {
                                        $opts = '[' ~ colored(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
                                        '  ' ~ (colored($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ colored(($_[2] || '[no description]'), 'yellow');
                                    }).join("\n");
+                $out ~= '  [no params]' if !$ep{'params'};
                 $out ~= "\n\n";
             }
             $out;
