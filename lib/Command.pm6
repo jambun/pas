@@ -492,13 +492,14 @@ class Command {
     method doc {
         my @u = $!uri.split('/');
         my $endpoint = endpoint_for_uri($!uri);
-        my $method = $!qualifier || 'get';
 
-        if $endpoint && $method {
-            my $ep = (from-json client.get('/endpoints', ['uri=' ~ $endpoint, 'method=' ~ $method])).first;
-            if $ep {
-                my $out = '';
-                $out = colored($method.uc, 'bold green') ~ ' ' ~ colored($ep{'uri'}, 'bold');
+        if $endpoint {
+            my @args = ['uri=' ~ $endpoint];
+            @args.push('method=' ~ $!qualifier) if $!qualifier;
+            my (@endpoints) = from-json client.get('/endpoints', @args);
+            my $out = "\n";
+            for @endpoints -> $ep {
+                $out ~= colored($ep{'method'}.join(' ').uc, 'bold green') ~ ' ' ~ colored($ep{'uri'}, 'bold');
                 if $ep{'permissions'}.elems > 0 {
                     $out ~= '  [' ~ colored($ep{'permissions'}.join(' '), 'red') ~ ']';
                 }
@@ -515,10 +516,9 @@ class Command {
                                        $opts = '[' ~ colored(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
                                        '  ' ~ (colored($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ colored($_[2], 'yellow');
                                    }).join("\n");
-                $out;
-            } else {
-                "Method {colored($method.uc, 'bold green')} not supported";
+                $out ~= "\n\n";
             }
+            $out;
         } else {
             "Oh dear. Can't find that endpoint!";
         }
