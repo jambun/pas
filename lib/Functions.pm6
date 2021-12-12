@@ -272,6 +272,7 @@ sub endpoint_for_uri($uri) is export {
                 if @e.elems == @u.elems {
 		                for zip @u, @e -> ($u, $e) {
 	       	              $out = False if $e !~~ /^ ':' / && $e ne $u;
+	       	              $out = False if $e ~~ /^ ':' / && $e ne $u && $u !~~ /^ \d+ $/;
 		                }
                 } else {
                     $out = False;
