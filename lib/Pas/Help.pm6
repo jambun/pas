@@ -15,11 +15,11 @@ class Pas::Help {
     my constant DEFAULT_DIRECTORY = 'help';
     
     method dir {
-	$!dir ||= DEFAULT_DIRECTORY;
-	if !self!store.path($!dir).IO.e {
-	    mkdir self!store.path($!dir);
-	}
-	$!dir;
+	      $!dir ||= DEFAULT_DIRECTORY;
+	      if !self!store.path($!dir).IO.e {
+	          mkdir self!store.path($!dir);
+	      }
+	      $!dir;
     }
 
     method !store { $!store //= Pas::Store.new(:dir(self.dir)); }
@@ -29,4 +29,6 @@ class Pas::Help {
     method topic($topic) { self!store.load(self.file($topic), :make); }
     
     method update($topic, $text) { self!store.save(self.file, $text); }
+
+    method list() { self!store.list(self.dir); }
 }

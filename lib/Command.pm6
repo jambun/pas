@@ -40,7 +40,8 @@ class Command {
                                       schemas.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
-                                      groups.add groups.remove groups.removeall>>;
+                                      groups.add groups.remove groups.removeall
+                                      help.list help.write>>;
 
     method actions { ACTIONS }
     method qualified_actions { QUALIFIED_ACTIONS }
@@ -825,7 +826,7 @@ class Command {
 
     method help {
         if $!first {
-            if @!args > 0 && @!args[0].starts-with('w') {
+            if $!qualifier eq 'write' {
                 if edit(store.path(Pas::Help.new(:store(store)).file($!first))) {
                     "Help saved.";
                 } else {
@@ -834,6 +835,8 @@ class Command {
             } else {
                 Pas::Help.new(:store(store)).topic($!first);
             }
+        } elsif $!qualifier eq 'list' {
+            Pas::Help.new(:store(store)).list;
         } else {
             shell_help;
         }
@@ -913,6 +916,9 @@ sub shell_help {
       history   show command history
        [n]      show the last n commands 
       help      this
+       .list    list help topics
+       .write   write help for topic
+       topic    the topic to write or read
       quit      exit pas (^d works too)
 
       < file    post file to uri

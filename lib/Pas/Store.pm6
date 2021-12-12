@@ -16,4 +16,9 @@ class Pas::Store {
         mkdir($!dir);
         spurt $!dir ~ '/' ~ $file, $data;
     }
+
+
+    method list($dir) {
+        (dir($!dir ~ '/' ~ $dir).map: { .Str.split('/')[*-1] }).grep(/ <-[\~]> $/).join("\n");
+    }
 }
