@@ -882,6 +882,13 @@ sub shell_help {
        .me      show the current user
        .pass    set password for current user
          name   set password for user name
+      group     no op without repo_id
+       .add     add user to group
+       .remove  remove user from group
+       .removeall remove all users from group
+       repo_id  list groups for repo_id
+       [n]      group listing number
+       user     the user to add or remove
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules
