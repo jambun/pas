@@ -872,9 +872,9 @@ sub shell_help {
       search    show search index document
        .public  show pui document
       doc       show endpoint documentation for uri
-       .get     GET method (default)
-       .post    POST method
-       .delete  DELETE method
+       .get     GET method only
+       .post    POST method only
+       .delete  DELETE method only
 
     other actions:
       login     force a login
