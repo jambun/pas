@@ -266,18 +266,25 @@ sub term_lines is export {
 
 sub endpoint_for_uri($uri) is export {
         my @u = $uri.split('/');
-        (load_endpoints.grep: {
-                my $out = True;
-                my @e = .split('/');
-                if @e.elems == @u.elems {
-		                for zip @u, @e -> ($u, $e) {
-	       	              $out = False if $e !~~ /^ ':' / && $e ne $u;
-	       	              $out = False if $e ~~ /^ ':' / && $e ne $u && $u !~~ /^ \d+ $/;
-		                }
-                } else {
-                    $out = False;
-                }
+        my @maybe = [];
+        my @probably = load_endpoints.grep: {
+            my $endpoint = $_;
+            my $out = True;
+            my @e = .split('/');
+            if @e.elems == @u.elems {
+		            for zip @u, @e -> ($u, $e) {
+	       	          $out = False if $e !~~ /^ ':' / && $e ne $u;
+                    if $e ~~ /^ ':' / && $e ne $u && $u !~~ /^ \d+ $/ {
+	       	              $out = False;
+                        @maybe.push($endpoint);
+                    }
+		            }
+            } else {
+                $out = False;
+            }
 
-                $out;
-            }).first;
+            $out;
+        };
+
+        @probably ?? @probably.first !! @maybe.first
 }
