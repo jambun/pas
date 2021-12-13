@@ -19,6 +19,6 @@ class Pas::Store {
 
 
     method list($dir) {
-        (dir($!dir ~ '/' ~ $dir).map: { .Str.split('/')[*-1] }).grep(/ <-[\~]> $/).join("\n");
+        (dir(self.path($dir)).map: { .Str.split('/')[*-1] }).grep(/ <-[\~]> $/).join("\n");
     }
 }
