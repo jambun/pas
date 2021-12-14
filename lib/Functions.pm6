@@ -92,7 +92,7 @@ sub edit($file) is export {
 
 sub page($text) is export {
     save_tmp($text);
-    shell (%*ENV<PAGER> || 'less') ~ ' ' ~ tmp_file;
+    shell (%*ENV<PAGER> || 'less -R') ~ ' ' ~ tmp_file;
 }
 
 
