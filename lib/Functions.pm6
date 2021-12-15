@@ -17,7 +17,7 @@ our constant  HISTORY_FILE       = 'history';
 our constant  HISTORY_LENGTH     = 100;
 our constant  ENDPOINTS_URI      = '/endpoints';
 my constant   SCHEMAS_URI        = '/schemas';
-my constant   ENUMS_URI          = '/config/enumerations';
+my constant   ENUMS_URI          = '/enumerations'; # defined in pas_endpoints, was /config/enumerations
 our constant  USER_URI           = '/users/current-user';
 our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
@@ -237,7 +237,7 @@ sub enums(Bool :$reload, Str :$name) is export {
         $ENUMS = from-json(client.get(ENUMS_URI));
     }
 
-    my @enums = $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS;
+    my @enums = $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS.Array;
     last_uris(@enums.map: {$_<uri>});
     @enums;
 }
