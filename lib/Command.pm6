@@ -829,18 +829,18 @@ class Command {
 
         ($enums.map(-> $e {
                            my $val_len = 4;
-                           colored($e{'name'}, 'bold') ~
-                           ' [' ~ ($e{'editable'} ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
+                           colored($e<name>, 'bold') ~
+                           ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
                            colored($e<relationships>.join(' '), 'cyan') ~
                            "\n    " ~
-                           ($e{'values'}.map(-> $v {
+                           ($e<values>.map(-> $v {
                                    my $prefix = '';
                                    $val_len += $v.chars + 1;
                                    if $val_len >= term_cols() {
                                        $val_len = 4 + $v.chars + 1;
                                        $prefix = "\n    ";
                                    }
-                                   $prefix ~ ($e{'readonly_values'}.grep($v) ?? colored($v, 'red') !! $v);
+                                   $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
                                })).join(' ');
                        })).join("\n\n");
     }
