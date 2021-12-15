@@ -37,7 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
-                                      schemas.reload
+                                      schemas.reload enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
@@ -825,24 +825,22 @@ class Command {
 
 
     method enums {
-        my $enums = from-json(client.get("/config/enumerations"));
-
-        ($enums.map(-> $e {
-                           my $val_len = 4;
-                           colored($e<name>, 'bold') ~
-                           ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
-                           colored($e<relationships>.join(' '), 'cyan') ~
-                           "\n    " ~
-                           ($e<values>.map(-> $v {
-                                   my $prefix = '';
-                                   $val_len += $v.chars + 1;
-                                   if $val_len >= term_cols() {
-                                       $val_len = 4 + $v.chars + 1;
-                                       $prefix = "\n    ";
-                                   }
-                                   $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
-                               })).join(' ');
-                       })).join("\n\n");
+        (enums(:reload($!qualifier eq 'reload'), :name($!first)).map(-> $e {
+            my $val_len = 4;
+            colored($e<name>, 'bold') ~
+            ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
+            colored($e<relationships>.join(' '), 'cyan') ~
+            "\n    " ~
+            ($e<values>.map(-> $v {
+                my $prefix = '';
+                $val_len += $v.chars + 1;
+                if $val_len >= term_cols() {
+                    $val_len = 4 + $v.chars + 1;
+                    $prefix = "\n    ";
+                }
+                $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
+            })).join(' ');
+        })).join("\n\n");
     }
 
 
@@ -915,6 +913,8 @@ sub shell_help {
        [n]      group listing number
        user     the user to add or remove
       enums     list enumerations
+       .reload  force a reload
+       [str]    show enumerations that match str
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules

@@ -17,6 +17,7 @@ our constant  HISTORY_FILE       = 'history';
 our constant  HISTORY_LENGTH     = 100;
 our constant  ENDPOINTS_URI      = '/endpoints';
 my constant   SCHEMAS_URI        = '/schemas';
+my constant   ENUMS_URI          = '/config/enumerations';
 our constant  USER_URI           = '/users/current-user';
 our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
@@ -24,6 +25,7 @@ my constant   LOGOUT_URI         = '/logout';
 
 my $SCHEMAS;
 my $SCHEMAS_PARSED;
+my $ENUMS;
 my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
@@ -202,31 +204,40 @@ sub load_endpoints(Bool :$force) is export {
 
     my $e = client.get(ENDPOINTS_URI).trim;
     if $e ~~ /^ <-[{[]> / {
-	say 'No endpoints endpoint!';
-	@TAB_TARGETS = [];
-#	@TAB_TARGETS = |Command.actions;
-	return [];
+	      say 'No endpoints endpoint!';
+	      @TAB_TARGETS = [];
+        #	@TAB_TARGETS = |Command.actions;
+	      return [];
     }
     $e = from-json $e;
     @ENDPOINTS = $e ~~ Array ?? $e.unique !! [];
     @TAB_TARGETS = |@ENDPOINTS;
-#    @TAB_TARGETS = |@ENDPOINTS, |Command.actions;
+    # @TAB_TARGETS = |@ENDPOINTS, |Command.actions;
     @ENDPOINTS;
 }
 
 
 sub schemas(Bool :$reload, Str :$name) is export {
      if $reload || !$SCHEMAS {
-	 my $schemas = client.get(SCHEMAS_URI);
-	 $SCHEMAS = pretty $schemas;
-	 $SCHEMAS_PARSED = from-json $schemas;
+	       my $schemas = client.get(SCHEMAS_URI);
+	       $SCHEMAS = pretty $schemas;
+	       $SCHEMAS_PARSED = from-json $schemas;
      }
 
      if $name {
-	 pretty to-json $SCHEMAS_PARSED{$name};
+	       pretty to-json $SCHEMAS_PARSED{$name};
      } else {
-	 $SCHEMAS;
+	       $SCHEMAS;
      }
+}
+
+
+sub enums(Bool :$reload, Str :$name) is export {
+    if $reload || !$ENUMS {
+        $ENUMS = from-json(client.get(ENUMS_URI));
+    }
+
+    $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS;
 }
 
 
