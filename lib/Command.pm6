@@ -825,6 +825,7 @@ class Command {
 
 
     method enums {
+        "\n" ~
         (enums(:reload($!qualifier eq 'reload'), :name($!first)).map(-> $e {
             my $val_len = 4;
             colored($e<name>, 'bold') ~
@@ -840,7 +841,7 @@ class Command {
                 }
                 $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
             })).join(' ');
-        })).join("\n\n");
+        })).join("\n\n") ~ "\n\n";
     }
 
 
