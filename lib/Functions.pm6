@@ -237,7 +237,9 @@ sub enums(Bool :$reload, Str :$name) is export {
         $ENUMS = from-json(client.get(ENUMS_URI));
     }
 
-    $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS;
+    my @enums = $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS;
+    last_uris(@enums.map: {$_<uri>});
+    @enums;
 }
 
 

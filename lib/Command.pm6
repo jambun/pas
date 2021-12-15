@@ -825,11 +825,15 @@ class Command {
 
 
     method enums {
+        my @enums = enums(:reload($!qualifier eq 'reload'), :name($!first));
+        return 'no matching enumerations' unless @enums;
+
         "\n" ~
-        (enums(:reload($!qualifier eq 'reload'), :name($!first)).map(-> $e {
+        @enums.map(-> $e {
             my $val_len = 4;
             colored($e<name>, 'bold') ~
             ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
+            $e<uri> ~ "\n    " ~
             colored($e<relationships>.join(' '), 'cyan') ~
             "\n    " ~
             ($e<values>.map(-> $v {
@@ -841,7 +845,7 @@ class Command {
                 }
                 $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
             })).join(' ');
-        })).join("\n\n") ~ "\n\n";
+        }).join("\n\n") ~ "\n\n";
     }
 
 
