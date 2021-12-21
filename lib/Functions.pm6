@@ -255,7 +255,7 @@ sub enums(Bool :$reload, Str :$name) is export {
     }
 
     my @enums = $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS.Array;
-    last_uris(@enums.map: {$_<uri>});
+    last_uris((@enums.map: { 'enums ' ~ $_<name> }).Array.append(@enums.map: { $_<uri> }));
     @enums;
 }
 

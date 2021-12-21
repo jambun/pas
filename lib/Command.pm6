@@ -37,7 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
-                                      schemas.reload enums.reload
+                                      schemas.reload enums.i18n enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
@@ -909,7 +909,7 @@ class Command {
 
     method enums {
         my @enums = enums(:reload($!qualifier eq 'reload'), :name($!first));
-        return 'no matching enumerations' unless @enums;
+        return 'No enumerations matching: ' ~ $!first unless @enums;
 
         "\n" ~
         @enums.map(-> $e {
@@ -919,15 +919,23 @@ class Command {
             $e<uri> ~ "\n    " ~
             ($e<relationships> ?? colored($e<relationships>.join(' '), 'cyan') !! '[not used]') ~
             "\n    " ~
-            ($e<values>.map(-> $v {
-                my $prefix = '';
-                $val_len += $v.chars + 1;
-                if $val_len >= term_cols() {
-                    $val_len = 4 + $v.chars + 1;
-                    $prefix = "\n    ";
-                }
-                $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
-            })).join(' ');
+
+            (if $e<value_translations> && $!qualifier eq 'i18n' {
+                ($e<values>.map(-> $v {
+                                       $v ~ ': ' ~ colored($e<value_translations>{$v}, 'yellow')
+                                   })).join("\n    ");
+            } else {
+                ($e<values>.map(-> $v {
+                                       my $prefix = '';
+                                       $val_len += $v.chars + 1;
+                                       if $val_len >= term_cols() {
+                                           $val_len = 4 + $v.chars + 1;
+                                           $prefix = "\n    ";
+                                       }
+                                       $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
+                                   })).join(' ');
+            });
+
         }).join("\n\n") ~ "\n\n";
     }
 
