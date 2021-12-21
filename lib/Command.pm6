@@ -918,7 +918,7 @@ class Command {
             colored($e<name>, 'bold') ~
             ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
             $e<uri> ~ "\n    " ~
-            colored($e<relationships>.join(' '), 'cyan') ~
+            ($e<relationships> ?? colored($e<relationships>.join(' '), 'cyan') !! '[not used]') ~
             "\n    " ~
             ($e<values>.map(-> $v {
                 my $prefix = '';
