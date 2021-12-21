@@ -16,8 +16,8 @@ my constant   TMP_FILE           = 'last.json';
 our constant  HISTORY_FILE       = 'history';
 our constant  HISTORY_LENGTH     = 100;
 our constant  ENDPOINTS_URI      = '/endpoints';
-my constant   SCHEMAS_URI        = '/schemas';
-my constant   ENUMS_URI          = '/enumerations';
+my constant   SCHEMAS_URI        = '/pas/schemas';
+my constant   ENUMS_URI          = '/pas/enumerations';
 my constant   OLD_ENUMS_URI      = '/config/enumerations';
 our constant  USER_URI           = '/users/current-user';
 our constant  SEARCH_URI         = '/search';
@@ -200,6 +200,15 @@ sub extract_uris($text) is export {
 }
 
 
+sub extract_from_schema($text) is export {
+    $text ~~ m:g/ 'JSONModel(:' ( <-[ \) ]>+ ) /;
+    @LAST_URIS = (($/.map: { $_[0].Str }).sort.unique).map: { 'schemas ' ~ $_ };
+    $text ~~ m:g/ '"dynamic_enum"' \s* ':' \s* '"' ( <-[ \" ]>+ ) /;
+    @LAST_URIS.append((($/.map: { $_[0].Str }).sort.unique).map: { 'enums ' ~ $_ });
+    $text;
+}
+
+
 sub load_endpoints(Bool :$force) is export {
     return @ENDPOINTS if @ENDPOINTS && !$force;
 
@@ -226,7 +235,8 @@ sub schemas(Bool :$reload, Str :$name) is export {
      }
 
      if $name {
-	       pretty to-json $SCHEMAS_PARSED{$name};
+	       extract_from_schema(to-json $SCHEMAS_PARSED{$name});
+	       $SCHEMAS_PARSED{$name};
      } else {
 	       $SCHEMAS;
      }

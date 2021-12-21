@@ -528,7 +528,91 @@ class Command {
 
 
     method schemas {
-        schemas(:reload($!qualifier eq 'reload'), :name($!first));
+
+        sub render_jsonmodel(Str $ref is copy) {
+            $ref ~~ s/ 'JSONModel(:' (<-[\)]>+) ')' \s+ (\S+)/{ $1.Str ~ '(' ~ colored($0.Str, 'bold green') ~ ')'  }/;
+            $ref;
+        }
+
+        sub render_type($type) {
+            ($type.Array.map: { render_jsonmodel($_.WHAT ~~ Hash ?? $_<type> !! $_); }).join(' | ');
+        }
+
+        sub render_prop($name, $prop, Int $depth = 1) {
+            my $indent = '  ' x $depth;
+            my $out = $indent ~ colored($name, 'bold') ~ ' ';
+
+            if $prop.WHAT ~~ Hash {
+
+                $out ~= '[' ~ colored('readonly', 'cyan') ~ '] ' if $prop<readonly>;
+                $out ~= '[' ~ colored('required', 'red') ~ '] ' if $prop<ifmissing>;
+
+                if $prop<dynamic_enum> {
+                    $out ~= 'enum(' ~  colored($prop<dynamic_enum>, 'bold yellow') ~ ')';
+                } elsif $prop<enum> {
+                    $out ~= $prop<type> ~ '(' ~  $prop<enum>.join(', ') ~ ')';
+                } elsif $prop<type> eq 'array' {
+                    $out ~= 'array of ' ~ render_type($prop<items><type>);
+                    if $prop<items><properties> {
+                        $out ~= "\n" ~ render_props($prop<items><properties>.keys, $prop<items><properties>, $depth + 1);
+                    }
+                } else {
+                    $out ~= render_type($prop<type>);
+
+                    if $prop<minLength> || $prop<maxLength> {
+                        $out ~= '(' ~ ($prop<minLength> || '') ~ '..' ~ ($prop<maxLength> || '') ~ ')';
+                    }
+
+                    if $prop<default> {
+                        $out ~= '(default=' ~ $prop<default> ~ ')';
+                    }
+
+                    if $prop<properties> {
+                        $out ~= "\n" ~ render_props($prop<properties>.keys, $prop<properties>, $depth + 1);
+                    }
+                }
+            } else {
+               $out ~= $prop;
+            }
+
+            $out ~= "\n";
+            $out ~= "\n" if $depth == 1;
+
+            $out;
+        }
+
+        sub render_props(@keys, %props, Int $depth = 1) {
+            my @skip_props = <created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
+            my @top_props = <ref _resolved>;
+            my $out = '';
+
+            # FIXME: how about a cunning sort instead?
+            for @top_props -> $t {
+                $out ~= render_prop($t, %props{$t}, $depth) if %props{$t};
+            }
+
+            for @keys -> $k {
+                next if @skip_props.grep($k);
+                next if @top_props.grep($k);
+
+                $out ~= render_prop($k, %props{$k}, $depth);
+            };
+
+            $out.chomp;
+        }
+
+
+        my $schema = schemas(:reload($!qualifier eq 'reload'), :name($!first));
+
+        return $schema unless $!first;
+
+        return 'no schema' unless $schema;
+
+        my $out = "\n" ~ colored("JSONModel(:$!first)", 'bold green');
+        $out ~= '  ' ~ $schema<uri> if $schema<uri>;
+        $out ~= "\n";
+        $out ~= render_props($schema<property_list>, $schema<properties>);
+        $out ~ "\n";
     }
     
 
