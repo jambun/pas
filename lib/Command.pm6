@@ -543,9 +543,10 @@ class Command {
             my $out = $indent ~ colored($name, 'bold') ~ ' ';
 
             if $prop.WHAT ~~ Hash {
-
-                $out ~= '[' ~ colored('readonly', 'cyan') ~ '] ' if $prop<readonly>;
-                $out ~= '[' ~ colored('required', 'red') ~ '] ' if $prop<ifmissing>;
+                my @traits = [];
+                @traits.push(colored('readonly', 'cyan')) if $prop<readonly>;
+                @traits.push(colored('required', 'red')) if $prop<ifmissing>;
+                $out ~= '[' ~ @traits.join(' ') ~ '] ' if @traits;
 
                 if $prop<dynamic_enum> {
                     $out ~= 'enum(' ~  colored($prop<dynamic_enum>, 'bold yellow') ~ ')';
