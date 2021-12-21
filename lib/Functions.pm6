@@ -235,10 +235,16 @@ sub schemas(Bool :$reload, Str :$name) is export {
      }
 
      if $name {
-	       extract_from_schema(to-json $SCHEMAS_PARSED{$name});
-	       $SCHEMAS_PARSED{$name};
+         if ($SCHEMAS_PARSED{$name}) {
+             extract_from_schema(to-json $SCHEMAS_PARSED{$name});
+	           $SCHEMAS_PARSED{$name};
+         } else {
+             my @sch = $SCHEMAS_PARSED.keys.grep(/$name/).sort.Array;
+             @LAST_URIS = @sch.map: { 'schemas ' ~ $_ } if @sch;
+             @sch;
+         }
      } else {
-	       $SCHEMAS;
+	       $SCHEMAS_PARSED.keys.sort.Array;
      }
 }
 

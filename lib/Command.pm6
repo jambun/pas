@@ -604,9 +604,7 @@ class Command {
 
         my $schema = schemas(:reload($!qualifier eq 'reload'), :name($!first));
 
-        return $schema unless $!first;
-
-        return 'no schema' unless $schema;
+        return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $!first) if $schema.WHAT ~~ Array;
 
         my $out = "\n" ~ colored("JSONModel(:$!first)", 'bold green');
         $out ~= '  ' ~ $schema<uri> if $schema<uri>;
