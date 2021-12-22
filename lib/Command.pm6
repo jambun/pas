@@ -37,7 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
-                                      schemas.reload enums.i18n enums.reload
+                                      schemas.reload enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
@@ -920,7 +920,7 @@ class Command {
             ($e<relationships> ?? colored($e<relationships>.join(' '), 'cyan') !! '[not used]') ~
             "\n    " ~
 
-            (if $e<value_translations> && $!qualifier eq 'i18n' {
+            (if $e<value_translations> && $!qualifier eq 'tr' {
                 ($e<values>.map(-> $v {
                                        $v ~ ': ' ~ colored($e<value_translations>{$v}, 'yellow')
                                    })).join("\n    ");
@@ -1010,6 +1010,7 @@ sub shell_help {
        user     the user to add or remove
       enums     list enumerations
        .reload  force a reload
+       .tr      include translations for values
        [str]    show enumerations that match str
       session   show sessions or switch to a session
        .delete  delete a session
