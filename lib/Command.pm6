@@ -172,7 +172,7 @@ class Command {
         my $text = $!output.chomp;
         return unless $text;
 
-        my $stamp = config.attr<properties><stamp> ?? colored(now.DateTime.Str, 'yellow') !! '';
+        my $stamp = config.attr<properties><stamp> ?? ansi(now.DateTime.Str, 'yellow') !! '';
 
         if $!savefile {
 	          spurt($!savefile, ($text, $stamp).grep(/./).join("\n") ~ "\n", append => $!saveappend) unless $!savefile eq 'null';
@@ -394,8 +394,8 @@ class Command {
                               my $k = $pair.key;
                               my $v = $pair.value;
                               $ix += 1;
-                              my $user_fmt = colored('%-20s', $k eq config.session_key ?? 'bold green' !! 'bold white');
-                              my $ix_fmt = colored('%02d', 'cyan');
+                              my $user_fmt = ansi('%-20s', $k eq config.session_key ?? 'bold green' !! 'bold white');
+                              my $ix_fmt = ansi('%02d', 'cyan');
 
                               if $v<url> eq $last_url {
                                   sprintf("%-25s  [$ix_fmt]  $user_fmt",
@@ -406,7 +406,7 @@ class Command {
                                   my $version = try {
                                       (from-json client.get('/', :no_session, host => $v<url>, timeout => 1))<archivesSpaceVersion> || 'down'
                                   } // 'error';
-                                  my $version_fmt = colored('%-20s', ($version eq 'down' | 'error') ?? 'white' !! 'bold white');
+                                  my $version_fmt = ansi('%-20s', ($version eq 'down' | 'error') ?? 'white' !! 'bold white');
                                   sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
                                           $ix, $v<user>, $version, $v<url>);
@@ -500,11 +500,11 @@ class Command {
             my (@endpoints) = from-json client.get('/endpoints', @args);
             my $out = "\n";
             for @endpoints -> $ep {
-                $out ~= colored($ep{'method'}.join(' ').uc, 'bold green') ~ ' ' ~ colored($ep{'uri'}, 'bold');
+                $out ~= ansi($ep{'method'}.join(' ').uc, 'bold green') ~ ' ' ~ ansi($ep{'uri'}, 'bold');
                 if $ep{'permissions'}.elems > 0 {
-                    $out ~= '  [' ~ colored($ep{'permissions'}.join(' '), 'red') ~ ']';
+                    $out ~= '  [' ~ ansi($ep{'permissions'}.join(' '), 'red') ~ ']';
                 }
-                $out ~= "\n" ~ colored($ep{'description'}, 'yellow');
+                $out ~= "\n" ~ ansi($ep{'description'}, 'yellow');
                 $out ~= "\n" ~ ($ep{'params'}.map: {
                                        my @opts = [];
                                        if $_[3] {
@@ -514,8 +514,8 @@ class Command {
                                        }
                                        my $opts = '';
                                        $_[1] ~~ s/.* 'Boolean' .*/Boolean/;
-                                       $opts = '[' ~ colored(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
-                                       '  ' ~ (colored($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ colored(($_[2] || '[no description]'), 'yellow');
+                                       $opts = '[' ~ ansi(@opts.join(' '), 'green') ~ ']' if @opts.elems > 0;
+                                       '  ' ~ (ansi($_[0], 'bold'), $_[1], $opts).join(' ') ~ "\n    " ~ ansi(($_[2] || '[no description]'), 'yellow');
                                    }).join("\n");
                 $out ~= '  [no params]' if !$ep{'params'};
                 $out ~= "\n\n";
@@ -530,7 +530,7 @@ class Command {
     method schemas {
 
         sub render_jsonmodel(Str $ref is copy) {
-            $ref ~~ s/ 'JSONModel(:' (<-[\)]>+) ')' \s+ (\S+)/{ $1.Str ~ '(' ~ colored($0.Str, 'bold green') ~ ')'  }/;
+            $ref ~~ s/ 'JSONModel(:' (<-[\)]>+) ')' \s+ (\S+)/{ $1.Str ~ '(' ~ ansi($0.Str, 'bold green') ~ ')'  }/;
             $ref;
         }
 
@@ -540,16 +540,16 @@ class Command {
 
         sub render_prop($name, $prop, Int $depth = 1) {
             my $indent = '  ' x $depth;
-            my $out = $indent ~ colored($name, 'bold') ~ ' ';
+            my $out = $indent ~ ansi($name, 'bold') ~ ' ';
 
             if $prop.WHAT ~~ Hash {
                 my @traits = [];
-                @traits.push(colored('readonly', 'cyan')) if $prop<readonly>;
-                @traits.push(colored('required', 'red')) if $prop<ifmissing>;
+                @traits.push(ansi('readonly', 'cyan')) if $prop<readonly>;
+                @traits.push(ansi('required', 'red')) if $prop<ifmissing>;
                 $out ~= '[' ~ @traits.join(' ') ~ '] ' if @traits;
 
                 if $prop<dynamic_enum> {
-                    $out ~= 'enum(' ~  colored($prop<dynamic_enum>, 'bold yellow') ~ ')';
+                    $out ~= 'enum(' ~  ansi($prop<dynamic_enum>, 'bold yellow') ~ ')';
                 } elsif $prop<enum> {
                     $out ~= $prop<type> ~ '(' ~  $prop<enum>.join(', ') ~ ')';
                 } elsif $prop<type> eq 'array' {
@@ -607,7 +607,7 @@ class Command {
 
         return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $!first) if $schema.WHAT ~~ Array;
 
-        my $out = "\n" ~ colored("JSONModel(:$!first)", 'bold green');
+        my $out = "\n" ~ ansi("JSONModel(:$!first)", 'bold green');
         $out ~= '  ' ~ $schema<uri> if $schema<uri>;
         $out ~= "\n";
         $out ~= render_props($schema<property_list>, $schema<properties>);
@@ -635,9 +635,9 @@ class Command {
             } else {
                 return (for %prop.kv -> $k, $v {
                                my $out = $v;
-                               $out = colored('on', 'bold green') if $out.WHAT ~~ Bool && $out;
-                               $out = colored('off', 'bold red') if $out.WHAT ~~ Bool && !$out;
-                               $out = colored($out.Str, 'bold white') if $out.WHAT ~~ Int;
+                               $out = ansi('on', 'bold green') if $out.WHAT ~~ Bool && $out;
+                               $out = ansi('off', 'bold red') if $out.WHAT ~~ Bool && !$out;
+                               $out = ansi($out.Str, 'bold white') if $out.WHAT ~~ Int;
                                sprintf("  %-10s %s", $k, $out);
                            }).join("\n");
             }
@@ -652,24 +652,24 @@ class Command {
                 if $!first eq '0' | 'off' | 'false' {
                     %prop{$!qualifier} = False;
                     config.save;
-                    $!qualifier ~ colored(' off', 'bold red');
+                    $!qualifier ~ ansi(' off', 'bold red');
                 } elsif $!first ~~ /./ {
                     %prop{$!qualifier} = True;
                     config.save;
-                    $!qualifier ~ colored(' on', 'bold green');
+                    $!qualifier ~ ansi(' on', 'bold green');
                 } else {
-                    $!qualifier ~ (%prop{$!qualifier} ?? colored(' on', 'bold green') !! colored(' off', 'bold red'));
+                    $!qualifier ~ (%prop{$!qualifier} ?? ansi(' on', 'bold green') !! ansi(' off', 'bold red'));
                 }
             }
             when Int {
                 if so $!first.Int {
                     %prop{$!qualifier} = $!first.Int;
                     config.save;
-                    $!qualifier ~ ' ' ~ colored(%prop{$!qualifier}.Str, 'bold white');
+                    $!qualifier ~ ' ' ~ ansi(%prop{$!qualifier}.Str, 'bold white');
                 } elsif $!first ~~ /./ {
                     $!qualifier ~ ' must be a number';
                 } else {
-                    $!qualifier ~ ' ' ~ colored(%prop{$!qualifier}.Str, 'bold white');
+                    $!qualifier ~ ' ' ~ ansi(%prop{$!qualifier}.Str, 'bold white');
                 }
             }
         }
@@ -701,8 +701,8 @@ class Command {
         }
 
         my $longest_name = max($asam<statuses>.keys>>.chars);
-        my $name_fmt = colored("%-{$longest_name}s", 'bold white');
-        my $n_fmt = colored("%02d", 'cyan');
+        my $name_fmt = ansi("%-{$longest_name}s", 'bold white');
+        my $n_fmt = ansi("%02d", 'cyan');
         my $days = 60*60*24;
         my $hours = 60*60;
         my $mins = 60;
@@ -728,10 +728,10 @@ class Command {
             sprintf("  [$n_fmt]  $name_fmt  %s  %s",
                     $n,
                     $name,
-                    colored($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
+                    ansi($status<message>, ($status<status> ~~ 'good' ?? 'bold green' !!
                                                ($status<status> ~~ 'busy' ?? 'bold blue' !!
                                                 ($status<status> ~~ 'no' ?? 'white' !! 'bold red')))),
-                    colored($age, 'blue')) if !$!first || $!first.Int || $name.lc.contains($!first.lc);
+                    ansi($age, 'blue')) if !$!first || $!first.Int || $name.lc.contains($!first.lc);
         }
 
 
@@ -776,9 +776,9 @@ class Command {
         sub render-schedule($ix) {
             my $s = schedules[$ix];
             return '' unless $s;
-            my $ix_fmt = colored("%02d", 'cyan');
-            my $status_fmt = colored("%-10s", %state_color{$s<command>.state});
-            my $runs_fmt = colored("%d/%s", 'magenta');
+            my $ix_fmt = ansi("%02d", 'cyan');
+            my $status_fmt = ansi("%-10s", %state_color{$s<command>.state});
+            my $runs_fmt = ansi("%d/%s", 'magenta');
             sprintf("[$ix_fmt]  $status_fmt  %s  ($runs_fmt)\n",
                     $ix+1,
                     $s<command>.state,
@@ -828,12 +828,12 @@ class Command {
             my $g = from-json(client.get($groups[$ix]<uri>));
             return $g<error> if $g<error>;
 
-            my $ix_fmt = colored("%02d", 'cyan');
-            my $code_fmt = colored("%-35s", "bold white");
+            my $ix_fmt = ansi("%02d", 'cyan');
+            my $code_fmt = ansi("%-35s", "bold white");
             my $out = sprintf("[$ix_fmt] $code_fmt %s",
                               $ix + 1,
                               $g<group_code>,
-                              colored($g<member_usernames>.sort.join(', '), "bold green"));
+                              ansi($g<member_usernames>.sort.join(', '), "bold green"));
 
             if visible_length($out) > term_cols() {
                 my $snip;
@@ -897,8 +897,8 @@ class Command {
                 }
             } else {
                 (('Groups for repository:',
-                  colored($repo<repo_code>, 'bold yellow'),
-                  colored($repo<name>, 'bold white')).join(' '),
+                  ansi($repo<repo_code>, 'bold yellow'),
+                  ansi($repo<name>, 'bold white')).join(' '),
                  |(await (start { render-group($groups, $_) } for ^$groups))).join("\n");
             }
         } else {
@@ -914,15 +914,15 @@ class Command {
         "\n" ~
         @enums.map(-> $e {
             my $val_len = 4;
-            colored($e<name>, 'bold') ~
-            ' [' ~ ($e<editable> ?? colored('editable', 'green') !! colored('not editable', 'red')) ~ '] ' ~
+            ansi($e<name>, 'bold') ~
+            ' [' ~ ($e<editable> ?? ansi('editable', 'green') !! ansi('not editable', 'red')) ~ '] ' ~
             $e<uri> ~ "\n    " ~
-            ($e<relationships> ?? colored($e<relationships>.join(' '), 'cyan') !! '[not used]') ~
+            ($e<relationships> ?? ansi($e<relationships>.join(' '), 'cyan') !! '[not used]') ~
             "\n    " ~
 
             (if $e<value_translations> && $!qualifier eq 'tr' {
                 ($e<values>.map(-> $v {
-                                       $v ~ ': ' ~ colored($e<value_translations>{$v}, 'yellow')
+                                       $v ~ ': ' ~ ansi($e<value_translations>{$v}, 'yellow')
                                    })).join("\n    ");
             } else {
                 ($e<values>.map(-> $v {
@@ -932,7 +932,7 @@ class Command {
                                            $val_len = 4 + $v.chars + 1;
                                            $prefix = "\n    ";
                                        }
-                                       $prefix ~ ($e<readonly_values>.grep($v) ?? colored($v, 'red') !! $v);
+                                       $prefix ~ ($e<readonly_values>.grep($v) ?? ansi($v, 'red') !! $v);
                                    })).join(' ');
             });
 

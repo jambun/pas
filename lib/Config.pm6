@@ -16,6 +16,7 @@ class Config {
     loud     => False,
     compact  => False,
     page     => True,
+    color    => True,
     time     => False,
     savepwd  => False,
     anon     => False,

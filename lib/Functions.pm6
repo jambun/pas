@@ -99,6 +99,15 @@ sub page($text) is export {
 }
 
 
+sub ansi(Str $s, Str $ansi_fmt) is export {
+    if config.attr<properties><color> {
+        colored($s, $ansi_fmt);
+    } else {
+        $s;
+    }
+}
+
+
 sub modify_json($json, @pairs) is export {
     my %hash = from-json $json;
     for @pairs -> $q {

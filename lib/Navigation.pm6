@@ -52,7 +52,7 @@ method start {
 	if $new_uri {
 	    plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
 	    print_at('.' x @uri_history, 2, 1);
-	    print_at(colored('h', 'bold') ~ 'elp ' ~ colored('q', 'bold') ~ 'uit',
+	    print_at(ansi('h', 'bold') ~ 'elp ' ~ ansi('q', 'bold') ~ 'uit',
 		     $term_cols - 9, 1);
 	    cursor($x, $y);
 	    $new_uri = False;
@@ -197,7 +197,7 @@ sub clear_nav_cursor($line = False) {
 
 sub print_nav_cursor(Int $clear = 0) {
     clear_nav_cursor($clear) if $clear;
-    print_at(colored('>', 'bold'), $nav_cursor_col, $y) unless $y == $y_offset && $current_nav_offset == 0;
+    print_at(ansi('>', 'bold'), $nav_cursor_col, $y) unless $y == $y_offset && $current_nav_offset == 0;
 }
 
 
@@ -254,11 +254,11 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     run 'tput', 'civis';                   # hide the cursor
     clear_screen;
 
-    print_at(colored(record_label(%json).Str, 'bold'), 2, 3);
+    print_at(ansi(record_label(%json).Str, 'bold'), 2, 3);
     print_at(record_summary(%json), 6, 4);
-    print_at(colored($uri, 'bold'), 4, 6);
+    print_at(ansi($uri, 'bold'), 4, 6);
     @uris = Array.new;
-    @uris.push(uri_hash($uri, 'top', colored($uri, 'bold'), 4));
+    @uris.push(uri_hash($uri, 'top', ansi($uri, 'bold'), 4));
     $y = 7;
 
     plot_hash(%json, 'top', 6);
@@ -363,16 +363,16 @@ sub print_nav_help($s, $line) {
 sub nav_help {
     run 'tput', 'civis'; # hide the cursor
     print_nav_help('', 1);
-    print_nav_help(colored('UP', 'bold') ~ '/' ~ colored('DOWN', 'bold') ~ '  Select Previous/Next uri', 2);
-    print_nav_help(colored('LEFT', 'bold') ~ '     Back to last uri', 3);
-    print_nav_help(colored('RIGHT', 'bold') ~ '    Load selected uri', 4);
-    print_nav_help(colored('SPACE', 'bold') ~ '    View json for selected uri', 5);
-    print_nav_help(colored('RETURN', 'bold') ~ '   View summary for selected uri', 6);
-    print_nav_help(colored('r', 'bold') ~ '        Resolve refs like the selected uri', 7);
-    print_nav_help(colored('q', 'bold') ~ '        Quit navigator', 8);
-    print_nav_help(colored('h', 'bold') ~ '        This help', 9);
+    print_nav_help(ansi('UP', 'bold') ~ '/' ~ ansi('DOWN', 'bold') ~ '  Select Previous/Next uri', 2);
+    print_nav_help(ansi('LEFT', 'bold') ~ '     Back to last uri', 3);
+    print_nav_help(ansi('RIGHT', 'bold') ~ '    Load selected uri', 4);
+    print_nav_help(ansi('SPACE', 'bold') ~ '    View json for selected uri', 5);
+    print_nav_help(ansi('RETURN', 'bold') ~ '   View summary for selected uri', 6);
+    print_nav_help(ansi('r', 'bold') ~ '        Resolve refs like the selected uri', 7);
+    print_nav_help(ansi('q', 'bold') ~ '        Quit navigator', 8);
+    print_nav_help(ansi('h', 'bold') ~ '        This help', 9);
     print_nav_help('', 10);
-    print_nav_help(colored('    <ANY KEY> to exit help', 'bold'), 11);
+    print_nav_help(ansi('    <ANY KEY> to exit help', 'bold'), 11);
     print_nav_help('', 12);
     get_char;
     cursor($x, $y);
