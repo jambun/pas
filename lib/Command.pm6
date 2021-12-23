@@ -481,11 +481,12 @@ class Command {
     method endpoints {
         if $!first {
             my $f = $!first;
-            my @uris = load_endpoints.grep(/$f/);
+            my @uris = load_endpoints(:force($!qualifier eq 'reload')).grep(/$f/);
+            return 'No endpoints match: ' ~ $!first unless @uris;
             last_uris(@uris);
             @uris.join("\n");
         } else {
-            load_endpoints.join("\n");
+            load_endpoints(:force($!qualifier eq 'reload')).join("\n");
         }
     }
 
