@@ -55,6 +55,7 @@ sub MAIN(Str :$e?, Bool :$h) {
 	      }
     });
 
+    say ansi('~~~ pas : porcelain archivesspace ~~~', 'bold');
 
     while (my $line = linenoise cmd_prompt).defined {
         try {
