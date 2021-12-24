@@ -1045,9 +1045,12 @@ sub shell_help {
        [n]      group listing number
        user     the user to add or remove
       enums     list enumerations
+       .add     add val to enum str
+       .remove  remove val from enum str
        .reload  force a reload
        .tr      include translations for values
        [str]    show enumerations that match str
+       [val]    value to add or remove
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules
