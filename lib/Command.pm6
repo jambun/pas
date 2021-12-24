@@ -27,7 +27,7 @@ class Command {
     has Bool $.cancelled;
 
 
-    my constant ACTIONS = <show update create edit stub post delete
+    my constant ACTIONS = <show update create edit stub revisions post delete
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
                            session who asam doc
@@ -314,6 +314,35 @@ class Command {
 
     method delete {
         pretty extract_uris client.delete($!uri);
+    }
+
+
+    method revisions {
+        unless load_endpoints.grep('/history') {
+            return 'Revision histories unavailable'
+        }
+
+        my $h;
+
+        if $!uri {
+            my $r = from-json client.get($!uri);
+
+            if $r<history> {
+                $h = from-json client.get($r<history><ref>, ['array=true']);
+            } else {
+                return 'No revision history for ' ~ $!uri;
+            }
+        } else {
+            $h = from-json client.get('/history', ['array=true']);
+        }
+
+        "\n" ~
+        ($h.map: {
+                my $r = $_<_resolved>;
+                ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~ ansi($r<revision>.Str, 'bold') ~
+                ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
+                ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
+            }).join("\n\n") ~ "\n\n";
     }
 
 
