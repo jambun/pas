@@ -37,7 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
-                                      schemas.reload enums.tr enums.reload
+                                      schemas.reload enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
@@ -911,6 +911,41 @@ class Command {
     method enums {
         my @enums = enums(:reload($!qualifier eq 'reload'), :name($!first));
         return 'No enumerations matching: ' ~ $!first unless @enums;
+
+        if $!qualifier eq 'add' || $!qualifier eq 'remove' {
+            if @enums != 1 {
+                return "Must match only one enum to add or remove values. You matched {@enums.elems} with: $!first";
+            }
+
+            unless @!args {
+                return 'Please provide a value to add or remove';
+            }
+
+            my $e = @enums.first;
+            my $v = @!args.first;
+
+            if $!qualifier eq 'add' {
+                if $e<values>.grep($v) {
+                    return "Enumeration '{$e<name>}' already has value '$v'"
+                }
+
+                $e<values>.push($v);
+            }
+
+            if $!qualifier eq 'remove' {
+                unless $e<values>.grep($v) {
+                    return "Enumeration '{$e<name>}' doesn't have value '$v' to remove"
+                }
+
+                $e<values> = $e<values>.grep({ $_ ne $v}).Array;
+            }
+
+            client.post($e<uri>, [], to-json($e));
+
+            enums(:reload(True));
+
+            return "Value '$v' {$!qualifier eq 'add' ?? 'added to' !! 'removed from'} enumeration '{$e<name>}'";
+        }
 
         "\n" ~
         @enums.map(-> $e {
