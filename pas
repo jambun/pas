@@ -65,6 +65,7 @@ sub MAIN(Str :$e?, Bool :$h) {
         }
         if $! {
             say "Something bad happened: $!";
+            say $!.backtrace.join;
         }
     }
 }
