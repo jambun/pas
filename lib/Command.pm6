@@ -80,7 +80,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d]>+ }
+        token arg           { <[\w\d\=\-\_]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -323,22 +323,26 @@ class Command {
         }
 
         my $h;
+        my @args = @!args;
+        @args.push($!first);
+        @args.push('array=true');
 
         if $!uri {
             my $r = from-json client.get($!uri);
 
             if $r<history> {
-                $h = from-json client.get($r<history><ref>, ['array=true']);
+                $h = from-json client.get($r<history><ref>, @args);
             } else {
                 return 'No revision history for ' ~ $!uri;
             }
         } else {
-            $h = from-json client.get('/history', ['array=true']);
+            $h = from-json client.get('/history', @args);
         }
 
         "\n" ~
         ($h.map: {
                 my $r = $_<_resolved>;
+                next unless $r<last_modified_by>; # edge case - the global repo is created/modified by nobody
                 ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~ ansi($r<revision>.Str, 'bold') ~
                 ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
                 ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
