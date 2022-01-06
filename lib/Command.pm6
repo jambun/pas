@@ -343,7 +343,8 @@ class Command {
         ($h.map: {
                 my $r = $_<_resolved>;
                 next unless $r<last_modified_by>; # edge case - the global repo is created/modified by nobody
-                ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~ ansi($r<revision>.Str, 'bold') ~
+                ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~
+                ansi($r<revision>.Str, 'bold magenta') ~
                 ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
                 ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
             }).join("\n\n") ~ "\n\n";
