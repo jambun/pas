@@ -87,7 +87,7 @@ sub pretty($json is copy) is export {
 
 
 sub edit($file) is export {
-    my $mtime = $file.IO.modified;
+    my $mtime = $file.IO.e ?? $file.IO.modified !! 0;
     shell (%*ENV<EDITOR> || 'emacs') ~ ' ' ~ $file;
     $mtime != $file.IO.modified;
 }
