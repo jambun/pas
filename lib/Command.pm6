@@ -65,7 +65,7 @@ class Command {
 
         rule  command       { [ <uricmd> | <actioncmd> ] <redirect>? <schedule>? }
 
-        rule  uricmd        { <uri> <pairlist> <action>? <postfile>? }
+        rule  uricmd        { <uri> <pairlist> <action>? <arglist> <postfile>? }
         rule  actioncmd     { <action> <arglist> }
 
         token comment       { '#' .* }
@@ -80,7 +80,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d\=\-\_]>+ }
+        token arg           { <[\w\d\=\-\_\/\+\,\;]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -318,36 +318,71 @@ class Command {
 
 
     method revisions {
+        # /uri revisions [rev[/[diff]]] | ( [+cnt] ( [;user] [-date] | [,rev] ) )
+        # revisions ( [+cnt] [=model] [;user] [-date] )
+
         unless load_endpoints.grep('/history') {
             return 'Revision histories unavailable'
         }
 
-        my $h;
-        my @args = @!args;
-        @args.push($!first);
-        @args.push('array=true');
+        my $huri = '/history';
 
         if $!uri {
-            my $r = from-json client.get($!uri);
-
-            if $r<history> {
-                $h = from-json client.get($r<history><ref>, @args);
+            my $record = from-json client.get($!uri);
+            if $record<history> {
+                $huri = $record<history><ref>;
             } else {
                 return 'No revision history for ' ~ $!uri;
             }
-        } else {
-            $h = from-json client.get('/history', @args);
         }
 
-        "\n" ~
-        ($h.map: {
-                my $r = $_<_resolved>;
-                next unless $r<last_modified_by>; # edge case - the global repo is created/modified by nobody
-                ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~
-                ansi($r<revision>.Str, 'bold magenta') ~
-                ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
-                ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
-            }).join("\n\n") ~ "\n\n";
+        my @args;
+        my $revision;
+
+        @!args.push($!first) unless $!uri;
+
+        for @!args -> $a {
+            if $a ~~ /^ (\d+) (\/ ( \d* ) )? $/ {
+                return 'Makes no sense to provide a revision without a uri' unless $!uri;
+                $revision = $0.Str;
+                $huri ~= "/{$revision}";
+                if $1 {
+                    $huri ~= "/{$1[0].Str || ($revision.Int - 1)}";
+                }
+            } elsif $a ~~ /^ \+ ( \d+ ) $/ {
+                @args.push("limit={$0.Str}");
+            } elsif $a ~~ /^ \; ( \S+ ) $/ {
+                @args.push("user={$0.Str}");
+            } elsif $a ~~ /^ \- ( \S+ ) $/ {
+                @args.push("at={$0.Str}");
+            } elsif $a ~~ /^ \, ( \d+ ) $/ {
+                return 'Makes no sense to provide a start revision' if $revision;
+                $huri ~= $0.Str;
+            } elsif $a ~~ /^ \= ( \S+ ) $/ {
+                return 'Makes no sense to provide a model' if $!uri;
+                $huri ~= "/{$0.Str}";
+            }
+        }
+
+        @args.push('array=true') unless $revision;
+
+        my $history = client.get($huri, @args);
+
+        if $revision {
+            pretty extract_uris $history;
+        } else {
+            my $h = from-json $history;
+            last_uris($h.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
+            "\n" ~
+            ($h.map: {
+                    my $r = $_<_resolved>;
+                    next unless $r<last_modified_by>; # edge case - the global repo is created by nobody apparently
+                    ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~
+                    ansi($r<revision>.Str, 'bold magenta') ~
+                    ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
+                    ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
+                }).join("\n\n") ~ "\n\n";
+        }
     }
 
 
@@ -1057,6 +1092,13 @@ sub shell_help {
       post      post a file (default if last arg is a file)
       search    show search index document
        .public  show pui document
+      revisions show revision history
+       n        show revision n
+       n/[m]    show diff between n and m (default n - 1)
+       +cnt     show cnt revisions in list (default 20)
+       ;user    only show revisions by user
+       -date    only show revisions at or before date
+       ,rev     only show revisions up to rev
       doc       show endpoint documentation for uri
        .get     GET method only
        .post    POST method only
@@ -1085,6 +1127,11 @@ sub shell_help {
        .tr      include translations for values
        [str]    show enumerations that match str
        [val]    value to add or remove
+      revisions show revision history
+       +cnt     show cnt revisions in list (default 20)
+       =model   only show revisions for model
+       ;user    only show revisions by user
+       -date    only show revisions at or before date
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules
