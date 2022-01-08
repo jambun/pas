@@ -364,24 +364,34 @@ class Command {
             }
         }
 
+        @args.push('mode=full');
         @args.push('array=true') unless $revision;
 
         my $history = client.get($huri, @args);
 
-        if $revision {
-            pretty extract_uris $history;
-        } else {
-            my $h = from-json $history;
-            last_uris($h.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
+
+        sub render_revisions($revs) {
             "\n" ~
-            ($h.map: {
-                    my $r = $_<_resolved>;
+            ($revs.map: -> $r {
                     next unless $r<last_modified_by>; # edge case - the global repo is created by nobody apparently
                     ansi($r<model>, 'bold') ~ ' / ' ~ ansi($r<record_id>.Str, 'bold') ~ ' .v' ~
                     ansi($r<revision>.Str, 'bold magenta') ~
                     ' :: ' ~ ansi($r<short_label>, 'yellow') ~ "\n" ~
                     ansi($r<last_modified_by>, 'cyan') ~ ' at ' ~ $r<user_mtime>;
                 }).join("\n\n") ~ "\n\n";
+        }
+
+
+        if $revision {
+#            pretty extract_uris $history;
+            my $h = from-json $history;
+            render_revisions($h<data>.values) ~ "\n\n" ~
+            pretty($history, :mark_diff);
+        } else {
+            my $h = from-json $history;
+            my $r = $h<versions>;
+            last_uris($r.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
+            render_revisions($r.map: { $_<_resolved> });
         }
     }
 

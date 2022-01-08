@@ -68,20 +68,27 @@ sub cmd_prompt is export {
 }
 
 
-sub pretty($json is copy) is export {
-    return $json if config.attr<properties><compact>;
+sub mark_diff($json is copy) is export {
+    $json ~~ s:g/ (\s*) '"' (<-[\"]>+) '":' \s* '{' \s* '"_diff":' \s* '[' \s* ('NULL' | '"' .*? '"') ',' \s* ('NULL' | '"' .*? '"') \s* ']' \s* '}'/{
+        my $sp = $0.Str ?? ' ' !! '';
+        (($2.Str eq 'NULL' ?? False !! ($0.Str ~ ansi('"' ~ $1.Str ~ '":' ~ $sp ~ $2.Str, 'red'))),
+         ($3.Str eq 'NULL' ?? False !! ($0.Str ~ ansi('"' ~ $1.Str ~ '":' ~ $sp ~ $3.Str, 'green')))).grep({$_}).join(',')
+    }/;
+
+    $json;
+}
+
+
+sub pretty($json is copy, Bool :$mark_diff) is export {
+    return ($mark_diff ?? mark_diff($json) !! $json) if config.attr<properties><compact>;
 
     if $json ~~ /^<[\{\[]>/ {
-	JSONPretty::prettify($json, config.attr<properties><indent>);
+	      my $pretty = JSONPretty::prettify($json, config.attr<properties><indent>);
+        $mark_diff ?? mark_diff($pretty) !! $pretty;
     } elsif $json ~~ /^<[\<]>/ {
-	XMLPretty::prettify($json, config.attr<properties><indent>);
-	# a rare xml response - hack it
-#	$json ~~ s:g/ ('</' <-[\>]>+ '>') /$0\n/;
-#	$json ~~ s:g/ ('<?' <-[\>]>+ '>') /$0\n/;
-#	$json ~~ s:g/ ('<' \w <-[\>]>+ '>') /\n$0/;
-#	$json;
+	      XMLPretty::prettify($json, config.attr<properties><indent>);
     } else {
-	$json;
+	      $json;
     }
 }
 
