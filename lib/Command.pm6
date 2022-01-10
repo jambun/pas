@@ -337,17 +337,19 @@ class Command {
         }
 
         my @args;
-        my $revision;
+        my Int $revision;
+        my Int $diff;
 
         @!args.push($!first) unless $!uri;
 
         for @!args -> $a {
             if $a ~~ /^ (\d+) (\/ ( \d* ) )? $/ {
                 return 'Makes no sense to provide a revision without a uri' unless $!uri;
-                $revision = $0.Str;
-                $huri ~= "/{$revision}";
+                $revision = $0.Int;
+                $huri ~= "/$revision";
                 if $1 {
-                    $huri ~= "/{$1[0].Str || ($revision.Int - 1)}";
+                    $diff = $1[0].Int || ($revision.Int - 1);
+                    @args.push("diff=$diff");
                 }
             } elsif $a ~~ /^ \+ ( \d+ ) $/ {
                 @args.push("limit={$0.Str}");
@@ -385,8 +387,14 @@ class Command {
         if $revision {
 #            pretty extract_uris $history;
             my $h = from-json $history;
-            render_revisions($h<data>.values) ~ "\n\n" ~
-            pretty($history, :mark_diff);
+            my $out = render_revisions($h<data>.values);
+            if $diff {
+                $out ~= 'Diff with revision .v' ~ ansi($diff.Str, 'bold magenta') ~ ":\n\n";
+                $out ~= pretty($history, :mark_diff, :select('inline_diff'));
+            } else {
+                $out ~= pretty($history, :select('json'));
+            }
+            $out;
         } else {
             my $h = from-json $history;
             my $r = $h<versions>;

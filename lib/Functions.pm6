@@ -79,11 +79,11 @@ sub mark_diff($json is copy) is export {
 }
 
 
-sub pretty($json is copy, Bool :$mark_diff) is export {
+sub pretty($json is copy, Bool :$mark_diff, Str :$select) is export {
     return ($mark_diff ?? mark_diff($json) !! $json) if config.attr<properties><compact>;
 
     if $json ~~ /^<[\{\[]>/ {
-	      my $pretty = JSONPretty::prettify($json, config.attr<properties><indent>);
+	      my $pretty = JSONPretty::prettify($json, config.attr<properties><indent>, $select);
         $mark_diff ?? mark_diff($pretty) !! $pretty;
     } elsif $json ~~ /^<[\<]>/ {
 	      XMLPretty::prettify($json, config.attr<properties><indent>);

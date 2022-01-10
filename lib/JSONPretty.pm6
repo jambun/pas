@@ -36,17 +36,30 @@ grammar Grammar {
 
 class PrettyActions {
     has Int $.step = 2;
+    has Str $.select;
 
     method indent(Str $json) {
     	my Int $indent = 0;
 	    my Str $out = '';
+      my Int $selected = 0;
+      my $sel = $!select;
 	    for $json.split("\n")>>.trim -> $line {
 	        next unless $line ~~ /./;
+
 	        $indent -= $!step if $line ~~ /^<[ \} \] ]>/;
-          $out ~= ' ' x $indent ~ $line ~ "\n";
+          $out ~= ' ' x ($indent - $selected) ~ $line ~ "\n" if !$!select || $selected;
 	        $indent -= $!step if $line eq '[],';
 	        $indent += $!step if $line ~~ /^<[ \{ \[ ]>/;
+
+          if $!select {
+              if $line ~~ /^ \s* '"' $sel '":'/ {
+                  $selected = $indent;
+              } elsif $indent <= $selected {
+                  $selected = 0;
+              }
+          }
 	    }
+      $out ~~ s/ ',' \n $/\n/ if $!select;
 	    $out;
     }
 
@@ -70,7 +83,6 @@ class PrettyActions {
 }
 
 
-our sub prettify($json, $indent) {
-    Grammar.parse($json, :actions(PrettyActions.new(step => $indent))).made;
+our sub prettify($json, $indent, $select) {
+    Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
 }
-
