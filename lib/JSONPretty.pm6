@@ -10,7 +10,7 @@ grammar Grammar {
     rule emptyarray { '[]'                     }
     rule array      { '[' ~ ']' <arraylist>    }
     rule arraylist  { <arrayvalue> * % [ \, ]  }
-    rule arrayvalue { [ <diffvalue> | <value> ]                 }
+    rule arrayvalue { [ <diffvalue> | <value> ] }
 
     rule diffvalue  { '{' ~ '}' <diffpair>     }
     rule diffpair   { '"_diff":' '[' <fromvalue> ',' <tovalue> ']' }
@@ -52,12 +52,12 @@ class PrettyActions {
       my Int $selected = 0;
       my $sel = $!select;
 	    for $json.split("\n")>>.trim -> $line {
-	        next unless $line ~~ /./;
+	        next unless colorstrip($line) ~~ /./;
 
-	        $indent -= $!step if $line ~~ /^<[ \} \] ]>/;
+	        $indent -= $!step if colorstrip($line) ~~ /^  <[ \} \] ]> /;
           $out ~= ' ' x ($indent - $selected) ~ $line ~ "\n" if !$!select || $selected;
-	        $indent -= $!step if $line eq '[],';
-	        $indent += $!step if $line ~~ /^<[ \{ \[ ]>/;
+	        $indent -= $!step if colorstrip($line) eq '[],';
+	        $indent += $!step if colorstrip($line) ~~ /^  <[ \{ \[ ]> /;
 
           if $!select {
               if $line ~~ /^ \s* '"' $sel '":'/ {
@@ -72,7 +72,7 @@ class PrettyActions {
     }
 
     method ansi($text, $fmt) {
-        ($text.split("\n").grep(/\S/).map: { colored($_, $fmt) }).join("\n");
+        ($text.split("\n").map: { colored($_, $fmt) }).join("\n");
     }
 
     method TOP ($/)        { make self.indent($<value>.made)                  }
