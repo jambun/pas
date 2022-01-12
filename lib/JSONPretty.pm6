@@ -1,14 +1,21 @@
+use Terminal::ANSIColor;
+
 unit module JSONPretty;
 
 grammar Grammar {
     token TOP       { \s* <value> \s*          }
     rule object     { '{' ~ '}' <pairlist>     }
     rule pairlist   { <pair> * % \,            }
-    rule pair       { <string> ':' <value>     }
+    rule pair       { <string> ':' [ <diffvalue> | <value> ]     }
     rule emptyarray { '[]'                     }
     rule array      { '[' ~ ']' <arraylist>    }
     rule arraylist  { <arrayvalue> * % [ \, ]  }
-    rule arrayvalue { <value>                  }
+    rule arrayvalue { [ <diffvalue> | <value> ]                 }
+
+    rule diffvalue  { '{' ~ '}' <diffpair>     }
+    rule diffpair   { '"_diff":' '[' <fromvalue> ',' <tovalue> ']' }
+    token fromvalue { <value> }
+    token tovalue   { <value> }
 
     proto token value {*};
 
@@ -36,6 +43,7 @@ grammar Grammar {
 
 class PrettyActions {
     has Int $.step = 2;
+    has Bool $.mark_diff = False;
     has Str $.select;
 
     method indent(Str $json) {
@@ -63,14 +71,23 @@ class PrettyActions {
 	    $out;
     }
 
+    method ansi($text, $fmt) {
+        ($text.split("\n").grep(/\S/).map: { colored($_, $fmt) }).join("\n");
+    }
+
     method TOP ($/)        { make self.indent($<value>.made)                  }
     method object($/)      { make "\n" ~ '{' ~ "\n" ~ $<pairlist>.made ~ '}'  }
     method pairlist($/)    { make $<pair>>>.made.join(",\n") ~ "\n"           }
-    method pair($/)        { make $<string> ~ ': ' ~ $<value>.made            }
+    method pair($/)        { make $<string> ~ ': ' ~ ($<diffvalue>.made || $<value>.made) }
     method emptyarray($/)  { make '[]'                                        }
     method array($/)       { make "\n" ~ '[' ~ "\n" ~ $<arraylist>.made ~ ']' }
     method arraylist($/)   { make $<arrayvalue>>>.made.join(",\n") ~ "\n"     }
-    method arrayvalue($/)  { make $<value>.made                               }
+    method arrayvalue($/)  { make ($<diffvalue>.made || $<value>.made)        }
+
+    method diffvalue($/)   { make $<diffpair>.made                            }
+    method diffpair($/)    { make ($<fromvalue>.made, $<tovalue>.made).grep({$_}).join(' ') } 
+    method fromvalue($/)   { make $<value>.made.Str eq 'NULL' ?? False !! self.ansi($<value>.made.Str, 'red') }
+    method tovalue($/)     { make $<value>.made.Str eq 'NULL' ?? False !! self.ansi($<value>.made.Str, 'green') }
 
     method value:sym<number>($/)      { make +$/.Str            }
     method value:sym<string>($/)      { make $<string>          }
@@ -83,6 +100,6 @@ class PrettyActions {
 }
 
 
-our sub prettify($json, $indent, $select) {
-    Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
+our sub prettify($json, Int :$indent, Bool :$mark_diff, Str :$select) {
+    Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select, mark_diff => $mark_diff))).made;
 }

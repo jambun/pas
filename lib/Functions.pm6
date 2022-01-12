@@ -68,23 +68,11 @@ sub cmd_prompt is export {
 }
 
 
-sub mark_diff($json is copy) is export {
-    $json ~~ s:g/ (\s*) '"' (<-[\"]>+) '":' \s* '{' \s* '"_diff":' \s* '[' \s* ('NULL' | '"' .*? '"') ',' \s* ('NULL' | '"' .*? '"') \s* ']' \s* '}'/{
-        my $sp = $0.Str ?? ' ' !! '';
-        (($2.Str eq 'NULL' ?? False !! ($0.Str ~ ansi('"' ~ $1.Str ~ '":' ~ $sp ~ $2.Str, 'red'))),
-         ($3.Str eq 'NULL' ?? False !! ($0.Str ~ ansi('"' ~ $1.Str ~ '":' ~ $sp ~ $3.Str, 'green')))).grep({$_}).join(',')
-    }/;
-
-    $json;
-}
-
-
 sub pretty($json is copy, Bool :$mark_diff, Str :$select) is export {
-    return ($mark_diff ?? mark_diff($json) !! $json) if config.attr<properties><compact>;
+    return $json if config.attr<properties><compact>;
 
     if $json ~~ /^<[\{\[]>/ {
-	      my $pretty = JSONPretty::prettify($json, config.attr<properties><indent>, $select);
-        $mark_diff ?? mark_diff($pretty) !! $pretty;
+	      JSONPretty::prettify($json, :indent(config.attr<properties><indent>), :mark_diff($mark_diff), :select($select));
     } elsif $json ~~ /^<[\<]>/ {
 	      XMLPretty::prettify($json, config.attr<properties><indent>);
     } else {
