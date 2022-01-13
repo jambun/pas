@@ -33,7 +33,7 @@ class Command {
                            session who asam doc
                            history last set ls help comment quit>;
 
-    my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last 
+    my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
@@ -320,6 +320,7 @@ class Command {
     method revisions {
         # /uri revisions [rev[/[diff]]] | ( [+cnt] ( [;user] [-date] | [,rev] ) )
         # revisions ( [+cnt] [=model] [;user] [-date] )
+        # /uri revisions.restore rev
 
         unless load_endpoints.grep('/history') {
             return 'Revision histories unavailable'
@@ -385,7 +386,10 @@ class Command {
 
 
         if $revision {
-#            pretty extract_uris $history;
+            if $!qualifier eq 'restore' {
+                return pretty client.post($huri ~ '/restore', [], 'nothing')
+            }
+
             my $h = from-json $history;
             my $out = render_revisions($h<data>.values);
             if $diff {
@@ -1111,6 +1115,7 @@ sub shell_help {
       search    show search index document
        .public  show pui document
       revisions show revision history
+       .restore attempt to restore revision n
        n        show revision n
        n/[m]    show diff between n and m (default n - 1)
        +cnt     show cnt revisions in list (default 20)
