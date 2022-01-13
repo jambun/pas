@@ -6,16 +6,11 @@ grammar Grammar {
     token TOP       { \s* <value> \s*          }
     rule object     { '{' ~ '}' <pairlist>     }
     rule pairlist   { <pair> * % \,            }
-    rule pair       { <string> ':' [ <diffvalue> | <value> ]     }
+    rule pair       { <string> ':' <value>     }
     rule emptyarray { '[]'                     }
     rule array      { '[' ~ ']' <arraylist>    }
     rule arraylist  { <arrayvalue> * % [ \, ]  }
-    rule arrayvalue { [ <diffvalue> | <value> ] }
-
-    rule diffvalue  { '{' ~ '}' <diffpair>     }
-    rule diffpair   { '"_diff":' '[' <fromvalue> ',' <tovalue> ']' }
-    token fromvalue { <value> }
-    token tovalue   { <value> }
+    rule arrayvalue {  <value>                 }
 
     proto token value {*};
 
@@ -41,9 +36,19 @@ grammar Grammar {
 }
 
 
+grammar GrammarWithDiff is Grammar {
+    rule pair       { <string> ':' [ <diffvalue> | <value> ]     }
+    rule arrayvalue { [ <diffvalue> | <value> ] }
+
+    rule diffvalue  { '{' ~ '}' <diffpair>     }
+    rule diffpair   { '"_diff":' '[' <fromvalue> ',' <tovalue> ']' }
+    token fromvalue { <value> }
+    token tovalue   { <value> }
+}
+
+
 class PrettyActions {
     has Int $.step = 2;
-    has Bool $.mark_diff = False;
     has Str $.select;
 
     method indent(Str $json) {
@@ -101,5 +106,9 @@ class PrettyActions {
 
 
 our sub prettify($json, Int :$indent, Bool :$mark_diff, Str :$select) {
-    Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select, mark_diff => $mark_diff))).made;
+    if $mark_diff {
+        GrammarWithDiff.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
+    } else {
+        Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
+    }
 }
