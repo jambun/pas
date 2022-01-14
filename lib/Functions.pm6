@@ -30,6 +30,7 @@ my $ENUMS;
 my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
+my @HISTORY_MODELS;
 
 my @SCHEDULES = [];
 
@@ -210,6 +211,17 @@ sub extract_from_schema($text) is export {
     $text ~~ m:g/ '"dynamic_enum"' \s* ':' \s* '"' ( <-[ \" ]>+ ) /;
     @LAST_URIS.append((($/.map: { $_[0].Str }).sort.unique).map: { 'enums ' ~ $_ });
     $text;
+}
+
+
+sub history_models(Bool :$force) is export {
+    return @HISTORY_MODELS if @HISTORY_MODELS && !$force;
+
+    if load_endpoints.grep('/history') {
+        @HISTORY_MODELS = |(from-json client.get('/history/models')).map({ $_ ~~ s:g/(<[A..Z]>)/{'_' ~ $0.Str.lc}/; $_.substr(1)});
+    }
+
+    @HISTORY_MODELS;
 }
 
 

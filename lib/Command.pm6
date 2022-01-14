@@ -46,6 +46,17 @@ class Command {
     method actions { ACTIONS }
     method qualified_actions { QUALIFIED_ACTIONS }
 
+    method contextual_completions(Str $line) {
+        my @out;
+
+        if $line ~~ /'revisions ' .* '=' $/ {
+            for history_models() -> $m {
+                @out.push($line ~ $m);
+            }
+        }
+
+        @out;
+    }
 
     my constant ALIAS = {
         p => 'page',
@@ -402,8 +413,12 @@ class Command {
         } else {
             my $h = from-json $history;
             my $r = $h<versions>;
-            last_uris($r.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
-            render_revisions($r.map: { $_<_resolved> });
+            if $r {
+                last_uris($r.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
+                render_revisions($r.map: { $_<_resolved> });
+            } else {
+                'No matching revisions.'
+            }
         }
     }
 
