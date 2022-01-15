@@ -31,6 +31,7 @@ my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
 my @HISTORY_MODELS;
+my @USERS;
 
 my @SCHEDULES = [];
 
@@ -222,6 +223,15 @@ sub history_models(Bool :$force) is export {
     }
 
     @HISTORY_MODELS;
+}
+
+
+sub system_users(Bool :$force) is export {
+    return @USERS if @USERS && !$force;
+
+    @USERS = |(from-json client.get('/users', ('page=1', 'page_size=100')))<results>>><username>;
+
+    @USERS;
 }
 
 

@@ -46,17 +46,16 @@ class Command {
     method actions { ACTIONS }
     method qualified_actions { QUALIFIED_ACTIONS }
 
+
     method contextual_completions(Str $line) {
         my @out;
 
-        if $line ~~ /'revisions ' .* '=' $/ {
-            for history_models() -> $m {
-                @out.push($line ~ $m);
-            }
-        }
+        @out.append(history_models) if $line ~~ /'revisions ' .* '=' $/;
+        @out.append(system_users) if $line ~~ /'revisions ' .* ';' $/;
 
-        @out;
+        @out.map: { $line ~ $_ };
     }
+
 
     my constant ALIAS = {
         p => 'page',
