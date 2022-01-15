@@ -50,8 +50,12 @@ class Command {
     method contextual_completions(Str $line) {
         my @out;
 
-        @out.append(history_models) if $line ~~ /'revisions ' .* '=' $/;
-        @out.append(system_users) if $line ~~ /'revisions ' .* ';' $/;
+        @out.append(history_models) if $line ~~ /'revisions' \s+ .* '=' $/;
+        @out.append(system_users) if $line ~~ /'revisions' \s+ .* ';' $/;
+
+        @out.append(repo_codes) if $line ~~ /^ 'groups' ('.' \S+)? \s+ $/;
+        @out.append(system_users) if $line ~~ /^ 'groups.add' \s+ \w+ \s+ \d+ \s+ $/;
+        @out.append(system_users) if $line ~~ /^ 'groups.remove' \s+ \w+ \s+ \d+ \s+ $/;
 
         @out.map: { $line ~ $_ };
     }
@@ -962,12 +966,14 @@ class Command {
         }
 
         if $!first {
-            my $repo = from-json(client.get("/repositories/$!first"));
+            my $repo_id = $!first.Int.so ?? $!first !! repo_map($!first);
+
+            my $repo = from-json(client.get("/repositories/$repo_id"));
             if $repo<error> {
                 return pretty to-json $repo
             }
 
-            my $groups = from-json(extract_uris client.get("/repositories/$!first/groups"));
+            my $groups = from-json(extract_uris client.get("/repositories/$repo_id/groups"));
             if $groups<error> {
                 return pretty to-json $groups
             }
@@ -1008,7 +1014,7 @@ class Command {
                  |(await (start { render-group($groups, $_) } for ^$groups))).join("\n");
             }
         } else {
-            "Give a repo id like this:\n> groups 2"
+            "Give a repo id or code like this:\n> groups 2\n> groups REPO"
         }
     }
 

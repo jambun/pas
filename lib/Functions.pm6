@@ -32,6 +32,7 @@ my @ENDPOINTS = [];
 my @TAB_TARGETS;
 my @HISTORY_MODELS;
 my @USERS;
+my %REPO_MAP;
 
 my @SCHEDULES = [];
 
@@ -232,6 +233,20 @@ sub system_users(Bool :$force) is export {
     @USERS = |(from-json client.get('/users', ('page=1', 'page_size=100')))<results>>><username>;
 
     @USERS;
+}
+
+
+sub repo_codes(Bool :$force) is export {
+    repo_map(:$force).keys;
+}
+
+
+sub repo_map(Str $code?, Bool :$force) is export {
+    if $force || !%REPO_MAP {
+        %REPO_MAP = |(from-json client.get('/repositories')).map: { $_<repo_code> => $_<uri>.split('/')[*-1] };
+    }
+
+    $code ?? %REPO_MAP{$code} !! %REPO_MAP;
 }
 
 
