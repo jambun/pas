@@ -493,7 +493,7 @@ class Command {
                 client.delete_session($!first);
             } else {
                 my $out = client.switch_to_session($!first);
-                load_endpoints(:force);
+                clear_session_state;
                 $out;
             }
         } else {

@@ -311,6 +311,20 @@ sub enums(Bool :$reload, Str :$name) is export {
 }
 
 
+sub clear_session_state() is export {
+    $SCHEMAS = Empty;
+    $SCHEMAS_PARSED = Empty;
+    $ENUMS = Empty;
+    @LAST_URIS = Empty;
+    @ENDPOINTS = Empty;
+    @TAB_TARGETS = Empty;
+    @HISTORY_MODELS = Empty;
+    @HISTORY_USERS = Empty;
+    @USERS = Empty;
+    %REPO_MAP = Empty;
+}
+
+
 sub tmp_file is export {
     store.path(TMP_FILE);
 }
