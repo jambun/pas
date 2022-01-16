@@ -51,9 +51,9 @@ class Command {
         my @out;
 
         @out.append(history_models) if $line ~~ /'revisions' \s+ .* '=' $/;
-        @out.append(system_users) if $line ~~ /'revisions' \s+ .* ';' $/;
+        @out.append(history_makers) if $line ~~ /'revisions' \s+ .* ';' $/;
 
-        @out.append(repo_codes) if $line ~~ /^ 'groups' ('.' \S+)? \s+ $/;
+        @out.append(repo_codes) if $line ~~ /^ 'groups' ( '.' \S+ )? \s+ $/;
         @out.append(system_users) if $line ~~ /^ 'groups.add' \s+ \w+ \s+ \d+ \s+ $/;
         @out.append(system_users) if $line ~~ /^ 'groups.remove' \s+ \w+ \s+ \d+ \s+ $/;
 

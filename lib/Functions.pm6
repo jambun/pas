@@ -31,6 +31,7 @@ my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
 my @HISTORY_MODELS;
+my @HISTORY_USERS;
 my @USERS;
 my %REPO_MAP;
 
@@ -233,6 +234,15 @@ sub system_users(Bool :$force) is export {
     @USERS = |(from-json client.get('/users', ('page=1', 'page_size=100')))<results>>><username>;
 
     @USERS;
+}
+
+
+sub history_makers(Bool :$force) is export {
+    return @HISTORY_USERS if @HISTORY_USERS && !$force;
+
+    @HISTORY_USERS = |(from-json client.get('/history/editors'));
+
+    @HISTORY_USERS;
 }
 
 
