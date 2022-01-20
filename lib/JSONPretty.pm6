@@ -91,6 +91,7 @@ class PrettyActions {
 
           sub diff_strip(Bool :$reverse) {
               my $found_depth = 0;
+              my Bool $want_key = False;
               my @ix = %lines.keys.sort;
               @ix = @ix.reverse if $reverse;
               for @ix -> $ix {
@@ -101,10 +102,13 @@ class PrettyActions {
                   if $ss ne $line {
                       $found_depth = $depth;
                       %out_lines{$ix} = $line;
+                      $want_key = True;
+                  } elsif $depth > $found_depth {
+                      $want_key = False;
                   } elsif $depth < $found_depth {
                       $found_depth = $depth;
                       %out_lines{$ix} = $line;
-                  } elsif $reverse && $depth == $found_depth && $ss ~~ /^ \s* '"' \w+ '":' $/ {
+                  } elsif $reverse && $want_key && $depth == $found_depth && $ss ~~ /^ \s* '"' \w+ '":' $/ {
                       $found_depth = $depth - 1;
                       %out_lines{$ix} = $line;
                   }
