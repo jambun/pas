@@ -72,11 +72,11 @@ sub cmd_prompt is export {
 }
 
 
-sub pretty($json is copy, Bool :$mark_diff, Str :$select) is export {
+sub pretty($json is copy, Bool :$mark_diff, Bool :$inline, Str :$select) is export {
     return $json if config.attr<properties><compact>;
 
     if $json ~~ /^<[\{\[]>/ {
-	      JSONPretty::prettify($json, :indent(config.attr<properties><indent>), :mark_diff($mark_diff), :select($select));
+	      JSONPretty::prettify($json, :indent(config.attr<properties><indent>), :mark_diff($mark_diff), :inline($inline), :select($select));
     } elsif $json ~~ /^<[\<]>/ {
 	      XMLPretty::prettify($json, config.attr<properties><indent>);
     } else {
@@ -279,9 +279,8 @@ sub load_endpoints(Bool :$force) is export {
 
 
 sub schemas(Bool :$reload, Str :$name) is export {
-     if $reload || !$SCHEMAS {
+     if $reload || !$SCHEMAS_PARSED {
 	       my $schemas = client.get(SCHEMAS_URI);
-	       $SCHEMAS = pretty $schemas;
 	       $SCHEMAS_PARSED = from-json $schemas;
      }
 

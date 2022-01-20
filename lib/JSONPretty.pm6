@@ -50,19 +50,30 @@ grammar GrammarWithDiff is Grammar {
 class PrettyActions {
     has Int $.step = 2;
     has Str $.select;
+    has Bool $.diff_only = False;
 
     method indent(Str $json) {
     	my Int $indent = 0;
 	    my Str $out = '';
       my Int $selected = 0;
       my $sel = $!select;
+
 	    for $json.split("\n")>>.trim -> $line {
 	        next unless colorstrip($line) ~~ /./;
 
-	        $indent -= $!step if colorstrip($line) ~~ /^  <[ \} \] ]> /;
+          if colorstrip($line) ~~ /^  <[ \} \] ]> / {
+	            $indent -= $!step;
+          }
+
           $out ~= ' ' x ($indent - $selected) ~ $line ~ "\n" if !$!select || $selected;
-	        $indent -= $!step if colorstrip($line) eq '[],';
-	        $indent += $!step if colorstrip($line) ~~ /^  <[ \{ \[ ]> /;
+
+          if colorstrip($line) eq '[],' {
+	            $indent -= $!step;
+          }
+
+          if colorstrip($line) ~~ /^  <[ \{ \[ ]> / {
+	            $indent += $!step;
+          }
 
           if $!select {
               if $line ~~ /^ \s* '"' $sel '":'/ {
@@ -73,11 +84,44 @@ class PrettyActions {
           }
 	    }
       $out ~~ s/ ',' \n $/\n/ if $!select;
+
+      if $!diff_only {
+          my %lines{Int} = $out.split("\n").pairs;
+          my %out_lines{Int};
+
+          sub diff_strip(Bool :$reverse) {
+              my $found_depth = 0;
+              my @ix = %lines.keys.sort;
+              @ix = @ix.reverse if $reverse;
+              for @ix -> $ix {
+                  my $line = %lines{$ix};
+                  my $ss = colorstrip($line);
+                  $ss ~~ /^ (\s*)/;
+                  my $depth = $0.Str.chars;
+                  if $ss ne $line {
+                      $found_depth = $depth;
+                      %out_lines{$ix} = $line;
+                  } elsif $depth < $found_depth {
+                      $found_depth = $depth;
+                      %out_lines{$ix} = $line;
+                  } elsif $reverse && $depth == $found_depth && $ss ~~ /^ \s* '"' \w+ '":' $/ {
+                      $found_depth = $depth - 1;
+                      %out_lines{$ix} = $line;
+                  }
+              }
+          }
+
+          diff_strip();
+          diff_strip(:reverse);
+
+          $out = %out_lines.keys.sort.map({ %out_lines{$_}}).join("\n");
+      }
+
 	    $out;
     }
 
     method ansi($text, $fmt) {
-        ($text.split("\n").map: { colored($_, $fmt) }).join("\n");
+        ($text.split("\n").map: { $_ ?? colored($_, $fmt) !! $_ }).join("\n");
     }
 
     method TOP ($/)        { make self.indent($<value>.made)                  }
@@ -105,9 +149,9 @@ class PrettyActions {
 }
 
 
-our sub prettify($json, Int :$indent, Bool :$mark_diff, Str :$select) {
+our sub prettify($json, Int :$indent, Bool :$mark_diff, Str :$select, Bool :$inline) {
     if $mark_diff {
-        GrammarWithDiff.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
+        GrammarWithDiff.parse($json, :actions(PrettyActions.new(step => $indent, select => $select, :diff_only(!$inline)))).made;
     } else {
         Grammar.parse($json, :actions(PrettyActions.new(step => $indent, select => $select))).made;
     }

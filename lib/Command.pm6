@@ -332,7 +332,7 @@ class Command {
 
 
     method revisions {
-        # /uri revisions [rev[/[diff]]] | ( [+cnt] ( [;user] [-date] | [,rev] ) )
+        # /uri revisions [rev[/[/][diff]]] | ( [+cnt] ( [;user] [-date] | [,rev] ) )
         # revisions ( [+cnt] [=model] [;user] [-date] )
         # /uri revisions.restore rev
 
@@ -354,17 +354,19 @@ class Command {
         my @args;
         my Int $revision;
         my Int $diff;
+        my Bool $inline;
 
         @!args.push($!first) unless $!uri;
 
         for @!args -> $a {
-            if $a ~~ /^ (\d+) (\/ ( \d* ) )? $/ {
+            if $a ~~ /^ (\d+) (\/ (\/)? ( \d* ) )? $/ {
                 return 'Makes no sense to provide a revision without a uri' unless $!uri;
                 $revision = $0.Int;
                 $huri ~= "/$revision";
                 if $1 {
-                    $diff = $1[0].Int || ($revision.Int - 1);
+                    $diff = $1[1].Int || ($revision.Int - 1);
                     @args.push("diff=$diff");
+                    $inline = $1[0].so;
                 }
             } elsif $a ~~ /^ \+ ( \d+ ) $/ {
                 @args.push("limit={$0.Str}");
@@ -408,7 +410,7 @@ class Command {
             my $out = render_revisions($h<data>.values);
             if $diff {
                 $out ~= 'Diff with revision .v' ~ ansi($diff.Str, 'bold magenta') ~ ":\n\n";
-                $out ~= pretty($history, :mark_diff, :select('inline_diff'));
+                $out ~= pretty($history, :mark_diff, :select('inline_diff'), :$inline);
             } else {
                 $out ~= pretty($history, :select('json'));
             }
@@ -611,7 +613,7 @@ class Command {
             my $out = "\n";
             for @endpoints -> $ep {
                 $out ~= ansi($ep{'method'}.join(' ').uc, 'bold green') ~ ' ' ~ ansi($ep{'uri'}, 'bold');
-                if $ep{'permissions'}.elems > 0 {
+                if $ep{'permissions'}.WHAT ~~ Array && $ep{'permissions'}.elems > 0 {
                     $out ~= '  [' ~ ansi($ep{'permissions'}.join(' '), 'red') ~ ']';
                 }
                 $out ~= "\n" ~ ansi($ep{'description'}, 'yellow');
@@ -1138,6 +1140,7 @@ sub shell_help {
        .restore attempt to restore revision n
        n        show revision n
        n/[m]    show diff between n and m (default n - 1)
+       n//[m]   show inline diff between n and m (default n - 1)
        +cnt     show cnt revisions in list (default 20)
        ;user    only show revisions by user
        -date    only show revisions at or before date
