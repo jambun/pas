@@ -47,10 +47,10 @@ class Command {
     method qualified_actions { QUALIFIED_ACTIONS }
 
 
-    method contextual_completions(Str $line) {
+    method contextual_completions(Str $line is copy) {
         my @out;
 
-        @out.append(history_models) if $line ~~ /'revisions' \s+ .* '=' $/;
+        @out.append(history_models($1.Str)) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
         @out.append(history_makers) if $line ~~ /'revisions' \s+ .* ';' $/;
 
         @out.append(repo_codes) if $line ~~ /^ 'groups' ( '.' \S+ )? \s+ $/;

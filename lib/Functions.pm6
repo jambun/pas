@@ -217,14 +217,14 @@ sub extract_from_schema($text) is export {
 }
 
 
-sub history_models(Bool :$force) is export {
+sub history_models(Str $match = '', Bool :$force) is export {
     return @HISTORY_MODELS if @HISTORY_MODELS && !$force;
 
     if load_endpoints.grep('/history') {
         @HISTORY_MODELS = |(from-json client.get('/history/models')).map({ $_ ~~ s:g/(<[A..Z]>)/{'_' ~ $0.Str.lc}/; $_.substr(1)});
     }
 
-    @HISTORY_MODELS;
+    $match ?? @HISTORY_MODELS.grep(/^ $match/) !! @HISTORY_MODELS;
 }
 
 
