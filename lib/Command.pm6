@@ -50,14 +50,18 @@ class Command {
     method contextual_completions(Str $line is copy) {
         my @out;
 
-        @out.append(history_models($1.Str)) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
-        @out.append(history_makers) if $line ~~ /'revisions' \s+ .* ';' $/;
+        sub build_cc($line, $prefix, @list) {
+            @out.append(@list.grep(/^ $prefix/).map: { $line ~ $_});
+        }
 
-        @out.append(repo_codes) if $line ~~ /^ 'groups' ( '.' \S+ )? \s+ $/;
-        @out.append(system_users) if $line ~~ /^ 'groups.add' \s+ \w+ \s+ \d+ \s+ $/;
-        @out.append(system_users) if $line ~~ /^ 'groups.remove' \s+ \w+ \s+ \d+ \s+ $/;
+        build_cc($line, $1.Str, history_models) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
+        build_cc($line, $1.Str, history_makers) if $line ~~ s/('revisions' \s+ .* ';') (\w*) $/$0/;
 
-        @out.map: { $line ~ $_ };
+        build_cc($line, $1.Str, repo_codes) if $line ~~ s/^ ('groups' ( '.' \S+ )? \s+) (\w*) $/$0/;
+        build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.add' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
+        build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.remove' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
+
+        @out;
     }
 
 
