@@ -377,7 +377,13 @@ class Command {
             } elsif $a ~~ /^ \; ( \S+ ) $/ {
                 @args.push("user={$0.Str}");
             } elsif $a ~~ /^ \- ( \S+ ) $/ {
-                @args.push("at={$0.Str}");
+                my $d = $0.Str;
+                if $d ~~ /^ (\d+)d $/ {
+                    my $days = $0.Int;
+                    @args.push('at=' ~ Date.today.earlier(:days($days)).Str);
+                } else {
+                  @args.push("at={$d}");
+                }
             } elsif $a ~~ /^ \, ( \d+ ) $/ {
                 return 'Makes no sense to provide a start revision' if $revision;
                 $huri ~= $0.Str;
@@ -1182,6 +1188,7 @@ sub shell_help {
        =model   only show revisions for model
        ;user    only show revisions by user
        -date    only show revisions at or before date
+       -[n]d    only show revisions at n days ago
       session   show sessions or switch to a session
        .delete  delete a session
       schedules show current schedules
