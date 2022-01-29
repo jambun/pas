@@ -61,6 +61,8 @@ class Command {
         build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.add' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.remove' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
 
+        build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
+
         @out;
     }
 
