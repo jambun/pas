@@ -32,6 +32,7 @@ my @ENDPOINTS = [];
 my @TAB_TARGETS;
 my @HISTORY_MODELS;
 my @HISTORY_USERS;
+my %IMPORT_TYPES;
 my @USERS;
 my %REPO_MAP;
 
@@ -202,6 +203,7 @@ sub random_truth {
 
 
 sub extract_uris($text) is export {
+    return $text unless $text.WHAT ~~ Str;
     $text ~~ m:g/ '"' ( '/' <-[\\ \s "]>+ )  '"'  /;
     @LAST_URIS = ($/.map: { $_[0].Str }).sort.unique;
     $text;
@@ -257,6 +259,18 @@ sub repo_map(Str $code?, Bool :$force) is export {
     }
 
     $code ?? %REPO_MAP{$code} !! %REPO_MAP;
+}
+
+
+sub import_types(Str $repo_code, Bool :$force) is export {
+    return %IMPORT_TYPES{$repo_code} if %IMPORT_TYPES{$repo_code} && !$force;
+
+    my $repo = repo_map($repo_code);
+    return ["Unknown repository!"] unless $repo;
+
+    %IMPORT_TYPES{$repo_code} = |((from-json client.get("/repositories/$repo/jobs/import_types")).map: { $_<name> });
+
+    %IMPORT_TYPES{$repo_code};
 }
 
 
@@ -321,6 +335,7 @@ sub clear_session_state() is export {
     @HISTORY_USERS = Empty;
     @USERS = Empty;
     %REPO_MAP = Empty;
+    %IMPORT_TYPES = Empty;
 }
 
 
@@ -385,4 +400,19 @@ sub endpoint_for_uri($uri) is export {
         };
 
         @probably ?? @probably.first !! @maybe.first
+}
+
+
+sub import_job($type, @files) is export {
+    qq:to/END/;
+      \{
+        "job_type": "import_job",
+        "jsonmodel_type": "job",
+        "job": \{
+	        "jsonmodel_type": "import_job",
+	        "filenames": [ "{(@files.map: { .IO.basename }).join('", "')}" ],
+	        "import_type": "{$type}"
+        }
+      }
+    END
 }

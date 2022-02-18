@@ -27,7 +27,7 @@ class Command {
     has Bool $.cancelled;
 
 
-    my constant ACTIONS = <show update create edit stub revisions post delete
+    my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
                            session who asam doc
@@ -60,6 +60,9 @@ class Command {
         build_cc($line, $1.Str, repo_codes) if $line ~~ s/^ ('groups' ( '.' \S+ )? \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.add' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, system_users) if $line ~~ s/^ ('groups.remove' \s+ \w+ \s+ \d+ \s+) (\w*) $/$0/;
+
+        build_cc($line, $1.Str, repo_codes) if $line ~~ s/^ ('import' \s+) (\w*) $/$0/;
+        build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ (\S+) \s+) (\w*) $/$0/;
 
         build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
 
@@ -95,12 +98,13 @@ class Command {
         rule  pairitem      { <pair> }
         token pair          { <key=.refpath> '=' <value> }
         token refpath       { <[\w\.\d\[\]]>+ }
-        token action        { <arg> <qualifier>? }
-        token qualifier     { '.' <arg> }
+        token action        { <keyword> <qualifier>? }
+        token qualifier     { '.' <keyword> }
+        token keyword       { <[\w\d\_]>+ }
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d\=\-\_\/\+\,\;]>+ }
+        token arg           { <[\w\d\=\-\_\/\+\,\;\.]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -131,8 +135,8 @@ class Command {
                                                                                $/<value><singlequoted>[0] ||
                                                                                $/<value><doublequoted>[0]).Str) }
 
-        method action($/)     { $!cmd.action = $/<arg>.Str; }
-        method qualifier($/)  { $!cmd.qualifier = $/<arg>.Str; }
+        method action($/)     { $!cmd.action = $/<keyword>.Str; }
+        method qualifier($/)  { $!cmd.qualifier = $/<keyword>.Str; }
         method argvalue($/)   { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
@@ -334,6 +338,46 @@ class Command {
 
     method delete {
         pretty extract_uris client.delete($!uri);
+    }
+
+
+    method import {
+        return "You did it wrong!\nDo it like this:\n  > import repo_code import_type files+" unless $!first && @!args > 1;
+
+        my $repo_code = $!first;
+
+        my $repo_id = repo_map($repo_code);
+        return "Unknown repository '{$!first}'!" unless $repo_id;
+
+        my $type = @!args.shift;
+        return "Unknown import type '{$type}' for repository '{$repo_code}'!" unless import_types($repo_code).grep($type);
+
+        my @files = @!args;
+        my %parts;
+
+        my @headers =
+            'Content-Type' => 'text/plain',
+            'Content-Transfer-Encoding' => 'binary';
+
+        for 0..^@files -> $i {
+            my $file = @files[$i];
+            return "Can't find file: $file" unless $file.IO.e;
+            %parts{"files[{$i}]"} = [$file, $file.IO.basename, |@headers];
+        }
+
+        my $uri = "/repositories/{$repo_id}/jobs_with_files";
+        my $import_job = import_job($type, @files);
+
+        %parts{'job'} = $import_job;
+
+        print "Uri: {$uri}\nJob:\n{$import_job}\nReady to import? (y/N) ";
+        my $resp = get;
+
+        if $resp eq 'y' {
+            pretty extract_uris client.multi_part($uri, [], %parts);
+        } else {
+            'Chicken';
+        }
     }
 
 
@@ -1185,6 +1229,10 @@ sub shell_help {
        .tr      include translations for values
        [str]    show enumerations that match str
        [val]    value to add or remove
+      import    import data
+       repo     repo code to import into
+       type     import type
+       files+   list of file paths
       revisions show revision history
        +cnt     show cnt revisions in list (default 20)
        =model   only show revisions for model

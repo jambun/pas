@@ -31,30 +31,34 @@ class Pas::ASClient {
         HTTP::Request.new(:DELETE($url), |%header);
     }
 
-    method !multipart_request($url, %header, %files is copy) {
-        for %files.kv -> $name, $file {
-            my ($filename, $type) = $file.split('::');
-            unless $filename.IO.e {
-                self.log.blurt("File not found: $filename");
-                next;
-            }
-            unless $type {
-                if $filename ~~ /\.(<-[.]>+)$/ {
-                    $type = 'text/' ~ $0.Str;
+    method !multipart_request($url, %header, %files is copy, Bool :$raw?) {
+        unless $raw {
+            for %files.kv -> $name, $file {
+                my ($filename, $type) = $file.split('::');
+                unless $filename.IO.e {
+                    self.log.blurt("File not found: $filename");
+                    next;
                 }
+                unless $type {
+                    if $filename ~~ /\.(<-[.]>+)$/ {
+                        $type = 'text/' ~ $0.Str;
+                    }
+                }
+                $type ||= 'text/plain';
+                my %h = 'Content-Type' => $type;
+                %files{$name} = [$file, $file, |%h];
             }
-            $type ||= 'text/plain';
-            my %h = 'Content-Type' => $type;
-            %files{$name} = [$file, $file, |%h];
         }
+
         my $request = HTTP::Request.new(:POST($url), |%header);
         $request.add-form-data(%files, :multipart);
         $request;
     }
     
-    method !handle_request($url, %header, $body, %files = {}, Bool :$delete, Int :$timeout?) {
+    method !handle_request($url, %header, $body, %files = {}, Bool :$delete, Int :$timeout?, :%parts?) {
         my $intime = now;
         my $request = $delete ?? self!delete_request($url, %header) !!
+                                 %parts ?? self!multipart_request($url, %header, %parts, :raw) !!
                                  %files ?? self!multipart_request($url, %header, %files) !!
                                            $body ?? self!post_request($url, %header, $body) !!
                                                     self!get_request($url, %header);
@@ -73,7 +77,7 @@ class Pas::ASClient {
         $resp;
     }
     
-    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?, Int :$timeout?) {
+    method !request($uri, @pairs, $body?, Bool :$delete, Bool :$no_session, Str :$host?, Int :$timeout?, :%parts?) {
         my $url = self.build_url($uri, @pairs, :$host);
         my %header = 'X-ArchivesSpace-Priority' => 'high';
         %header<X-Archivesspace-Session> = $!config.attr<token> if $!config.attr<token> && !$no_session && !$!config.attr<properties><anon>;
@@ -83,7 +87,7 @@ class Pas::ASClient {
 
         my $response;
         try {
-            $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout) || die "Timed out";
+            $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout, :%parts) || die "Timed out";
 
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -138,6 +142,11 @@ class Pas::ASClient {
 
     method post($uri, @pairs, $body) {
         self!request($uri, @pairs, $body);
+    }
+
+
+    method multi_part($uri, @pairs, %parts) {
+        self!request($uri, @pairs, :%parts);
     }
 
 
