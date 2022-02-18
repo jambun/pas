@@ -110,12 +110,12 @@ method start {
 	    my %selected = @uris[$yix];
 	    given $c {
 		when ' ' {
-		    page(pretty client.get(%selected<uri>,
-					   to_resolve_params(@resolves)));
+        page(pretty client.get(%selected<uri>,
+                               to_resolve_params(@resolves)));
 		}
 		when "\r" {
-		    page(stripped pretty client.get(@uris[$y-$y_offset]<uri>,
-						    to_resolve_params(@resolves)));
+        page(stripped pretty client.get(%selected<uri>,
+                                        to_resolve_params(@resolves)));
 		}
 		when 'e' {
 		    plot_edit(%selected<uri>, @resolves) || ($message = "No record for $uri");
