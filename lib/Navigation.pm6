@@ -392,7 +392,7 @@ sub stripped($t) {
     @tl = map {
 	      my $line = $_;
 	      if $line.chars > $term_cols-2 {
-	          my $left = ($line.index('":') + 1) || $line.index('"') || 10;
+	          my $left = $line.index(':') || $line.index('"') || 10;
 	          my $offset = $term_cols;
 	          while $offset < $line.chars {
 		            my $off = $line.substr(0, $offset).rindex(' ') || $offset;
