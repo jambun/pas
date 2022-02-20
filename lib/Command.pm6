@@ -30,7 +30,7 @@ class Command {
     my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
-                           session who asam doc
+                           session who asam doc assb
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
@@ -386,9 +386,7 @@ class Command {
         # revisions ( [+cnt] [=model] [;user] [-date] )
         # /uri revisions.restore rev
 
-        unless load_endpoints.grep('/history') {
-            return 'Revision histories unavailable'
-        }
+        return unless check_endpoint('/history', 'Revision histories unavailable. Install as_history plugin.');
 
         my $huri = '/history';
 
@@ -646,19 +644,25 @@ class Command {
 
 
     method endpoints {
+        return unless check_endpoint('/endpoints', 'Endpoints unavailable. Install pas_endpoints plugin.');
+
+        my @ep = load_endpoints(:force($!qualifier eq 'reload'));
+
         if $!first {
             my $f = $!first;
-            my @uris = load_endpoints(:force($!qualifier eq 'reload')).grep(/$f/);
+            my @uris = @ep.grep(/$f/);
             return 'No endpoints match: ' ~ $!first unless @uris;
             last_uris(@uris);
             @uris.join("\n");
         } else {
-            load_endpoints(:force($!qualifier eq 'reload')).join("\n");
+            @ep.join("\n");
         }
     }
 
 
     method doc {
+        return unless check_endpoint('/endpoints', 'Endpoint documentation unavailable. Install pas_endpoints plugin.');
+
         my @u = $!uri.split('/');
         my $endpoint = endpoint_for_uri($!uri);
 
@@ -850,9 +854,7 @@ class Command {
 
 
     method asam {
-        unless load_endpoints.grep('/plugins/activity_monitor') {
-            return 'Activity monitor unavailable. Install asam plugin.'
-        }
+        return unless check_endpoint('/plugins/activity_monitor', 'Acitivity monitor unavailable. Install asam plugin.');
 
         if $!qualifier ~~ <reset> && !$!first.Int {
             return "Give a status number to reset like this:\n  > asam.reset 2";
@@ -936,6 +938,13 @@ class Command {
                 }
             }.join("\n");
         }
+    }
+
+
+    method assb {
+        return unless check_endpoint('/assb_admin', 'Sail boats unavailable. Install assb plugin.');
+
+        'assb';
     }
 
 

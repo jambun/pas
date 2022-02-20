@@ -278,8 +278,8 @@ sub load_endpoints(Bool :$force) is export {
     return @ENDPOINTS if @ENDPOINTS && !$force;
 
     my $e = client.get(ENDPOINTS_URI).trim;
-    if $e ~~ /^ <-[{[]> / {
-	      say 'No endpoints endpoint!';
+    if $e ~~ /^ <-[[]> / {
+        logger.blurt("Endpoints unavailable. Install pas_endpoints plugin.");
 	      @TAB_TARGETS = [];
         #	@TAB_TARGETS = |Command.actions;
 	      return [];
@@ -289,6 +289,18 @@ sub load_endpoints(Bool :$force) is export {
     @TAB_TARGETS = |@ENDPOINTS;
     # @TAB_TARGETS = |@ENDPOINTS, |Command.actions;
     @ENDPOINTS;
+}
+
+
+sub check_endpoint($ep, $msg) is export {
+    my @ep = load_endpoints;
+    unless @ep.grep($ep) {
+        if @ep || (from-json client.get($ep))<error> {
+            say $msg;
+            return False;
+        }
+    }
+    True;
 }
 
 
