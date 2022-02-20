@@ -850,6 +850,10 @@ class Command {
 
 
     method asam {
+        unless load_endpoints.grep('/plugins/activity_monitor') {
+            return 'Activity monitor unavailable. Install asam plugin.'
+        }
+
         if $!qualifier ~~ <reset> && !$!first.Int {
             return "Give a status number to reset like this:\n  > asam.reset 2";
         }
