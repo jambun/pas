@@ -37,6 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
+                                      assb.install assb.plugins assb.catalog
                                       schemas.reload enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
@@ -944,7 +945,33 @@ class Command {
     method assb {
         return unless check_endpoint('/assb_admin', 'Sail boats unavailable. Install assb plugin.');
 
-        'assb';
+        sub render-plugin($p, $max = 10) {
+            my $s = max($max - $p<name>.chars + 2, 2);
+            '  ' ~ ansi($p<name>, 'bold') ~ (' ' x $s) ~ ansi($p<display_name>, 'yellow') ~ "\n";
+        }
+
+        if $!qualifier eq 'install' {
+            pretty client.post('/assb_admin/install/' ~ $!first);
+        } elsif $!qualifier eq 'plugins' {
+            my $plugins = (from-json client.get('/assb_admin/config'))<plugins>.sort: { $_<name> };
+            my $max = max(@$plugins.map: { $_<name>.chars });
+            my $out;
+            for @$plugins -> $p {
+                $out ~= render-plugin($p, $max);
+            }
+            $out;
+        } elsif $!qualifier eq 'catalog' {
+            my $cat = (from-json client.get('/assb_admin/catalog'))<plugins>.sort: { $_<name> };
+            $cat = $cat.grep: { $_<name>.lc.contains($!first.lc)} if $!first;
+
+            my $out;
+            for @$cat -> $p {
+                $out ~= render-plugin($p);
+            }
+            $out;
+        } else {
+            pretty client.get('/assb_admin');
+        }
     }
 
 

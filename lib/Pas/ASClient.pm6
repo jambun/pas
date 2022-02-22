@@ -140,7 +140,7 @@ class Pas::ASClient {
     }
     
 
-    method post($uri, @pairs, $body) {
+    method post($uri, @pairs = [], $body = 'nothing') {
         self!request($uri, @pairs, $body);
     }
 
