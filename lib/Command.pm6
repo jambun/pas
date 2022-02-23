@@ -570,9 +570,10 @@ class Command {
                               } else {
                                   $last_url = $v<url>;
                                   my $version = try {
-                                      (from-json client.get('/', :no_session, host => $v<url>, timeout => 1))<archivesSpaceVersion> || 'down'
+                                      my $asv = (from-json client.get('/', :no_session, host => $v<url>, timeout => 1));
+                                      $asv<git_archivesSpaceVersion> || $asv<archivesSpaceVersion> || 'down'
                                   } // 'error';
-                                  my $version_fmt = ansi('%-20s', ($version eq 'down' | 'error') ?? 'white' !! 'bold white');
+                                  my $version_fmt = ansi('%-26s', ($version eq 'down' | 'error') ?? 'white' !! 'bold white');
                                   sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
                                           $ix, $v<user>, $version, $v<url>);
