@@ -37,7 +37,7 @@ class Command {
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
-                                      assb.install assb.plugins assb.catalog
+                                      assb.keys assb.install assb.plugins assb.catalog
                                       schemas.reload enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
@@ -66,6 +66,9 @@ class Command {
         build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ (\S+) \s+) (\w*) $/$0/;
 
         build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
+
+        build_cc($line, '', <list request install remove switch>) if $line ~~ /^ ('assb.keys' \s+) $/;
+        build_cc($line, $1.Str, assb_cat_names) if $line ~~ s/^ ('assb.install' \s+) (\w*) $/$0/;
 
         @out;
     }
@@ -105,7 +108,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d\=\-\_\/\+\,\;\.]>+ }
+        token arg           { <[\w\d\=\-\_\/\+\,\;\.\@]>+ }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
@@ -946,28 +949,75 @@ class Command {
     method assb {
         return unless check_endpoint('/assb_admin', 'Sail boats unavailable. Install assb plugin.');
 
-        sub render-plugin($p, $max = 10) {
+        sub render-plugin($p, $max, $pending = False) {
+            logger.blurt('pppp ' ~ $pending.perl);
             my $s = max($max - $p<name>.chars + 2, 2);
-            '  ' ~ ansi($p<name>, 'bold') ~ (' ' x $s) ~ ansi($p<display_name>, 'yellow') ~ "\n";
+            '  ' ~ ansi($p<name>, 'bold') ~ (' ' x $s) ~ ansi($p<display_name>, 'yellow') ~ ($pending ?? " [{%$pending<mode>}]" !! '') ~ "\n";
         }
 
-        if $!qualifier eq 'install' {
+        if $!qualifier eq 'keys' {
+            my $action = $!first || 'list';
+            if $action eq 'list' {
+                my $keys = from-json client.get('/assb_admin/installed_keys', ["exclude_current=true"]);
+                if $keys.WHAT ~~ Hash {
+                    'No keys. Request or install a key to use ASSB.';
+                } else {
+                    last_uris($keys.map:{ 'assb.keys switch ' ~ $_});
+                    my $current_key = (from-json client.get('/assb_admin'))<assb_key>;
+                    "\nCurrent: " ~ ansi($current_key, 'bold') ~ "\n\nOthers:  " ~
+                    $keys.join("\n         ") ~ "\n\n";
+                }
+            } elsif $action eq 'switch' {
+                my $key = @!args.first;
+                if $key {
+                    clear_last_uris();
+                    pretty client.post("/assb_admin/switch_key/$key");
+                } else {
+                    'Please provide a key to swtich to.'
+                }
+            } elsif $action eq 'request' {
+                my ($email, $code) = @!args;
+                if $email {
+                    if $email ~~ /^ \S+ \@ \S+ $/ {
+                        if $code {
+                            pretty client.post('/assb_admin/request_key', ["email=$email", "code=$code"]);
+                        } else {
+                            my $resp = from-json client.post('/assb_admin/request_key', ["email=$email"]);
+                            if $resp<error> {
+                                pretty to-json $resp;
+                            } else {
+                                "A confirmation code has been sent to $email. Please repeat this action with that code." ~
+                                "\n  For example:\n    assb.keys request $email 123456";
+                            }
+                        }
+                    } else {
+                        "That doesn't look much like an email address, so yeah.";
+                    }
+                } else {
+                    "Please provide an email address to send a confirmation code to."
+                }
+
+            }
+        } elsif $!qualifier eq 'install' {
             pretty client.post('/assb_admin/install/' ~ $!first);
         } elsif $!qualifier eq 'plugins' {
-            my $plugins = (from-json client.get('/assb_admin/config'))<plugins>.sort: { $_<name> };
+            my $cfg = from-json client.get('/assb_admin/config');
+            my $plugins = $cfg<plugins>.sort: { $_<name> };
+            my $pending = $cfg<pending_restart>;
             my $max = max(@$plugins.map: { $_<name>.chars });
             my $out;
             for @$plugins -> $p {
-                $out ~= render-plugin($p, $max);
+                $out ~= render-plugin($p, $max, |$pending.grep: { $_<ext> eq $p<name>}.first);
             }
             $out;
         } elsif $!qualifier eq 'catalog' {
             my $cat = (from-json client.get('/assb_admin/catalog'))<plugins>.sort: { $_<name> };
             $cat = $cat.grep: { $_<name>.lc.contains($!first.lc)} if $!first;
+            my $max = max(@$cat.map: { $_<name>.chars });
 
             my $out;
             for @$cat -> $p {
-                $out ~= render-plugin($p);
+                $out ~= render-plugin($p, $max);
             }
             $out;
         } else {

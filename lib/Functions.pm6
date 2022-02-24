@@ -35,10 +35,12 @@ my @HISTORY_USERS;
 my %IMPORT_TYPES;
 my @USERS;
 my %REPO_MAP;
+my @ASSB_CAT;
 
 my @SCHEDULES = [];
 
 sub last_uris(@uris = ()) is export { @LAST_URIS = @uris if @uris; @LAST_URIS }
+sub clear_last_uris() is export { @LAST_URIS = Empty }
 sub tab_targets is export { @TAB_TARGETS }
 #sub tab_targets is export { |last_uris, |Command.actions, |@TAB_TARGETS }
 
@@ -274,6 +276,20 @@ sub import_types(Str $repo_code, Bool :$force) is export {
 }
 
 
+sub assb_cat_names(Bool :$force) is export {
+    (assb_catalog(:$force).map: { $_<name> }).sort;
+}
+
+
+sub assb_catalog(Bool :$force) is export {
+    if $force || !@ASSB_CAT {
+        @ASSB_CAT = |((from-json client.get('/assb_admin/catalog'))<plugins>);
+    }
+
+    @ASSB_CAT;
+}
+
+
 sub load_endpoints(Bool :$force) is export {
     return @ENDPOINTS if @ENDPOINTS && !$force;
 
@@ -348,6 +364,7 @@ sub clear_session_state() is export {
     @USERS = Empty;
     %REPO_MAP = Empty;
     %IMPORT_TYPES = Empty;
+    @ASSB_CAT = Empty;
 }
 
 
