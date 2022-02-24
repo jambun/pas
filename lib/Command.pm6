@@ -1003,7 +1003,7 @@ class Command {
         } elsif $!qualifier eq 'plugins' {
             my $cfg = from-json client.get('/assb_admin/config');
             my $plugins = $cfg<plugins>.sort: { $_<name> };
-            my $pending = $cfg<pending_restart>;
+            my $pending = $cfg<pending_restart> || {};
             my $max = max(@$plugins.map: { $_<name>.chars });
             my $out;
             for @$plugins -> $p {
