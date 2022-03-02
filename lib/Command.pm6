@@ -108,7 +108,7 @@ class Command {
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
         token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
-        token arg           { <[\w\d\=\-\_\/\+\,\;\.\@]>+ }
+        token arg           { <[\w\d\=\-\_\/\+\,\;\.]> \S* }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
         token singlequoted  { "'" ~ "'" (<-[']>*) }
