@@ -52,7 +52,7 @@ class Command {
         my @out;
 
         sub build_cc($line, $prefix, @list) {
-            @out.append(@list.grep(/^ $prefix/).map: { $line ~ $_});
+            @out.append(@list.grep(/^ $prefix/).map: { my $c = $_ ~~ /\s/ ?? "'$_'" !! $_; $line ~ $c});
         }
 
         build_cc($line, $1.Str, history_models) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
