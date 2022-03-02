@@ -1358,6 +1358,7 @@ sub shell_help {
        .[prop]  show or set prop
       history   show command history
        [n]      show the last n commands 
+      assb      sail boats
       help      this
        .list    list help topics
        .write   write help for topic
