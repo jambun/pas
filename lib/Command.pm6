@@ -477,8 +477,13 @@ class Command {
             my $h = from-json $history;
             my $r = $h<versions>;
             if $r {
-                last_uris($r.map: {$_<_resolved><uri> ~ ' revisions ' ~ $_<_resolved><revision>});
-                render_revisions($r.map: { $_<_resolved> });
+                if $r.WHAT ~~ Array {
+                    $r = $r.map: { $_<_resolved> };
+                } else {
+                    $r = ($r.values.sort: { $_<user_mtime> }).reverse;
+                }
+                last_uris(@$r.map: {$_<uri> ~ ' revisions ' ~ $_<revision>});
+                render_revisions(@$r);
             } else {
                 'No matching revisions.'
             }
