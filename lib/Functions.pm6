@@ -320,20 +320,26 @@ sub check_endpoint($ep, $msg) is export {
 }
 
 
-sub schemas(Bool :$reload, Str :$name) is export {
+sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {
      if $reload || !$SCHEMAS_PARSED {
 	       my $schemas = client.get(SCHEMAS_URI);
 	       $SCHEMAS_PARSED = from-json $schemas;
      }
 
      if $name {
-         if ($SCHEMAS_PARSED{$name}) {
-             extract_from_schema(to-json $SCHEMAS_PARSED{$name});
-	           $SCHEMAS_PARSED{$name};
-         } else {
-             my @sch = $SCHEMAS_PARSED.keys.grep(/$name/).sort.Array;
+         if ($prop) {
+             my @sch = ($SCHEMAS_PARSED.grep: { .value<properties>.keys.grep(/$name/) !== Empty }).Hash.keys.sort.Array;
              @LAST_URIS = @sch.map: { 'schemas ' ~ $_ } if @sch;
              @sch;
+         } else {
+             if ($SCHEMAS_PARSED{$name}) {
+                 extract_from_schema(to-json $SCHEMAS_PARSED{$name});
+	               $SCHEMAS_PARSED{$name};
+             } else {
+                 my @sch = $SCHEMAS_PARSED.keys.grep(/$name/).sort.Array;
+                 @LAST_URIS = @sch.map: { 'schemas ' ~ $_ } if @sch;
+                 @sch;
+             }
          }
      } else {
 	       $SCHEMAS_PARSED.keys.sort.Array;

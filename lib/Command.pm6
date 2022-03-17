@@ -38,7 +38,8 @@ class Command {
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete
                                       assb.keys assb.install assb.plugins assb.catalog
-                                      schemas.reload enums.add enums.remove enums.tr enums.reload
+                                      schemas.reload schemas.property
+                                      enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
@@ -97,7 +98,7 @@ class Command {
 
         token comment       { '#' .* }
 
-        token uri           { '/' <[\/\-_\w\:]>* }
+        token uri           { '/' <[\/\-_\w\:\.]>* }
         rule  pairlist      { <pairitem>* }
         rule  pairitem      { <pair> }
         token pair          { <key=.refpath> '=' <value> }
@@ -785,7 +786,7 @@ class Command {
         }
 
 
-        my $schema = schemas(:reload($!qualifier eq 'reload'), :name($!first));
+        my $schema = schemas(:reload($!qualifier eq 'reload'), :name($!first), :prop($!qualifier eq 'property'));
 
         return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $!first) if $schema.WHAT ~~ Array;
 
@@ -1347,7 +1348,8 @@ sub shell_help {
        [str]    show endpoints that include str
       schemas   show all record schemas
        .reload  force a reload
-       [name]   show a named record schema
+       .property show schemas with a property that matches name
+       [name]   show a named record schema, or list that match name
       search    perform a search (page defaults to 1)
        .parse   parse the 'json' property
        q        the query string
