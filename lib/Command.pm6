@@ -1378,6 +1378,7 @@ sub shell_help {
     Say 'help [action]' for detailed help. ... well, not yet
 
     Use the <tab> key to cycle through completions for uris or actions.
+    Some actions have context sensitive completions.
 
     Command history and standard keybindings.
 END
