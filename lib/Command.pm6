@@ -964,14 +964,22 @@ class Command {
         if $!qualifier eq 'keys' {
             my $action = $!first || 'list';
             if $action eq 'list' {
-                my $keys = from-json client.get('/assb_admin/installed_keys', ["exclude_current=true"]);
-                if $keys.WHAT ~~ Hash {
+                my $keys = from-json client.get('/assb_admin/installed_keys', ["exclude_current=true", "include_subscriptions=true"]);
+                if $keys<error>:exists {
                     'No keys. Request or install a key to use ASSB.';
                 } else {
-                    last_uris($keys.map:{ 'assb.keys switch ' ~ $_});
-                    my $current_key = (from-json client.get('/assb_admin'))<assb_key>;
-                    "\nCurrent: " ~ ansi($current_key, 'bold') ~ "\n\nOthers:  " ~
-                    $keys.join("\n         ") ~ "\n\n";
+                    my $current_key = (from-json client.get('/assb_admin/current_key'));
+                    $keys{$current_key<key>}:delete;
+                    last_uris($keys.keys.map:{ 'assb.keys switch ' ~ $_});
+                    my $ren = $current_key<subscription><renews>:exists ??	$current_key<subscription><renews>.substr(0,10) !! '          ';
+                    "\n  " ~ ansi($current_key<key>, 'bold') ~ '  ' ~
+                    ansi($ren, 'bold red') ~ '  ' ~
+                    ansi($current_key<subscription><email>, 'bold green') ~
+                    "\n\n  " ~
+                    (for $keys.kv -> $key, $subs {
+                            my $ren = $subs<renews>:exists ??  $subs<renews>.substr(0,10) !! '          ';
+                            $key ~ '  ' ~ ansi($ren, "red") ~ '  ' ~ ansi($subs<email>, 'green');
+                        }).join("\n  ") ~ "\n\n";
                 }
             } elsif $action eq 'switch' {
                 my $key = @!args.first;
