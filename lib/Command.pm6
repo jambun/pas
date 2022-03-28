@@ -956,7 +956,6 @@ class Command {
         return unless check_endpoint('/assb_admin', 'Sail boats unavailable. Install assb plugin.');
 
         sub render-plugin($p, $max, $pending = False) {
-            logger.blurt('pppp ' ~ $pending.perl);
             my $s = max($max - $p<name>.chars + 2, 2);
             '  ' ~ ansi($p<name>, 'bold') ~ (' ' x $s) ~ ansi($p<display_name>, 'yellow') ~ ($pending ?? " [{%$pending<mode>}]" !! '') ~ "\n";
         }
