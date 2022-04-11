@@ -384,6 +384,22 @@ sub save_tmp($data) is export {
 }
 
 
+sub wrap_lines($string is copy, $indent) is export {
+    my $out;
+
+    for $string.split("\n") -> $line {
+        if visible_length($line) > term_cols() {
+            my $snip;
+            $line.indices(' ').reverse.map({($snip = $_) && last if visible_length($line.substr(0..$_)) < term_cols()});
+            $out ~= $line.substr(0..$snip) ~ "\n" ~ (' ' x $indent) ~ $line.substr($snip+1) ~ "\n";
+        } else {
+            $out ~= $line ~ "\n";
+        }
+    }
+    $out;
+}
+
+
 sub visible_length($string is copy) is export {
     $string ~~ s:g/\e.+?\#//;
     $string ~~ s:g/\e.+?m//;

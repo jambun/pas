@@ -724,12 +724,15 @@ class Command {
         sub render_prop($name, $prop, Int $depth = 1) {
             my $indent = '  ' x $depth;
             my $out = $indent ~ ansi($name, 'bold') ~ ' ';
+            my $leader_length;
 
             if $prop.WHAT ~~ Hash {
                 my @traits = [];
                 @traits.push(ansi('readonly', 'cyan')) if $prop<readonly>;
                 @traits.push(ansi('required', 'red')) if $prop<ifmissing>;
                 $out ~= '[' ~ @traits.join(' ') ~ '] ' if @traits;
+
+                $leader_length = visible_length($out);
 
                 if $prop<dynamic_enum> {
                     $out ~= 'enum(' ~  ansi($prop<dynamic_enum>, 'bold yellow') ~ ')';
@@ -759,9 +762,8 @@ class Command {
                $out ~= $prop;
             }
 
-            $out ~= "\n";
+            $out = wrap_lines($out, $leader_length);
             $out ~= "\n" if $depth == 1;
-
             $out;
         }
 
