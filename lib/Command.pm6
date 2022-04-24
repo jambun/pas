@@ -578,14 +578,16 @@ class Command {
                                           $ix, $v<user>);
                               } else {
                                   $last_url = $v<url>;
-                                  my $version = try {
-                                      my $asv = (from-json client.get('/', :no_session, host => $v<url>, timeout => 1));
-                                      $asv<git_archivesSpaceVersion> || $asv<archivesSpaceVersion> || 'down'
+                                  my ($version, $label) = try {
+                                      my $as = (from-json client.get('/', :no_session, host => $v<url>, timeout => 1));
+                                      $as<git_archivesSpaceVersion> || $as<archivesSpaceVersion> || 'down',
+                                      $as<label> || 'no label'
                                   } // 'error';
                                   my $version_fmt = ansi('%-26s', ($version eq 'down' | 'error') ?? 'white' !! 'bold white');
-                                  sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $version_fmt  %s",
+                                  my $label_fmt = ansi('%-12s', ($label eq 'no label' | 'error') ?? 'white' !! 'bold yellow');
+                                  sprintf("\n%-25s  [$ix_fmt]  $user_fmt  $label_fmt  $version_fmt  %s",
                                           $v<time> ?? DateTime.new($v<time>).local.truncated-to('second') !! '[unauthenticated]',
-                                          $ix, $v<user>, $version, $v<url>);
+                                          $ix, $v<user>, $label, $version, $v<url>);
                               }
                           }).join("\n") ~ "\n\n";
             $out;
