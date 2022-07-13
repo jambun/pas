@@ -1,23 +1,26 @@
 # pas
+
 An ArchivesSpace commandline client
 
-Needs Perl6. Currently developing against:
+Needs Raku (Perl6). Currently developing against:
 
     % perl6 --version
-    This is Rakudo version 2017.04.3 built on MoarVM version 2017.04-53-g66c6dda
-    implementing Perl 6.c.
+    Welcome to Rakudo™ v2022.06.
+    Implementing the Raku® Programming Language v6.d.
+    Built on MoarVM version 2022.06.
 
-Newer versions all have problems - can't parse URIs properly, threading lockups,
-can't compile HTTP::UserAgent. It's a bit ridiculous really. Losing faith.
+On an M1 Mac.
 
-With URI::Encode, XML and Crypt::Random:
-
-      % zef install URI::Encode
-      % zef install XML
-      % zef install Crypt::Random
+    % zef install JSON::Tiny
+    % zef install Terminal::ANSIColor
+    % zef install HTTP::UserAgent
+    % zef install URI::Encode
+    % zef install XML
+    % zef install Digest::MD5
+    % zef install Crypt::Random
 
 And an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints)
-to make `endpoints`, `groups` and `stub` work.
+to make `endpoints`, `groups` and `stub`, etc work.
 
 
     pas - a terminal client for ArchivesSpace
