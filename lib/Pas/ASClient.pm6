@@ -136,6 +136,10 @@ class Pas::ASClient {
         $url ~~ s:g/ '#' /_HASHME_/;
         $url = uri_encode($url);
         $url ~~ s:g/ '_HASHME_' /%23/;
+
+        $url ~~ s:g/ '[' /\%5b/;
+        $url ~~ s:g/ ']' /\%5d/;
+
         $url;
     }
     
