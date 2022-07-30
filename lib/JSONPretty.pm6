@@ -54,6 +54,7 @@ class PrettyActions {
 
     method indent(Str $json) {
     	my Int $indent = 0;
+      $!step ||= 2;
 	    my Str $out = '';
       my Int $selected = 0;
       my $sel = $!select;
