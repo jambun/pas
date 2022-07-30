@@ -140,14 +140,14 @@ class PrettyActions {
 
     method diffvalue($/)   { make $<diffpair>.made                            }
     method diffpair($/)    { make ($<fromvalue>.made, $<tovalue>.made).grep({$_}).join(' ') } 
-    method fromvalue($/)   { make $<value>.made.Str eq 'NULL' ?? False !! self.ansi($<value>.made.Str, 'red') }
-    method tovalue($/)     { make $<value>.made.Str eq 'NULL' ?? False !! self.ansi($<value>.made.Str, 'green') }
+    method fromvalue($/)   { make $<value>.made.Str eq 'null' ?? False !! self.ansi($<value>.made.Str, 'red') }
+    method tovalue($/)     { make $<value>.made.Str eq 'null' ?? False !! self.ansi($<value>.made.Str, 'green') }
 
     method value:sym<number>($/)      { make +$/.Str            }
     method value:sym<string>($/)      { make $<string>          }
     method value:sym<true>($/)        { make 'true'             }
     method value:sym<false>($/)       { make 'false'            }
-    method value:sym<null>($/)        { make 'NULL'             }
+    method value:sym<null>($/)        { make 'null'             }
     method value:sym<object>($/)      { make $<object>.made;    }
     method value:sym<emptyarray>($/)  { make $<emptyarray>.made }
     method value:sym<array>($/)       { make $<array>.made      }
