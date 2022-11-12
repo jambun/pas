@@ -184,6 +184,20 @@ class Command {
         $spool || unspool;
         unless self.done {
             self.action = 'doc' if self.uri && self.uri ~~ /\:/;
+
+            my $out = self."{self.action}"();
+
+            if ($out ~~ Buf) {
+                if (!$!savefile) {
+                    say 'Binary response with content type: ' ~ client.last_response_header<Content-Type>[0];
+                    print 'Enter file name (or return to discard): ';
+                    $!savefile = get.chomp;
+                    return unless $!savefile;
+                }
+	              spurt($!savefile, $out, append => $!saveappend) unless $!savefile eq 'null';
+                return;
+            }
+
             $!output = self."{self.action}"();
             if $spool {
                 $SPOOL.send(self);

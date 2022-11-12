@@ -11,6 +11,7 @@ class Pas::ASClient {
     has HTTP::UserAgent $!http;
     has Config $.config;
     has Pas::Logger $.log;
+    has %.last_response_header;
 
     my constant LOGOUT_URI     = '/logout';
 
@@ -74,6 +75,8 @@ class Pas::ASClient {
                 $resp = self!http.request($request);
             });
         say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if $!config.attr<properties><time>;
+        %!last_response_header = $resp.header.hash;
+        self.log.blurt($resp.header);
         $resp;
     }
     
