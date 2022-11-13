@@ -75,8 +75,10 @@ class Pas::ASClient {
                 $resp = self!http.request($request);
             });
         say colored(((now - $intime)*1000).Int ~ ' ms', 'cyan') if $!config.attr<properties><time>;
-        %!last_response_header = $resp.header.hash;
-        self.log.blurt($resp.header);
+        if ($resp) {
+            %!last_response_header = $resp.header.hash;
+            self.log.blurt($resp.header);
+        }
         $resp;
     }
     
