@@ -198,7 +198,7 @@ class Command {
                 return;
             }
 
-            $!output = self."{self.action}"();
+            $!output = $out;
             if $spool {
                 $SPOOL.send(self);
             } else {
