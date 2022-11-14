@@ -196,6 +196,8 @@ class Command {
                 }
 	              spurt($!savefile, $out, append => $!saveappend) unless $!savefile eq 'null';
                 return;
+            } elsif ($out ~~ Any) {
+                $out = '';
             }
 
             $!output = $out;
