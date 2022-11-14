@@ -196,11 +196,11 @@ class Command {
                 }
 	              spurt($!savefile, $out, append => $!saveappend) unless $!savefile eq 'null';
                 return;
-            } elsif ($out ~~ Any) {
+            } elsif (!$out.defined) {
                 $out = '';
             }
 
-            $!output = $out;
+            $!output = $out.Str;
             if $spool {
                 $SPOOL.send(self);
             } else {
