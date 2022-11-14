@@ -706,6 +706,13 @@ class Command {
                     $out ~= '  [' ~ ansi($ep{'permissions'}.join(' '), 'red') ~ ']';
                 }
                 $out ~= "\n" ~ ansi($ep{'description'}, 'yellow');
+
+                if ($ep{'paginated'}) {
+                    $ep{'params'}.push(['page', 'Integer', 'Page number']);
+                    $ep{'params'}.push(['id_set', 'Array', 'List of IDs']);
+                    $ep{'params'}.push(['all_ids', 'Boolean', 'Return a list of all IDs']);
+                }
+
                 $out ~= "\n" ~ ($ep{'params'}.map: {
                                        my @opts = [];
                                        if $_[3] {
