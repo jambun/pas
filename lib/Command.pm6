@@ -194,6 +194,7 @@ class Command {
                     $!savefile = get.chomp;
                     return unless $!savefile;
                 }
+                say "Saved to: " ~ ($!savefile ~~ /^ '/' / ?? $!savefile !! $*CWD ~ '/' ~ $!savefile);
 	              spurt($!savefile, $out, append => $!saveappend) unless $!savefile eq 'null';
                 return;
             } elsif (!$out.defined) {
