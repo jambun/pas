@@ -30,7 +30,7 @@ class Command {
     my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
-                           session who asam doc assb
+                           session who asam doc assb find
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
@@ -508,6 +508,42 @@ class Command {
         }
     }
 
+    method find {
+        my $page = @!args.tail || '1';
+        my $results = client.get(SEARCH_URI, ["q=$!first", "page=$page"]);
+        my $parsed = from-json $results;
+
+        my $out;
+
+        if ($parsed<this_page> > $parsed<last_page>) {
+            return "Page out of bounds";
+        } else {
+            $out = ansi("{$parsed<offset_first>}-{$parsed<offset_last>} of {$parsed<total_hits>}\n", 'bold');
+        }
+
+        last_uris($parsed<results>.map: { $_<uri> });
+
+        $parsed<results>.map: { $_<_id> = $_<uri>.split('/')[*-1].Str };
+
+        my $max_type = max($parsed<results>.map({$_<primary_type>})>>.chars);
+        my $max_id = max($parsed<results>.map({$_<_id>})>>.chars);
+        my $max_ident = max($parsed<results>.map({$_<identifier> || '--'})>>.chars);
+
+        my $type_fmt = ansi("%-{$max_type}s", 'yellow');
+        my $id_fmt = ansi("%-{$max_id}d", 'cyan');
+        my $ident_fmt = ansi("%-{$max_ident}s", 'bold green');
+        my $title_fmt = ansi('%s', 'white');
+
+        $out ~= $parsed<results>.map({
+                  sprintf("$type_fmt  $id_fmt  $ident_fmt  $title_fmt",
+                          $_<primary_type>,
+                          $_<_id>,
+                          $_<identifier> || '--',
+                          $_<title>);
+                }).join("\n");
+
+        $out;
+    }
 
     method search {
         if $!first ~~ /^<[./]>/ { # a uri
@@ -1387,6 +1423,9 @@ sub shell_help {
        [name]   show a named record schema, or list that match name
       search    perform a search (page defaults to 1)
        .parse   parse the 'json' property
+       q        the query string
+       [n]      page number (defaults to 1)
+      find      formatted  search (page defaults to 1)
        q        the query string
        [n]      page number (defaults to 1)
       config    show pas config
