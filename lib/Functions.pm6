@@ -69,7 +69,7 @@ sub cmd_prompt is export {
     if ($host ~~ /localhost\:(\d+)$/) {
         $host = $0;
     } else {
-        $host ~~ s/ 'http://' (<-[\.\:]>+) .* /$0/;
+        $host ~~ s/ 'http://' (\d+\.\d+\.\d+\.\d+ | <-[\.\:]>+) .* /$0/;
     }
     my $anon = config.attr<properties><anon> ?? "(anon)" !! '';
     sprintf("pas %s %s%s > ", $host, config.attr<user>, $anon);
@@ -226,7 +226,6 @@ sub search_models(Bool :$force) is export {
     return @SEARCH_MODELS if @SEARCH_MODELS && !$force;
 
     if load_endpoints.grep('/history') {
-#        @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep({!/'tree'/}).grep({!/'ordered'/}).sort;
         @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
     }
 
