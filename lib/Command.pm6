@@ -534,7 +534,7 @@ class Command {
         my $out;
 
         if ($parsed<this_page> > $parsed<last_page>) {
-            return "Page out of bounds";
+            return $parsed<total_hits> == 0 ?? 'No hits' !! "Page out of bounds";
         } else {
             $out = ansi("{$parsed<offset_first>}-{$parsed<offset_last>} of {$parsed<total_hits>}\n", 'bold');
         }
