@@ -513,20 +513,20 @@ class Command {
     method find {
         my @search_args;
         my @query;
-        my $page;
+        my $page = '1';
 
         for $!first, |@!args -> $arg {
             if $arg ~~ / ^ '=' / {
                 @search_args.push('type[]=' ~ $arg.substr(1));
-            } elsif $arg ~~ /^ \d+ $ / {
-                $page = $arg;
+            } elsif $arg ~~ /^ ',' \d+ $ / {
+                $page = $arg.substr(1);
             } else {
                 @query.push($arg);
             }
         }
 
         @search_args.push('q=' ~ @query.join(' ')) if @query;
-        @search_args.push('page=' ~ ($page || '1'));
+        @search_args.push('page=' ~ $page);
 
         my $results = client.get(SEARCH_URI, @search_args);
         my $parsed = from-json $results;
@@ -1443,9 +1443,10 @@ sub shell_help {
        .parse   parse the 'json' property
        q        the query string
        [n]      page number (defaults to 1)
-      find      formatted  search (page defaults to 1)
+      find      formatted search
        q        the query string
-       [n]      page number (defaults to 1)
+       [=m]+    only show results for model m
+       [,n]     page number (defaults to 1)
       config    show pas config
       last      show the last saved temp file
       set       show pas properties
