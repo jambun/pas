@@ -549,15 +549,17 @@ class Command {
 
         my $type_fmt = ansi("%-{$max_type}s", 'yellow');
         my $id_fmt = ansi("%-{$max_id}d", 'cyan');
-        my $ident_fmt = ansi("%-{$max_ident}s", 'bold green');
-        my $title_fmt = ansi('%s', 'white');
+        my $ident_fmt = ansi("%-{$max_ident}s", 'green');
+        my $title_fmt = '%s';
+        my $cols = term_cols();
 
         $out ~= $parsed<results>.map({
-                  sprintf("$type_fmt  $id_fmt  $ident_fmt  $title_fmt",
-                          $_<primary_type>,
-                          $_<_id>,
-                          $_<identifier> || '--',
-                          $_<title>);
+                  my $s = sprintf("$type_fmt  $id_fmt  $ident_fmt  $title_fmt",
+                                  $_<primary_type>,
+                                  $_<_id>,
+                                  $_<identifier> || '--',
+                                  $_<title>);
+                  $s.substr(0, ($s.chars - visible_length($s)) + $cols);
                 }).join("\n");
 
         $out;
