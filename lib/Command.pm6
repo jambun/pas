@@ -56,6 +56,8 @@ class Command {
             @out.append(@list.grep(/^ $prefix/).map: { my $c = $_ ~~ /\s/ ?? "'$_'" !! $_; $line ~ $c});
         }
 
+        build_cc($line, $1.Str, search_models) if $line ~~ s/('find' \s+ .* '=') (\w*) $/$0/;
+
         build_cc($line, $1.Str, history_models) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
         build_cc($line, $1.Str, history_makers) if $line ~~ s/('revisions' \s+ .* ';') (\w*) $/$0/;
 
@@ -509,8 +511,24 @@ class Command {
     }
 
     method find {
-        my $page = @!args.tail || '1';
-        my $results = client.get(SEARCH_URI, ["q=$!first", "page=$page"]);
+        my @search_args;
+        my @query;
+        my $page;
+
+        for $!first, |@!args -> $arg {
+            if $arg ~~ / ^ '=' / {
+                @search_args.push('type[]=' ~ $arg.substr(1));
+            } elsif $arg ~~ /^ \d+ $ / {
+                $page = $arg;
+            } else {
+                @query.push($arg);
+            }
+        }
+
+        @search_args.push('q=' ~ @query.join(' ')) if @query;
+        @search_args.push('page=' ~ ($page || '1'));
+
+        my $results = client.get(SEARCH_URI, @search_args);
         my $parsed = from-json $results;
 
         my $out;

@@ -30,6 +30,7 @@ my $ENUMS;
 my @LAST_URIS = [];
 my @ENDPOINTS = [];
 my @TAB_TARGETS;
+my @SEARCH_MODELS;
 my @HISTORY_MODELS;
 my @HISTORY_USERS;
 my %IMPORT_TYPES;
@@ -221,6 +222,18 @@ sub extract_from_schema($text) is export {
 }
 
 
+sub search_models(Bool :$force) is export {
+    return @SEARCH_MODELS if @SEARCH_MODELS && !$force;
+
+    if load_endpoints.grep('/history') {
+#        @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep({!/'tree'/}).grep({!/'ordered'/}).sort;
+        @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
+    }
+
+    @SEARCH_MODELS;
+}
+
+
 sub history_models(Bool :$force) is export {
     return @HISTORY_MODELS if @HISTORY_MODELS && !$force;
 
@@ -365,6 +378,7 @@ sub clear_session_state() is export {
     @LAST_URIS = Empty;
     @ENDPOINTS = Empty;
     @TAB_TARGETS = Empty;
+    @SEARCH_MODELS = Empty;
     @HISTORY_MODELS = Empty;
     @HISTORY_USERS = Empty;
     @USERS = Empty;
