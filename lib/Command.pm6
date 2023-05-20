@@ -57,6 +57,7 @@ class Command {
         }
 
         build_cc($line, $1.Str, search_models) if $line ~~ s/('find' \s+ .* '=') (\w*) $/$0/;
+        build_cc($line, $1.Str, 1..20) if $line ~~ s/('find' \s+ .* ',') (\d*) $/$0/;
 
         build_cc($line, $1.Str, history_models) if $line ~~ s/('revisions' \s+ .* '=') (\w*) $/$0/;
         build_cc($line, $1.Str, history_makers) if $line ~~ s/('revisions' \s+ .* ';') (\w*) $/$0/;
