@@ -224,12 +224,7 @@ sub extract_from_schema($text) is export {
 
 sub search_models(Bool :$force) is export {
     return @SEARCH_MODELS if @SEARCH_MODELS && !$force;
-
-    if load_endpoints.grep('/history') {
-        @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
-    }
-
-    @SEARCH_MODELS;
+    @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
 }
 
 
