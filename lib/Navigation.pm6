@@ -338,8 +338,8 @@ sub record_context(%hash) {
 
     $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
 
-    if %hash<ancestors> {
-        my $tree = from-json client.get(%hash<uri> ~ '/tree/node');
+    if %hash<tree> {
+        my $tree = from-json client.get(%hash<uri> ~ (%hash<uri> ~~ /resource/ ?? '/tree/root' !! '/tree/node'));
         if $tree<child_count> > 0 {
             $out ~= ' > ' ~ ansi($tree<child_count> ~ ($tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
         }
