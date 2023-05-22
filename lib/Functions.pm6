@@ -262,12 +262,14 @@ sub repo_codes(Bool :$force) is export {
 }
 
 
-sub repo_map(Str $code?, Bool :$force) is export {
+sub repo_map(Str $code?, Bool :$force, Bool :$invert) is export {
     if $force || !%REPO_MAP {
         %REPO_MAP = |(from-json client.get('/repositories')).map: { $_<repo_code> => $_<uri>.split('/')[*-1] };
     }
 
-    $code ?? %REPO_MAP{$code} !! %REPO_MAP;
+    my %map = $invert ?? %REPO_MAP.invert !! %REPO_MAP;
+
+    $code ?? %map{$code} !! %map;
 }
 
 

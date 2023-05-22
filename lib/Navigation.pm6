@@ -254,6 +254,8 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     run 'tput', 'civis';                   # hide the cursor
     clear_screen;
 
+    print_at(record_context(%json), 1, 2);
+
     print_at(ansi(record_label(%json).Str, 'bold'), 2, 3);
     print_at(record_summary(%json), 6, 4);
     print_at(ansi($uri, 'bold'), 4, 6);
@@ -325,6 +327,27 @@ sub print_nav_page(Int $offset, Int $cursor_y) {
     print_at('v', 1, $nav_page_size + $y_offset) if $has_next_page;
 }
     
+
+sub record_context(%hash) {
+    my $out;
+    $out = ansi(%hash<repository> ?? repo_map(%hash<repository><ref>.split('/')[*-1], :invert) !! 'GLOBAL', 'green');
+
+    for %hash<ancestors>.List.reverse -> $a {
+        $out ~= ' > ' ~ ansi($a<level>, 'yellow') if $a<level>;
+    }
+
+    $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
+
+    if %hash<ancestors> {
+        my $tree = from-json client.get(%hash<uri> ~ '/tree/node');
+        if $tree<child_count> > 0 {
+            $out ~= ' > ' ~ ansi($tree<child_count> ~ ($tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
+        }
+    }
+
+    $out;
+}
+
 
 sub record_label(%hash) {
     my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
