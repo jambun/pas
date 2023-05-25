@@ -331,7 +331,7 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     plot_header(%json);
 
     @uris = Array.new;
-    @uris.push(uri_hash($uri, 'top', ansi($uri, 'bold'), 4));
+    @uris.push(uri_hash($uri, 'top', ansi($uri, 'bold'), 4, ''));
 
     plot_tree(%json);
 
@@ -348,10 +348,6 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     nav_message(:default);
 }
 
-
-sub uri_hash($uri, $ref, $label, $indent) {
-    (uri => $uri, ref => $ref, label => $label, indent => $indent).Hash;
-}
 
 sub map_refs(%hash, $parent, $indent) {
     my $found_ref = 0;
@@ -374,10 +370,15 @@ sub map_refs(%hash, $parent, $indent) {
 }
 
 
+sub uri_hash($uri, $ref, $label, $indent, $sort) {
+    (uri => $uri, ref => $ref, label => $label, indent => $indent, sort => $sort).Hash;
+}
+
 sub plot_ref($uri, %hash, $parent, $indent) {
-    my $s = sprintf "%-*s %s", $nav_cursor_col - 5, $uri, link_label($parent, %hash);
-    @uris.push(uri_hash($uri, $parent, $s, $indent));
-    @uris = @uris.sort;
+    my $link_label = link_label($parent, %hash);
+    my $s = sprintf("%-*s %s", $nav_cursor_col - 5, $uri, $link_label);
+    @uris.push(uri_hash($uri, $parent, $s, $indent, $link_label ~ $uri));
+    @uris = @uris.sort({ .<sort> });
 }
 
 
