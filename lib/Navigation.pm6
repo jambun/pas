@@ -40,8 +40,8 @@ my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
                                   last_page outcome_note jsonmodel_type>;
 
 my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statements
-           	     		     external_ids external_documents revision_statements
-			             terms names agent_contacts>;
+           	     		                 external_ids external_documents revision_statements
+			                               terms names agent_contacts>;
 
 my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
 
@@ -442,9 +442,12 @@ sub record_label(%hash) {
 
 
 sub record_summary(%hash) {
-    RECORD_SUMMARY_ARRAYS.map: {
-	$_ ~ ': ' ~ %hash{$_}.elems if %hash{$_}:exists && %hash{$_} > 0;
-    }
+    my $out = ansi(%hash<jsonmodel_type>, 'magenta') ~ '  ';
+    $out ~= RECORD_SUMMARY_ARRAYS.grep({%hash{$_}:exists && %hash{$_} > 0}).map({
+	      $_ ~ ': ' ~ %hash{$_}.elems;
+    }).join(', ');
+
+    $out;
 }
 
 
