@@ -443,6 +443,9 @@ sub record_label(%hash) {
 
 sub record_summary(%hash) {
     my $out = ansi(%hash<jsonmodel_type>, 'magenta') ~ '  ';
+    $out ~= ansi('public', 'green') ~ '  ' if %hash<publish>;
+    $out ~= ansi('restricted', 'yellow') ~ '  ' if %hash<restrictions_apply>;
+    $out ~= ansi('suppressed', 'red') ~ '  ' if %hash<suppressed>;
     $out ~= RECORD_SUMMARY_ARRAYS.grep({%hash{$_}:exists && %hash{$_} > 0}).map({
 	      $_ ~ ': ' ~ %hash{$_}.elems;
     }).join(', ');
