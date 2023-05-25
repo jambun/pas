@@ -274,23 +274,28 @@ sub plot_header(%json) {
 sub plot_tree(%json) {
     cursor_reset(:line(6));
 
-    if $show_tree && (%json<tree>:exists) && %json<tree><_resolved><child_count> > 0 {
-        my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
-        my %width;
-        for <level child_count> -> $prop { %width{$prop} = @tree.map({($_{$prop}.chars, 2).max}).max }
-        for @tree[^10] -> $c {
-            if $c {
-                my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
-                my $count_fmt = ansi("%{%width<child_count>}s", 'cyan');
-                my $s = sprintf("$level_fmt  $count_fmt  %s",
-                                $c<level>,
-                                $c<child_count> || '--',
-                                $c<title>.substr(0, 100));
+    if $show_tree && (%json<tree>:exists) {
+        if %json<tree><_resolved><child_count> > 0 {
+            my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
+            my %width;
+            for <level child_count> -> $prop { %width{$prop} = @tree.map({($_{$prop}.chars, 2).max}).max }
+            for @tree[^10] -> $c {
+                if $c {
+                    my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+                    my $count_fmt = ansi("%{%width<child_count>}s", 'cyan');
+                    my $s = sprintf("$level_fmt  $count_fmt  %s",
+                                    $c<level>,
+                                    $c<child_count> || '--',
+                                    $c<title>.substr(0, 100));
 
-                cursored_print($s, :indent(6));
+                    cursored_print($s, :indent(6));
+                }
             }
+        } else {
+            cursored_print(ansi('-- no children --', 'yellow'), :indent(6));
         }
     }
+
     cursor_next;
     mark_cursor('top_of_nav');
 }
