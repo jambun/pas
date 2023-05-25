@@ -10,7 +10,11 @@ has $.line;
 my Int $x = 0;
 my Int $y = 0;
 my Int $nav_cursor_col = 50;
-my Int $y_offset = 6;
+
+# rows from top of page where nav links start
+# gets set in plot_nav_page - changes depending on tree
+my Int $y_offset = 7;
+
 my Hash @uris;
 my Hash %uri_cache;
 my $current_uri;
@@ -22,6 +26,9 @@ my Str $default_nav_message;
 my Str $nav_message;
 my Int $nav_page_size;
 my Int $current_nav_offset = 0;
+my Bool $show_tree = False;
+my Int $cursor_line = 1;
+my %cursor_marks;
 
 my constant UP_ARROW    =  "\x[1b][A";
 my constant DOWN_ARROW  =  "\x[1b][B";
@@ -43,101 +50,107 @@ method start {
     my $uri = $!uri;
     nav_message(cmd_prompt() ~ " $!line", :set_default);
     clear_screen;
+
     my Bool $new_uri = True;
     my $c = '';
     my @uri_history = ();
     my $message = '';
     @resolves = @!args || ();
+
     while $c ne 'q' {
-	if $new_uri {
-	    plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
-	    print_at('.' x @uri_history, 2, 1);
-	    print_at(ansi('h', 'bold') ~ 'elp ' ~ ansi('q', 'bold') ~ 'uit',
-		     $term_cols - 9, 1);
-	    cursor($x, $y);
-	    $new_uri = False;
-	}
-	
-	$c = get_char;
-	if $c eq "\x[1b]" {
-	    $c = $c ~ get_char() ~ get_char();
-	    given $c {
-		when UP_ARROW {
-		    if $y > $y_offset {
-			clear_nav_cursor;
-			$y--;
-			print_nav_cursor;
-		    } else {
-			if $current_nav_offset > 0 {
-			    print_nav_page($current_nav_offset - $nav_page_size, $y_offset);
-			} else {
-			    print BEL;
-			}
-		    }
-		}
-		when DOWN_ARROW {
-		    if $y < $y_offset + @uris - $current_nav_offset - 1 && $y < $term_lines - 2 {
-			$y++;
-			print_nav_cursor($y-1);
-		    } else {
-			if @uris > $current_nav_offset + $nav_page_size {
-			    print_nav_page($current_nav_offset + $nav_page_size, $y);
-			} else {
-			    print BEL;
-			}
-		    }
-		}
-		when RIGHT_ARROW {
-		    if $y == $y_offset {
-			print BEL;
-		    } else {
-			@uri_history.push: $uri;
-			$uri = @uris[$y-$y_offset+$current_nav_offset]<uri>;
-			$new_uri = True;
-		    }
-		}
-		when LEFT_ARROW {
-		    if @uri_history {
-			$uri = @uri_history.pop;
-			$new_uri = True;
-		    } else {
-			print BEL;
-		    }
-		}
-	    }
-	} else {
-	    my $yix = $y - $y_offset;
-	    my %selected = @uris[$yix];
-	    given $c {
-		when ' ' {
-        page(pretty client.get(%selected<uri>,
-                               to_resolve_params(@resolves)));
-		}
-		when "\r" {
-        page(stripped pretty client.get(%selected<uri>,
-                                        to_resolve_params(@resolves)));
-		}
-		when 'e' {
-		    plot_edit(%selected<uri>, @resolves) || ($message = "No record for $uri");
-		    get_char;
-		    plot_uri($uri, @resolves) || ($message = "No record for $uri");
-		}
-		when 'r' {
-		    if @resolves.grep(%current_refs{$y-$y_offset}) {
-			@resolves = @resolves.grep: { $_ ne %current_refs{$y-$y_offset} };
-		    } else {
-			@resolves.push(%current_refs{$y-$y_offset});
-		    }
-		    %uri_cache{$current_uri}:delete;
-		    $new_uri = True;
-		}
-		when 'h' {
-		    nav_help;
-		    $new_uri = True;
-		}
-	    }
-	}
-	cursor($x, $y);
+	      if $new_uri {
+	          plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
+	          print_at('.' x @uri_history, 2, 1);
+	          print_at(ansi('h', 'bold') ~ 'elp ' ~ ansi('q', 'bold') ~ 'uit',
+		                 $term_cols - 9, 1);
+	          cursor($x, $y);
+	          $new_uri = False;
+	      }
+
+	      $c = get_char;
+	      if $c eq "\x[1b]" {
+	          $c = $c ~ get_char() ~ get_char();
+	          given $c {
+		            when UP_ARROW {
+		                if $y > $y_offset {
+			                  clear_nav_cursor;
+			                  $y--;
+			                  print_nav_cursor;
+		                } else {
+			                  if $current_nav_offset > 0 {
+			                      plot_nav_page($current_nav_offset - $nav_page_size, $y_offset);
+			                  } else {
+			                      print BEL;
+			                  }
+		                }
+		            }
+		            when DOWN_ARROW {
+		                if $y < $y_offset + @uris - $current_nav_offset - 1 && $y < $term_lines - 2 {
+			                  $y++;
+			                  print_nav_cursor($y-1);
+		                } else {
+			                  if @uris > $current_nav_offset + $nav_page_size {
+			                      plot_nav_page($current_nav_offset + $nav_page_size, $y);
+			                  } else {
+			                      print BEL;
+			                  }
+		                }
+		            }
+		            when RIGHT_ARROW {
+		                if $y == $y_offset {
+			                  print BEL;
+		                } else {
+			                  @uri_history.push: $uri;
+			                  $uri = @uris[$y-$y_offset+$current_nav_offset]<uri>;
+			                  $new_uri = True;
+		                }
+		            }
+		            when LEFT_ARROW {
+		                if @uri_history {
+			                  $uri = @uri_history.pop;
+			                  $new_uri = True;
+		                } else {
+			                  print BEL;
+		                }
+		            }
+	          }
+	      } else {
+	          my $yix = $y - $y_offset;
+	          my %selected = @uris[$yix];
+	          given $c {
+		            when ' ' {
+                    page(pretty client.get(%selected<uri>,
+                                           to_resolve_params(@resolves)));
+		            }
+		            when "\r" {
+                    page(stripped pretty client.get(%selected<uri>,
+                                                    to_resolve_params(@resolves)));
+		            }
+		            when 'e' {
+		                plot_edit(%selected<uri>, @resolves) || ($message = "No record for $uri");
+		                get_char;
+		                plot_uri($uri, @resolves) || ($message = "No record for $uri");
+		            }
+		            when 'r' {
+		                if @resolves.grep(%current_refs{$y-$y_offset}) {
+			                  @resolves = @resolves.grep: { $_ ne %current_refs{$y-$y_offset} };
+		                } else {
+			                  @resolves.push(%current_refs{$y-$y_offset});
+		                }
+		                %uri_cache{$current_uri}:delete;
+		                $new_uri = True;
+		            }
+		            when 't' {
+                    $show_tree = !$show_tree;
+                    plot_uri($current_uri);
+                }
+		            when 'h' {
+		                nav_help;
+		                $new_uri = True;
+		            }
+	          }
+	      }
+	      cursor($x, $y);
     }
     nav_message(' ');
     clear_screen;
@@ -214,16 +227,72 @@ sub plot_edit(Str $uri, @args = (), Bool :$reload) {
     my $c = '';
     my $refresh = True;
     while $c ne 'q' {
-	print_at(%rec.map({ .perl.say }), 4, 2) if $refresh;
-	$refresh = False;
-	$c = get_char;
-	given $c {
-	    when "\r" {
-		client.post($uri, @args, to-json %rec);
-		$refresh = True;
-	    }
-	}
+	      print_at(%rec.map({ .perl.say }), 4, 2) if $refresh;
+	      $refresh = False;
+	      $c = get_char;
+	      given $c {
+	          when "\r" {
+		            client.post($uri, @args, to-json %rec);
+		            $refresh = True;
+	          }
+	      }
     }
+}
+
+sub cursor_reset(Int :$line = 1, :$mark) {
+    if $mark {
+        $cursor_line = %cursor_marks{$mark};
+    } else {
+        $cursor_line = $line;
+    }
+}
+
+sub current_cursor {
+    $cursor_line;
+}
+
+sub cursor_next {
+    $cursor_line++;
+}
+
+sub cursored_print($s, Int :$indent = 1, Bool :$fill) {
+    print_at($s, $indent, $cursor_line++, :$fill);
+}
+
+sub mark_cursor($key) {
+    %cursor_marks{$key} = $cursor_line;
+}
+
+sub plot_header(%json) {
+    cursor_reset(:line(2));
+
+    cursored_print(record_context(%json), :indent(1));
+    cursored_print(ansi(record_label(%json).Str, 'bold'), :indent(2));
+    cursored_print(record_summary(%json), :indent(6));
+}
+
+sub plot_tree(%json) {
+    cursor_reset(:line(6));
+
+    if $show_tree && (%json<tree>:exists) && %json<tree><_resolved><child_count> > 0 {
+        my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
+        my %width;
+        for <level child_count> -> $prop { %width{$prop} = @tree.map({($_{$prop}.chars, 2).max}).max }
+        for @tree[^10] -> $c {
+            if $c {
+                my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+                my $count_fmt = ansi("%{%width<child_count>}s", 'cyan');
+                my $s = sprintf("$level_fmt  $count_fmt  %s",
+                                $c<level>,
+                                $c<child_count> || '--',
+                                $c<title>.substr(0, 100));
+
+                cursored_print($s, :indent(6));
+            }
+        }
+    }
+    cursor_next;
+    mark_cursor('top_of_nav');
 }
 
 sub plot_uri(Str $uri, @args = (), Bool :$reload) {
@@ -231,20 +300,20 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 
     my %json;
     if %uri_cache{$uri} && !$reload {
-	%json = %uri_cache{$uri}<json>;
+	      %json = %uri_cache{$uri}<json>;
     } else {
-	nav_message("getting $uri ...");
-	my $raw_json = client.get($uri, to_resolve_params(@args));
-	nav_message("parsing $uri ...");
-	%json = from-json $raw_json;
-	return False if %json<error>:exists;
-	%uri_cache{$uri} = { json => %json.clone, y => $y_offset, offset => 0 };
-	nav_message(:default);
+	      nav_message("getting $uri ...");
+	      my $raw_json = client.get($uri, to_resolve_params(@args));
+	      nav_message("parsing $uri ...");
+	      %json = from-json $raw_json;
+	      return False if %json<error>:exists;
+	      %uri_cache{$uri} = { json => %json.clone, y => $y_offset, offset => 0 };
+	      nav_message(:default);
     }
 
-    if (%uri_cache{$current_uri}:exists) {
-	%uri_cache{$current_uri}<y> = $y;
-	%uri_cache{$current_uri}<offset> = $current_nav_offset;
+    if ($current_uri && (%uri_cache{$current_uri}:exists)) {
+	      %uri_cache{$current_uri}<y> = $y;
+	      %uri_cache{$current_uri}<offset> = $current_nav_offset;
     }
     $current_uri = $uri;
 
@@ -254,19 +323,19 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     run 'tput', 'civis';                   # hide the cursor
     clear_screen;
 
-    print_at(record_context(%json), 1, 2);
+    plot_header(%json);
 
-    print_at(ansi(record_label(%json).Str, 'bold'), 2, 3);
-    print_at(record_summary(%json), 6, 4);
-    print_at(ansi($uri, 'bold'), 4, 6);
     @uris = Array.new;
     @uris.push(uri_hash($uri, 'top', ansi($uri, 'bold'), 4));
-    $y = 7;
 
-    plot_hash(%json, 'top', 6);
+    plot_tree(%json);
+
+    $y = current_cursor;
+
+    map_refs(%json, 'top', 6);
     $nav_page_size = $term_lines - $y_offset - 2;
-    print_nav_page(%uri_cache{$current_uri}<offset>, %uri_cache{$current_uri}<y>);
-	
+    plot_nav_page(%uri_cache{$current_uri}<offset>, %uri_cache{$current_uri}<y>);
+
     $x = 2;
     $y = %uri_cache{$uri}<y>;
     cursor($x, $y);
@@ -279,23 +348,23 @@ sub uri_hash($uri, $ref, $label, $indent) {
     (uri => $uri, ref => $ref, label => $label, indent => $indent).Hash;
 }
 
-sub plot_hash(%hash, $parent, $indent) {
+sub map_refs(%hash, $parent, $indent) {
     my $found_ref = 0;
     for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
-	my $val = %hash{$prop};
-	if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
-	    plot_ref($val, %hash, $parent, $indent);
-	    $found_ref = 1;
-	} elsif $val.WHAT ~~ Hash {
-	    plot_hash($val, $prop, $indent+$found_ref);
-	} elsif $val.WHAT ~~ Array {
-	    for $val.values -> $h {
-		last if $y >= $term_lines;
-		if $h.WHAT ~~ Hash {
-		    plot_hash($h, $prop, $indent+$found_ref);
-		}
-	    }
-	}
+	      my $val = %hash{$prop};
+	      if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
+	          plot_ref($val, %hash, $parent, $indent);
+	          $found_ref = 1;
+	      } elsif $val.WHAT ~~ Hash {
+	          map_refs($val, $prop, $indent+$found_ref);
+	      } elsif $val.WHAT ~~ Array {
+	          for $val.values -> $h {
+		            last if $y >= $term_lines;
+		            if $h.WHAT ~~ Hash {
+		                map_refs($h, $prop, $indent+$found_ref);
+		            }
+	          }
+	      }
     }
 }
 
@@ -303,23 +372,27 @@ sub plot_hash(%hash, $parent, $indent) {
 sub plot_ref($uri, %hash, $parent, $indent) {
     my $s = sprintf "%-*s %s", $nav_cursor_col - 5, $uri, link_label($parent, %hash);
     @uris.push(uri_hash($uri, $parent, $s, $indent));
+    @uris = @uris.sort;
 }
 
 
-sub print_nav_page(Int $offset, Int $cursor_y) {
+sub plot_nav_page(Int $offset, Int $cursor_y) {
+    cursor_reset(:mark('top_of_nav'));
+    $y_offset = current_cursor;
+
     %current_refs = Hash.new;
     $current_nav_offset = ($offset, 0).max;
     my $last_y = $y;
     my $has_next_page = so @uris > $offset + $nav_page_size;
     for ($offset..$offset + $nav_page_size) {
-	if @uris[$_]:exists {
-	    my %ref = @uris[$_];
-	    %current_refs{$_} = %ref<ref>;
-	    print_at(' ' x %ref<indent> ~ %ref<label>, 0, $_ - $offset + $y_offset, :fill);
-	    $last_y = $_ - $offset + $y_offset;
-	} else {
-	    print_at(' ', 0, $_ - $offset + $y_offset, :fill);
-	}
+	      if @uris[$_]:exists {
+	          my %ref = @uris[$_];
+	          %current_refs{$_} = %ref<ref>;
+	          cursored_print(' ' x %ref<indent> ~ %ref<label>, :fill);
+	          $last_y = $_ - $offset + $y_offset;
+	      } else {
+	          cursored_print(' ', :fill);
+	      }
     }
     $y = ($last_y, $cursor_y).min;
     print_nav_cursor;
@@ -330,7 +403,7 @@ sub print_nav_page(Int $offset, Int $cursor_y) {
 
 sub record_context(%hash) {
     my $out;
-    $out = ansi(%hash<repository> ?? repo_map(%hash<repository><ref>.split('/')[*-1], :invert) !! 'GLOBAL', 'green');
+    $out = ansi(%hash<repository>:exists ?? repo_map(%hash<repository><ref>.split('/')[*-1], :invert) !! 'GLOBAL', 'green');
 
     for %hash<ancestors>.List.reverse -> $a {
         $out ~= ' > ' ~ ansi($a<level>, 'yellow') if $a<level>;
@@ -339,10 +412,11 @@ sub record_context(%hash) {
     $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
 
     if %hash<tree> {
-        my $tree = from-json client.get(%hash<uri> ~ (%hash<uri> ~~ /resource/ ?? '/tree/root' !! '/tree/node'));
-        if $tree<child_count> > 0 {
-            $out ~= ' > ' ~ ansi($tree<child_count> ~ ($tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
+        my %tree = from-json client.get(%hash<uri> ~ (%hash<uri> ~~ /resource/ ?? '/tree/root' !! '/tree/node'));
+        if %tree<child_count> > 0 {
+            $out ~= ' > ' ~ ansi(%tree<child_count> ~ (%tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
         }
+        %hash<tree><_resolved> = %tree;
     }
 
     $out;
