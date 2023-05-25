@@ -274,25 +274,30 @@ sub plot_header(%json) {
 sub plot_tree(%json) {
     cursor_reset(:line(6));
 
-    if $show_tree && (%json<tree>:exists) {
-        if %json<tree><_resolved><child_count> > 0 {
-            my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
-            my %width;
-            for <level child_count> -> $prop { %width{$prop} = @tree.map({($_{$prop}.chars, 2).max}).max }
-            for @tree[^10] -> $c {
-                if $c {
-                    my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
-                    my $count_fmt = ansi("%{%width<child_count>}s", 'cyan');
-                    my $s = sprintf("$level_fmt  $count_fmt  %s",
-                                    $c<level>,
-                                    $c<child_count> || '--',
-                                    $c<title>.substr(0, 100));
-
-                    cursored_print($s, :indent(6));
+    if $show_tree {
+        if (%json<tree>:exists) {
+            if %json<tree><_resolved><child_count> > 0 {
+                my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
+                my %width;
+                for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
+                for @tree[^10] -> $c {
+                    if $c {
+                        my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+                        my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
+                        my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
+                        my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
+                                        $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
+                                        $c<level>,
+                                        $c<identifier> || '--',
+                                        $c<title>.substr(0, 100));
+                        cursored_print($s, :indent(6));
+                    }
                 }
+            } else {
+                cursored_print(ansi('-- no children --', 'yellow'), :indent(6));
             }
         } else {
-            cursored_print(ansi('-- no children --', 'yellow'), :indent(6));
+            cursored_print(ansi('-- no tree --', 'yellow'), :indent(6));
         }
     }
 
@@ -458,25 +463,27 @@ sub link_label($prop, %hash) {
 }
 
 
-sub print_nav_help($s, $line) {
-    print_at(" $s", $term_cols - 50, $line, :fill);
+sub print_nav_help($s) {
+    cursored_print(" $s", :indent($term_cols - 50), :fill);
 }
 
 
 sub nav_help {
     run 'tput', 'civis'; # hide the cursor
-    print_nav_help('', 1);
-    print_nav_help(ansi('UP', 'bold') ~ '/' ~ ansi('DOWN', 'bold') ~ '  Select Previous/Next uri', 2);
-    print_nav_help(ansi('LEFT', 'bold') ~ '     Back to last uri', 3);
-    print_nav_help(ansi('RIGHT', 'bold') ~ '    Load selected uri', 4);
-    print_nav_help(ansi('SPACE', 'bold') ~ '    View json for selected uri', 5);
-    print_nav_help(ansi('RETURN', 'bold') ~ '   View summary for selected uri', 6);
-    print_nav_help(ansi('r', 'bold') ~ '        Resolve refs like the selected uri', 7);
-    print_nav_help(ansi('q', 'bold') ~ '        Quit navigator', 8);
-    print_nav_help(ansi('h', 'bold') ~ '        This help', 9);
-    print_nav_help('', 10);
-    print_nav_help(ansi('    <ANY KEY> to exit help', 'bold'), 11);
-    print_nav_help('', 12);
+    cursor_reset;
+    print_nav_help('');
+    print_nav_help(ansi('UP', 'bold') ~ '/' ~ ansi('DOWN', 'bold') ~ '  Select Previous/Next uri');
+    print_nav_help(ansi('LEFT', 'bold') ~ '     Back to last uri');
+    print_nav_help(ansi('RIGHT', 'bold') ~ '    Load selected uri');
+    print_nav_help(ansi('SPACE', 'bold') ~ '    View json for selected uri');
+    print_nav_help(ansi('RETURN', 'bold') ~ '   View summary for selected uri');
+    print_nav_help(ansi('t', 'bold') ~ '        Toggle tree view');
+    print_nav_help(ansi('r', 'bold') ~ '        Resolve refs like the selected uri');
+    print_nav_help(ansi('q', 'bold') ~ '        Quit navigator');
+    print_nav_help(ansi('h', 'bold') ~ '        This help');
+    print_nav_help('');
+    print_nav_help(ansi('    <ANY KEY> to exit help', 'bold'));
+    print_nav_help('');
     get_char;
     cursor($x, $y);
     run 'tput', 'cvvis'; # show the cursor
