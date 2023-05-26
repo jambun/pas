@@ -36,6 +36,8 @@ my constant RIGHT_ARROW =  "\x[1b][C";
 my constant LEFT_ARROW  =  "\x[1b][D";
 my constant BEL         =  "\x[07]";
 
+my constant RECORD_ID_PROPS = <id_0 component_id digital_object_id>;
+
 my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
                                   last_page outcome_note jsonmodel_type>;
 
@@ -434,9 +436,20 @@ sub record_context(%hash) {
 }
 
 
+sub record_id(%hash) {
+    my $id = RECORD_ID_PROPS.map({%hash{$_}}).grep(Cool)[0];
+
+    if %hash<id_0> {
+        $id = <id_0 id_1 id_2 id_3>.map({%hash{$_}}).grep(Cool).join('-');
+    }
+
+    $id && '[' ~ $id ~ ']';
+}
+
 sub record_label(%hash) {
     my $label = (RECORD_LABEL_PROPS.map: {%hash{$_}}).grep(Cool)[0];
     $label ~~ s:g/'<' .+? '>'// if $label;
+    $label = (record_id(%hash), $label).grep(Cool).join(' ');
     $label;
 }
 
@@ -459,9 +472,9 @@ sub link_label($prop, %hash) {
     LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
     my $record;
     if %hash<_resolved>:exists {
-	$record = record_label(%hash<_resolved>);
+	      $record = record_label(%hash<_resolved>);
     } else {
-	$record = record_label(%hash);
+	      $record = record_label(%hash);
     }
     $label ~= "  > $record" if $record;
     $label ~~ s:g/'<' .+? '>'//;
