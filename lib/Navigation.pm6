@@ -283,13 +283,22 @@ sub plot_tree(%json) {
     cursor_reset(:mark('bottom_of_header'));
     cursor_next;
 
+    my $tree_page = 1;
+    my $start_child = ($tree_page - 1) * 10 + 1;
+
     if $show_tree {
         if (%json<tree>:exists) {
             if %json<tree><_resolved><child_count> > 0 {
+                my $cnt = %json<tree><_resolved><child_count>;
                 my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
+                if $cnt > 10 {
+                    cursored_print($start_child ~ ' to ' ~ ($start_child + 9).Str ~ ' of ' ~ $cnt ~ ' children', :indent(6));
+                } else {
+                    cursored_print($cnt ~ ' children', :indent(6));
+                }
                 my %width;
                 for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
-                for @tree[^10] -> $c {
+                for @tree[$start_child - 1..$start_child + 9] -> $c {
                     if $c {
                         my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
                         my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
