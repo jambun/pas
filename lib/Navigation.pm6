@@ -453,15 +453,18 @@ sub record_label(%hash) {
     $label;
 }
 
+sub badge($label, $background) {
+    ansi(' ' ~ $label ~ ' ', 'white on_' ~ $background);
+}
 
 sub record_summary(%hash) {
-    my $out = ansi(%hash<jsonmodel_type>, 'magenta') ~ '  ';
-    $out ~= ansi('public', 'green') ~ '  ' if %hash<publish>;
-    $out ~= ansi('restricted', 'yellow') ~ '  ' if %hash<restrictions_apply>;
-    $out ~= ansi('suppressed', 'red') ~ '  ' if %hash<suppressed>;
+    my $out = badge(%hash<jsonmodel_type>, '0,0,180') ~ ' ';
+    $out ~= badge('public', '0,127,0') ~ ' ' if %hash<publish>;
+    $out ~= badge('restricted', '127,127,0') ~ ' ' if %hash<restrictions_apply>;
+    $out ~= badge('suppressed', '127,0,0') ~ ' ' if %hash<suppressed>;
     $out ~= RECORD_SUMMARY_ARRAYS.grep({%hash{$_}:exists && %hash{$_} > 0}).map({
-	      $_ ~ ': ' ~ %hash{$_}.elems;
-    }).join(', ');
+	      badge($_ ~ ': ' ~ %hash{$_}.elems, '127,47,95');
+    }).join(' ');
 
     $out;
 }
