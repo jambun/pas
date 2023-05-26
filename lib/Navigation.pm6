@@ -41,10 +41,6 @@ my constant RECORD_ID_PROPS = <id_0 component_id digital_object_id>;
 my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
                                   last_page outcome_note jsonmodel_type>;
 
-my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statements
-           	     		                 external_ids external_documents revision_statements
-			                               terms names agent_contacts lang_materials deaccessions>;
-
 my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
 
 
@@ -177,10 +173,17 @@ sub get_char {
 
 
 sub print_at($s, $col, $row, Bool :$fill) {
-    cursor($col, $row);
-    $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
-    $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
-    printf("%-*.*s", ($fill ?? $term_cols - $col !! $s.chars, $term_cols - $col + (+$s.perl.comb: /'\x'/)*4), $s) if $row <= $term_lines;
+    if $row <= $term_lines {
+        cursor($col, $row);
+        $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
+        $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
+
+        my $out = visible_trim($s, $term_cols - $col);
+        print $out;
+        if $fill {
+            print ' ' x ($term_cols - visible_length($out));
+        }
+    }
 }
 
 
@@ -258,7 +261,7 @@ sub cursor_next {
 }
 
 sub cursored_print($s, Int :$indent = 1, Bool :$fill) {
-    print_at($s, $indent, $cursor_line++, :$fill);
+    print_at($_, $indent, $cursor_line++, :$fill) for $s.split("\n");
 }
 
 sub mark_cursor($key) {
@@ -269,12 +272,16 @@ sub plot_header(%json) {
     cursor_reset(:line(2));
 
     cursored_print(record_context(%json), :indent(1));
-    cursored_print(ansi(record_label(%json).Str, 'bold'), :indent(2));
-    cursored_print(record_summary(%json), :indent(6));
+    cursored_print('', :fill);
+    cursored_print(ansi(record_label(%json).Str, 'bold'), :indent(4));
+    cursored_print('', :fill);
+    cursored_print(record_summary(%json), :indent(4), :fill);
+    mark_cursor('bottom_of_header');
 }
 
 sub plot_tree(%json) {
-    cursor_reset(:line(6));
+    cursor_reset(:mark('bottom_of_header'));
+    cursor_next;
 
     if $show_tree {
         if (%json<tree>:exists) {
@@ -440,7 +447,7 @@ sub record_id(%hash) {
     my $id = RECORD_ID_PROPS.map({%hash{$_}}).grep(Cool)[0];
 
     if %hash<id_0> {
-        $id = <id_0 id_1 id_2 id_3>.map({%hash{$_}}).grep(Cool).join('-');
+        $id = <id_0 id_1 id_2 id_3>.map({%hash{$_}}).grep(Cool).join('.');
     }
 
     $id && '[' ~ $id ~ ']';
@@ -458,13 +465,28 @@ sub badge($label, $background) {
 }
 
 sub record_summary(%hash) {
-    my $out = badge(%hash<jsonmodel_type>, '0,0,180') ~ ' ';
-    $out ~= badge('public', '0,127,0') ~ ' ' if %hash<publish>;
-    $out ~= badge('restricted', '127,127,0') ~ ' ' if %hash<restrictions_apply>;
-    $out ~= badge('suppressed', '127,0,0') ~ ' ' if %hash<suppressed>;
-    $out ~= RECORD_SUMMARY_ARRAYS.grep({%hash{$_}:exists && %hash{$_} > 0}).map({
-	      badge($_ ~ ': ' ~ %hash{$_}.elems, '127,47,95');
-    }).join(' ');
+    my @badges;
+    @badges.push(badge(%hash<jsonmodel_type>, '0,0,180')),
+    @badges.push(badge('public', '0,127,0')) if %hash<publish>;
+    @badges.push(badge('restricted', '127,127,0')) if %hash<restrictions_apply>;
+    @badges.push(badge('suppressed', '127,0,0')) if %hash<suppressed>;
+    %hash.keys.sort.grep({%hash{$_} ~~ Array && %hash{$_} > 0}).map({
+	      @badges.push(badge($_ ~ ': ' ~ %hash{$_}.elems, '127,47,95'));
+    });
+
+    my $cols = term_cols();
+    my $out = @badges[0];
+    my $current_length = visible_length($out);
+
+    for @badges[1..*] -> $b {
+        if $current_length + visible_length($b) + 1 > $cols - 6 {
+            $out ~= "\n" ~ $b;
+            $current_length = 0;
+        } else {
+            $out ~= " " ~ $b;
+        }
+        $current_length += visible_length($b) + 1;
+    }
 
     $out;
 }

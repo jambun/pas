@@ -409,11 +409,19 @@ sub wrap_lines($string is copy, $indent) is export {
     $out;
 }
 
+sub visible_trim($string is copy, $length) is export {
+    my $cols = term_cols;
+    return $string if visible_length($string) <= $cols;
+
+    while visible_length($string) > $length {
+        $string = $string.substr(0, $string.chars - 1);
+    }
+
+    $string ~ ansi('', 'reset');;
+}
 
 sub visible_length($string is copy) is export {
-    $string ~~ s:g/\e.+?\#//;
-    $string ~~ s:g/\e.+?m//;
-    $string.chars;
+    colorstrip($string).chars
 }
 
 
