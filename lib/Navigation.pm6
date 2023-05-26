@@ -43,7 +43,7 @@ my constant RECORD_LABEL_PROPS = <long_display_string display_string title name
 
 my constant RECORD_SUMMARY_ARRAYS = <dates extents instances notes rights_statements
            	     		                 external_ids external_documents revision_statements
-			                               terms names agent_contacts>;
+			                               terms names agent_contacts lang_materials deaccessions>;
 
 my constant LINK_LABEL_PROPS = <role relator level identifier display_string description>;
 
