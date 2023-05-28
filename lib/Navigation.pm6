@@ -1,4 +1,5 @@
 use Functions;
+use NavCache;
 use Terminal::ANSIColor;
 use JSON::Tiny;
 
@@ -16,7 +17,6 @@ my Int $nav_cursor_col = 50;
 my Int $y_offset = 7;
 
 my Hash @uris;
-my Hash %uri_cache;
 my $current_uri;
 my @resolves;
 my %current_refs;
@@ -29,6 +29,8 @@ my Int $current_nav_offset = 0;
 my Bool $show_tree = False;
 my Int $cursor_line = 1;
 my %cursor_marks;
+my $nav_cache;
+my $tree_indent = 6;
 
 my constant UP_ARROW    =  "\x[1b][A";
 my constant DOWN_ARROW  =  "\x[1b][B";
@@ -48,6 +50,8 @@ method start {
     my $uri = $!uri;
     nav_message(cmd_prompt() ~ " $!line", :set_default);
     clear_screen;
+
+    $nav_cache = NavCache.new;
 
     my Bool $new_uri = True;
     my $c = '';
@@ -135,12 +139,18 @@ method start {
 		                } else {
 			                  @resolves.push(%current_refs{$y-$y_offset});
 		                }
-		                %uri_cache{$current_uri}:delete;
+                    $nav_cache.remove($current_uri);
 		                $new_uri = True;
 		            }
 		            when 't' {
                     $show_tree = !$show_tree;
                     plot_uri($current_uri);
+                }
+		            when '.' {
+                    next_tree_page;
+                }
+		            when ',' {
+                    prev_tree_page;
                 }
 		            when 'h' {
 		                nav_help;
@@ -153,7 +163,6 @@ method start {
     nav_message(' ');
     clear_screen;
     cursor(0, q:x/tput lines/.chomp.Int);
-    %uri_cache = Hash.new;
     $current_uri = Str.new;
     last_uris(map { $_<uri> }, @uris);
     $message;
@@ -268,6 +277,10 @@ sub mark_cursor($key) {
     %cursor_marks{$key} = $cursor_line;
 }
 
+sub cursor_mark($key) {
+    %cursor_marks{$key};
+}
+
 sub plot_header(%json) {
     cursor_reset(:line(2));
 
@@ -279,26 +292,46 @@ sub plot_header(%json) {
     mark_cursor('bottom_of_header');
 }
 
+sub next_tree_page {
+    return unless $show_tree;
+    my $curi = $nav_cache.uri($current_uri);
+    if $curi.children {
+        if $curi.next_tree_page {
+            cursor_reset(:mark(<top_of_tree>));
+            cursored_print($curi.tree_page, :indent($tree_indent), :fill(True));
+        } else {
+           print BEL; 
+        }
+    }
+}
+
+sub prev_tree_page {
+    return unless $show_tree;
+    my $curi = $nav_cache.uri($current_uri);
+    if $curi.children {
+        if $curi.prev_tree_page {
+            cursor_reset(:mark(<top_of_tree>));
+            cursored_print($curi.tree_page, :indent($tree_indent), :fill(True));
+        } else {
+           print BEL; 
+        }
+    }
+}
+
 sub plot_tree(%json) {
     cursor_reset(:mark('bottom_of_header'));
     cursor_next;
-
-    my $tree_page = 1;
-    my $start_child = ($tree_page - 1) * 10 + 1;
+    mark_cursor('top_of_tree');
 
     if $show_tree {
         if (%json<tree>:exists) {
             if %json<tree><_resolved><child_count> > 0 {
-                my $cnt = %json<tree><_resolved><child_count>;
+                my $curi = $nav_cache.uri(%json<uri>);
+                $curi.child_count = %json<tree><_resolved><child_count>;
                 my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
-                if $cnt > 10 {
-                    cursored_print($start_child ~ ' to ' ~ ($start_child + 9).Str ~ ' of ' ~ $cnt ~ ' children', :indent(6));
-                } else {
-                    cursored_print($cnt ~ ' children', :indent(6));
-                }
                 my %width;
                 for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
-                for @tree[$start_child - 1..$start_child + 9] -> $c {
+                for @tree -> $c {
                     if $c {
                         my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
                         my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
@@ -308,14 +341,15 @@ sub plot_tree(%json) {
                                         $c<level>,
                                         $c<identifier> || '--',
                                         $c<title>.substr(0, 100));
-                        cursored_print($s, :indent(6));
+                        $curi.add_child($c<uri>, $s);
                     }
                 }
+                cursored_print($curi.tree_page, :indent($tree_indent), :fill);
             } else {
-                cursored_print(ansi('-- no children --', 'yellow'), :indent(6));
+                cursored_print(ansi('-- no children --', 'yellow'), :indent($tree_indent));
             }
         } else {
-            cursored_print(ansi('-- no tree --', 'yellow'), :indent(6));
+            cursored_print(ansi('-- no tree --', 'yellow'), :indent($tree_indent));
         }
     }
 
@@ -324,24 +358,24 @@ sub plot_tree(%json) {
 }
 
 sub plot_uri(Str $uri, @args = (), Bool :$reload) {
-    %uri_cache ||= Hash.new;
-
     my %json;
-    if %uri_cache{$uri} && !$reload {
-	      %json = %uri_cache{$uri}<json>;
+    if $nav_cache.is_cached($uri) && !$reload {
+        %json = $nav_cache.uri($uri).json;
     } else {
 	      nav_message("getting $uri ...");
 	      my $raw_json = client.get($uri, to_resolve_params(@args));
 	      nav_message("parsing $uri ...");
 	      %json = from-json $raw_json;
 	      return False if %json<error>:exists;
-	      %uri_cache{$uri} = { json => %json.clone, y => $y_offset, offset => 0 };
+
+        $nav_cache.add_uri($uri, :json(%json.clone));
+
 	      nav_message(:default);
     }
 
-    if ($current_uri && (%uri_cache{$current_uri}:exists)) {
-	      %uri_cache{$current_uri}<y> = $y;
-	      %uri_cache{$current_uri}<offset> = $current_nav_offset;
+    if ($current_uri && $nav_cache.is_cached($current_uri)) {
+        $nav_cache.uri($current_uri).focus_position = $y;
+        $nav_cache.uri($current_uri).refs_page = $current_nav_offset;
     }
     $current_uri = $uri;
 
@@ -362,15 +396,30 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 
     map_refs(%json, 'top', 6);
     $nav_page_size = $term_lines - $y_offset - 2;
-    plot_nav_page(%uri_cache{$current_uri}<offset>, %uri_cache{$current_uri}<y>);
+    plot_nav_page($nav_cache.uri($current_uri).refs_page, $nav_cache.uri($current_uri).focus_position);
 
     $x = 2;
-    $y = %uri_cache{$uri}<y>;
+    $y = cursor_for($uri);
     cursor($x, $y);
     run 'tput', 'cvvis'; # show the cursor
     nav_message(:default);
 }
 
+sub cursor_for($uri) {
+    if my $cached = $nav_cache.uri($uri) {
+        if $cached.focus_section eq <tree> {
+            if $show_tree {
+                cursor_mark(<top_of_tree>) + $cached.focus_position - 1;
+            } else {
+                cursor_mark(<top_of_nav>);        
+            }
+        } else {
+            cursor_mark(<top_of_nav>) + $cached.focus_position - 1;
+        }
+    } else {
+        cursor_mark(<top_of_nav>);        
+    }
+}
 
 sub map_refs(%hash, $parent, $indent) {
     my $found_ref = 0;
