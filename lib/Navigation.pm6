@@ -8,18 +8,10 @@ has $.uri;
 has @.args;
 has $.line;
 
-my Int $x = 0;
-my Int $y = 0;
 my Int $nav_cursor_col = 1;
 
-# rows from top of page where nav links start
-# gets set in plot_nav_page - changes depending on tree
-my Int $y_offset = 7;
-
-#my Hash @uris;
 my $current_uri;
 my @resolves;
-my %current_refs;
 my $term_cols;
 my $term_lines;
 my Str $default_nav_message;
@@ -66,7 +58,6 @@ method start {
 	          print_at('.' x @uri_history, 2, 1);
 	          print_at(ansi('h', 'bold') ~ 'elp ' ~ ansi('q', 'bold') ~ 'uit',
 		                 $term_cols - 9, 1);
-	          cursor($x, $y);
 	          $new_uri = False;
 	      }
 
@@ -81,13 +72,9 @@ method start {
                     move_nav_cursor(<next>) || print BEL;
 		            }
 		            when RIGHT_ARROW {
-		                if $y == $y_offset {
-			                  print BEL;
-		                } else {
-			                  @uri_history.push: $uri;
-			                  $uri = $nav_cache.uri($current_uri).selected_ref.uri;
-			                  $new_uri = True;
-		                }
+			              @uri_history.push: $uri;
+			              $uri = $nav_cache.uri($current_uri).selected_ref.uri;
+			              $new_uri = True;
 		            }
 		            when LEFT_ARROW {
 		                if @uri_history {
@@ -99,7 +86,6 @@ method start {
 		            }
 	          }
 	      } else {
-	          my $yix = $y - $y_offset;
 	          my $selected = $nav_cache.uri($current_uri).selected_ref;
 	          given $c {
 		            when ' ' {
@@ -116,10 +102,11 @@ method start {
 		                plot_uri($uri, @resolves) || ($message = "No record for $uri");
 		            }
 		            when 'r' {
-		                if @resolves.grep(%current_refs{$y-$y_offset}) {
-			                  @resolves = @resolves.grep: { $_ ne %current_refs{$y-$y_offset} };
+                    my $prop = $nav_cache.uri($current_uri).selected_ref.property;
+		                if @resolves.grep($prop) {
+			                  @resolves = @resolves.grep: { $_ ne $prop };
 		                } else {
-			                  @resolves.push(%current_refs{$y-$y_offset});
+			                  @resolves.push($prop);
 		                }
                     $nav_cache.remove($current_uri);
 		                $new_uri = True;
@@ -140,7 +127,6 @@ method start {
 		            }
 	          }
 	      }
-	      cursor($x, $y);
     }
     nav_message(' ');
     clear_screen;
@@ -183,14 +169,11 @@ sub print_at($s, $col, $row, Bool :$fill) {
 
 sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
     $default_nav_message ||= '';
-    $x ||= 0;
-    $y ||= 0;
     $nav_message = $message if $message;
     $default_nav_message = $message if $set_default;
     $nav_message = $default_nav_message if $default;
     $term_lines ||= q:x/tput lines/.chomp.Int;
     print_at(sprintf("%-*s", $term_cols - 1, $nav_message), 0, $term_lines);
-    cursor($x, $y);
 }
 
 
@@ -364,13 +347,7 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     clear_screen;
 
     plot_header(%json);
-
-#    @uris.push(uri_hash($uri, 'top', ansi($uri, 'bold'), 4, ''));
-
     plot_tree(%json);
-
-    $y = current_cursor;
-
     map_refs(%json, 'top', 6);
 
     $nav_cache.uri($current_uri).refs_page_size($term_lines - cursor_mark(<top_of_nav>) - 2);
@@ -380,9 +357,8 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 
     print_nav_cursor;
 
-    $x = 2;
-    cursor($x, $y);
     nav_message(:default);
+    True;
 }
 
 # return the y value of the cursor position for the currently plotted uri
@@ -429,7 +405,6 @@ sub map_refs(%hash, $parent, $indent) {
 	          map_refs($val, $prop, $indent+$found_ref);
 	      } elsif $val.WHAT ~~ Array {
 	          for $val.values -> $h {
-		            last if $y >= $term_lines;
 		            if $h.WHAT ~~ Hash {
 		                map_refs($h, $prop, $indent+$found_ref);
 		            }
@@ -439,10 +414,25 @@ sub map_refs(%hash, $parent, $indent) {
 }
 
 
+sub link_label($prop, %hash) {
+    my $label = $prop;
+    LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
+    my $record;
+    if %hash<_resolved>:exists {
+	      $record = record_label(%hash<_resolved>);
+    } else {
+	      $record = record_label(%hash);
+    }
+    $label ~= "  > $record" if $record;
+    $label ~~ s:g/'<' .+? '>'//;
+    $label;
+}
+
+
 sub plot_ref($uri, %hash, $parent, $indent) {
     my $link_label = link_label($parent, %hash);
-    my $s = sprintf("%-*s %s", $nav_cursor_col - 5, $uri, $link_label);
-    $nav_cache.uri($current_uri).add_ref($uri, $s);
+#    my $s = sprintf("%-*s %s", $nav_cursor_col - 5, $uri, $link_label);
+    $nav_cache.uri($current_uri).add_ref($uri, $link_label, $parent);
 }
 
 
@@ -525,21 +515,6 @@ sub record_summary(%hash) {
 }
 
 
-sub link_label($prop, %hash) {
-    my $label = $prop;
-    LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
-    my $record;
-    if %hash<_resolved>:exists {
-	      $record = record_label(%hash<_resolved>);
-    } else {
-	      $record = record_label(%hash);
-    }
-    $label ~= "  > $record" if $record;
-    $label ~~ s:g/'<' .+? '>'//;
-    $label;
-}
-
-
 sub print_nav_help($s) {
     cursored_print(" $s", :indent($term_cols - 50), :fill);
 }
@@ -561,7 +536,6 @@ sub nav_help {
     print_nav_help(ansi('    <ANY KEY> to exit help', 'bold'));
     print_nav_help('');
     get_char;
-    cursor($x, $y);
 }
     
 

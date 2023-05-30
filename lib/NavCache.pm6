@@ -1,6 +1,7 @@
 class CachedRef {
     has $.uri;
     has $.label;
+    has $.property;
     has $.sort;
 
     submethod TWEAK {
@@ -30,8 +31,8 @@ class CachedUri {
         $!focus_position ||= 1;
     }
 
-    method add_ref($uri, $label) {
-        @!refs.push(CachedRef.new(:$uri, :$label));
+    method add_ref($uri, $label, $property) {
+        @!refs.push(CachedRef.new(:$uri, :$label, :$property));
     }
 
     method add_child($uri, $label) {
@@ -88,9 +89,9 @@ class CachedUri {
 
     method refs_header {
         if +@!refs > $!refs_page_size {
-            (self.refs_page_start_index() + 1) ~ ' to ' ~ (+@!refs, (self.refs_page_end_index() + 1)).min ~ ' of ' ~ @!refs.elems ~ ' links';
+            (self.refs_page_start_index() + 1) ~ ' to ' ~ (+@!refs, (self.refs_page_end_index() + 1)).min ~ ' of ' ~ @!refs.elems ~ ' references';
         } else {
-            +@!refs ~ ' links';
+            +@!refs ~ ' references';
         }
     }
 
