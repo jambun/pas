@@ -58,6 +58,8 @@ method start {
     my $message = '';
     @resolves = @!args || ();
 
+    run 'tput', 'civis';                   # hide the cursor
+
     while $c ne 'q' {
 	      if $new_uri {
 	          plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
@@ -143,10 +145,11 @@ method start {
     nav_message(' ');
     clear_screen;
     cursor(0, q:x/tput lines/.chomp.Int);
-    $current_uri = Str.new;
     if $nav_cache.is_cached($current_uri) {
         last_uris(map { $_.uri }, $nav_cache.uri($current_uri).refs);
     }
+    $current_uri = Str.new;
+    run 'tput', 'cvvis'; # show the cursor
     $message;
 }
 
@@ -172,7 +175,7 @@ sub print_at($s, $col, $row, Bool :$fill) {
         my $out = visible_trim($s, $term_cols - $col);
         print $out;
         if $fill {
-            print ' ' x ($term_cols - visible_length($out));
+            print ' ' x ($term_cols - visible_length($out) - $col);
         }
     }
 }
@@ -185,11 +188,9 @@ sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
     $nav_message = $message if $message;
     $default_nav_message = $message if $set_default;
     $nav_message = $default_nav_message if $default;
-    run 'tput', 'civis'; # hide the cursor
     $term_lines ||= q:x/tput lines/.chomp.Int;
     print_at(sprintf("%-*s", $term_cols - 1, $nav_message), 0, $term_lines);
     cursor($x, $y);
-    run 'tput', 'cvvis'; # show the cursor
 }
 
 
@@ -360,7 +361,6 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     nav_message("plotting $uri ...");
     $term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
     $term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
-    run 'tput', 'civis';                   # hide the cursor
     clear_screen;
 
     plot_header(%json);
@@ -382,7 +382,6 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 
     $x = 2;
     cursor($x, $y);
-    run 'tput', 'cvvis'; # show the cursor
     nav_message(:default);
 }
 
@@ -547,7 +546,6 @@ sub print_nav_help($s) {
 
 
 sub nav_help {
-    run 'tput', 'civis'; # hide the cursor
     cursor_reset;
     print_nav_help('');
     print_nav_help(ansi('UP', 'bold') ~ '/' ~ ansi('DOWN', 'bold') ~ '  Select Previous/Next uri');
@@ -564,7 +562,6 @@ sub nav_help {
     print_nav_help('');
     get_char;
     cursor($x, $y);
-    run 'tput', 'cvvis'; # show the cursor
 }
     
 
