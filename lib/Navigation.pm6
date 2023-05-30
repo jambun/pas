@@ -304,21 +304,24 @@ sub plot_tree(%json) {
         if (%json<tree>:exists) {
             if %json<tree><_resolved><child_count> > 0 {
                 my $curi = $nav_cache.uri(%json<uri>);
-                $curi.child_count = %json<tree><_resolved><child_count>;
-                my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
-                my %width;
-                for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
-                for @tree -> $c {
-                    if $c {
-                        my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
-                        my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
-                        my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
-                        my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
-                                        $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
-                                        $c<level>,
-                                        $c<identifier> || '--',
-                                        $c<title>.substr(0, 100));
-                        $curi.add_child($c<uri>, $s);
+
+                unless $curi.child_count {
+                    $curi.child_count = %json<tree><_resolved><child_count>;
+                    my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
+                    my %width;
+                    for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
+                    for @tree -> $c {
+                        if $c {
+                            my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+                            my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
+                            my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
+                            my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
+                                            $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
+                                            $c<level>,
+                                            $c<identifier> || '--',
+                                            $c<title>.substr(0, 100));
+                            $curi.add_child($c<uri>, $s);
+                        }
                     }
                 }
                 cursored_print($curi.render_tree_page, :indent($tree_indent), :fill(True));
@@ -413,6 +416,8 @@ sub uri_for($cursor) {
 }
 
 sub map_refs(%hash, $parent, $indent) {
+    return if $parent eq <top> && $nav_cache.uri(%hash<uri>).refs;
+
     my $found_ref = 0;
     for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
 	      my $val = %hash{$prop};
