@@ -144,7 +144,9 @@ method start {
     clear_screen;
     cursor(0, q:x/tput lines/.chomp.Int);
     $current_uri = Str.new;
-    last_uris(map { $_.uri }, $nav_cache.uri($current_uri).refs);
+    if $nav_cache.is_cached($current_uri) {
+        last_uris(map { $_.uri }, $nav_cache.uri($current_uri).refs);
+    }
     $message;
 }
 
