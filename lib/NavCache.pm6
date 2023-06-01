@@ -61,7 +61,11 @@ class PagedSection is Section {
     }
 
     method size {
-        $!page_size;
+        if $!page !== 1 && $!page == (self.items / $!page_size).ceiling {
+            self.items % $!page_size;
+        } else {
+            $!page_size;
+        }
     }
 
     method page_size($size?) {
