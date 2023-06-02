@@ -117,10 +117,10 @@ method start {
                     plot_uri($current_uri);
                 }
 		            when '.' {
-                    print_tree_page(<next>);
+                    print_child_page(<next>);
                 }
 		            when ',' {
-                    print_tree_page(<prev>);
+                    print_child_page(<prev>);
                 }
 		            when 'h' {
 		                nav_help;
@@ -267,12 +267,12 @@ sub plot_header(%json) {
     mark_cursor('bottom_of_header');
 }
 
-sub print_tree_page($page?) {
+sub print_child_page($page?) {
     return unless $show_tree;
     my $curi = cached_uri();
     return unless $curi;
 
-    my $sect = $curi.section(<tree>);
+    my $sect = $curi.section(<children>);
 
     return unless $sect.size;
 
@@ -284,7 +284,7 @@ sub print_tree_page($page?) {
         when <last>    { $sect.last_page; }
         default        { $sect.page; }
        }) {
-        cursor_reset(:mark(<top_of_tree>));
+        cursor_reset(:mark(<top_of_children>));
         cursored_print($sect.render, :indent($tree_indent), :fill(True));
         print_nav_cursor;
     } else {
@@ -293,18 +293,39 @@ sub print_tree_page($page?) {
 }
 
 sub plot_tree(%json) {
-    cursor_reset(:mark('bottom_of_header'));
+    cursor_reset(:mark(<bottom_of_header>));
     cursor_next;
-    mark_cursor('top_of_tree');
+    mark_cursor(<top_of_tree>);
 
     if $show_tree {
-        cached_uri.section(<tree>).start_row = cursor_mark(<top_of_tree>) + 1;
         if (%json<tree>:exists) {
-            if %json<tree><_resolved><child_count> > 0 {
-                my $curi = $nav_cache.uri(%json<uri>);
+            my $curi = $nav_cache.uri(%json<uri>);
 
-                unless $curi.section(<tree>).item_count {
-                    $curi.section(<tree>).item_count = %json<tree><_resolved><child_count>;
+            if %json<tree><_resolved><parents> {
+                mark_cursor(<top_of_parents>);
+                unless $curi.section(<parents>).size {
+                    my $level_width = %json<ancestors>.map({$_<level>.chars}).max;
+                    $level_width += 3 if %json<ancestors> > 1;
+                    for %json<tree><_resolved><parents>.kv -> $ix, $p {
+                        my $uri = $p<node> || $p<root_record_uri>;
+                        my $level = %json<ancestors>.grep({$_<ref> eq $uri}).head<level>;
+                        my $label = (' ' x $ix * 3) ~ ($ix ?? "\x2517\x2501 " !! " \x25fc ") ~ ansi($level, 'yellow') ~ ' ' x ($level_width - $level.chars - $ix * 3) ~ '  ' ~ $p<title>;
+                        $curi.add_item(<parents>, $uri, $label);
+                    }
+                }
+                cached_uri.section(<parents>).start_row = cursor_mark(<top_of_parents>) + 1;
+                cursored_print($curi.section(<parents>).size ~ ' parent' ~ ($curi.section(<parents>).size > 1 ?? 's' !! ''), :indent(6), :fill);
+                cursored_print($curi.section(<parents>).render, :indent(6));
+                cursored_print('', :indent(6), :fill);
+            }
+
+            if %json<tree><_resolved><child_count> > 0 {
+                mark_cursor(<top_of_children>);
+
+                cached_uri.section(<children>).start_row = cursor_mark(<top_of_children>) + 1;
+
+                unless $curi.section(<children>).item_count {
+                    $curi.section(<children>).item_count = %json<tree><_resolved><child_count>;
                     my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
                     my %width;
                     for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
@@ -318,11 +339,11 @@ sub plot_tree(%json) {
                                             $c<level>,
                                             $c<identifier> || '--',
                                             $c<title>.substr(0, 100));
-                            $curi.add_item(<tree>, $c<uri>, $s);
+                            $curi.add_item(<children>, $c<uri>, $s);
                         }
                     }
                 }
-                cursored_print($curi.section(<tree>).render, :indent($tree_indent), :fill(True));
+                cursored_print($curi.section(<children>).render, :indent($tree_indent), :fill(True));
             } else {
                 cursored_print(ansi('-- no children --', 'yellow'), :indent($tree_indent));
             }
@@ -363,7 +384,7 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     map_refs(%json, 'top', 6);
 
     cached_uri().section(<refs>).page_size($term_lines - cursor_mark(<top_of_nav>) - 2);
-    cached_uri().section(<tree>).page_size(10);
+    cached_uri().section(<children>).page_size(10);
 
     plot_nav_page;
 
@@ -436,8 +457,12 @@ sub record_context(%hash) {
 
     $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
 
-    if %hash<tree> {
-        my %tree = from-json client.get(%hash<uri> ~ (%hash<uri> ~~ /resource/ ?? '/tree/root' !! '/tree/node'));
+    if %hash<tree> && !%hash<tree><_resolved> {
+        my %tree = from-json client.get(%hash<uri> ~ (%hash<jsonmodel_type> eq <resource> ?? '/tree/root' !! '/tree/node'));
+        unless %hash<jsonmodel_type> eq <resource> {
+            my $id =  %hash<uri>.split('/').tail;
+            %tree<parents> = (from-json client.get(%hash<resource><ref> ~ '/tree/node_from_root', ['node_ids[]=' ~ $id])){$id};
+        }
         if %tree<child_count> > 0 {
             $out ~= ' > ' ~ ansi(%tree<child_count> ~ (%tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
         }

@@ -135,13 +135,14 @@ class CachedUri {
     has $.json is rw;
     has $.focus_section is rw;
     has $.focus_position is rw;
-    has Str @.section_layout = <title tree refs>;
+    has Str @.section_layout = <title parents children refs>;
     has Section %!sections;
 
     submethod TWEAK {
-        %!sections = title => Section.new(:label(<title>), :start_row(1)),
-                     tree  => PagedSection.new(:label(<children>)),
-                     refs  => PagedSection.new(:label(<references>), :sorted);
+        %!sections = title    => Section.new(:label(<title>), :start_row(1)),
+                     parents  => Section.new(:label(<parents>)),
+                     children => PagedSection.new(:label(<children>)),
+                     refs     => PagedSection.new(:label(<references>), :sorted);
 
         $!focus_section ||= <title>;
         $!focus_position ||= 1;
