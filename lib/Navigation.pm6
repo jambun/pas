@@ -502,8 +502,8 @@ sub record_summary(%hash) {
     @badges.push(badge('restricted', '127,127,0')) if %hash<restrictions_apply>;
     @badges.push(badge('suppressed', '127,0,0')) if %hash<suppressed>;
 
-    %hash.keys.sort.grep({%hash{$_} ~~ Array && %hash{$_} > 0}).map({
-	      @badges.push(badge($_ ~ ': ' ~ %hash{$_}.elems, '127,47,95'));
+    %hash.keys.sort.grep({%hash{$_} ~~ Hash || %hash{$_} ~~ Array && %hash{$_} > 0}).map({
+	      @badges.push(badge($_ ~ (%hash{$_} ~~ Array ?? ': ' ~ %hash{$_}.elems !! ''), '127,47,95'));
     });
 
     my $cols = term_cols();
