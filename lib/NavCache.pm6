@@ -17,6 +17,7 @@ class Section {
     has $.item_count is rw;
     has $.start_row is rw;
     has Bool $.sorted is rw;
+    has Bool $.show_header is rw;
 
     method is_active {
         $!start_row && @!items;
@@ -46,10 +47,15 @@ class Section {
         +@!items;
     }
 
-    method header {}
+    method header {
+        self.size ~ ' ' ~ self.label;
+    }
 
     method render {
-        self.items.map({$_ ?? $_.label !! ''}).grep({$_}).join("\n");
+        my @out;
+        @out.push(ansi(self.header(), 'cyan')) if self.show_header;
+        @out.push(|self.items.map({$_ ?? $_.label !! ''}).grep({$_}));
+        @out.join("\n");
     }
 }
 
@@ -60,6 +66,7 @@ class PagedSection is Section {
     submethod TWEAK {
         $!page ||= 1;
         $!page_size ||= 10;
+        self.show_header = True;
     }
 
     method size {
@@ -111,11 +118,12 @@ class PagedSection is Section {
     }
 
     method render {
-        my $out = ansi(self.header(), 'cyan');
+        my @out;
+        @out.push(ansi(self.header(), 'cyan')) if self.show_header;
         if self.size > 0 {
-            $out ~= "\n" ~ self.items[self.start_index()..self.end_index()].map({$_ ?? $_.label !! ''}).grep({$!page > 1 || $_}).join("\n");
+            @out.push(|self.items[self.start_index()..self.end_index()].map({$_ ?? $_.label !! ''}).grep({$!page > 1 || $_}));
         }
-        $out;
+        @out.join("\n");
     }
 
     method last_page {
@@ -158,6 +166,10 @@ class CachedUri {
         %!sections{$section_name};
     }
 
+    method focussed_section {
+        %!sections{$!focus_section};
+    }
+
     method add_item($section_name, $uri, $label, $property?) {
         if (my $section = %!sections{$section_name}) {
             $section.add_item(CachedRef.new(:$uri, :$label, :$property));
@@ -165,7 +177,8 @@ class CachedUri {
     }
 
     method focus_row {
-        if (my $start = %!sections{$!focus_section}.start_row) {
+        if (my $start = self.focussed_section.start_row) {
+            $start++ if self.focussed_section.show_header;
             $start + $!focus_position - 1;
         } else {
             $!focus_section = @!section_layout[0];

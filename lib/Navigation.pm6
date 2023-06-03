@@ -117,10 +117,10 @@ method start {
                     plot_uri($current_uri);
                 }
 		            when '.' {
-                    print_child_page(<next>);
+                    print_section_page(<next>);
                 }
 		            when ',' {
-                    print_child_page(<prev>);
+                    print_section_page(<prev>);
                 }
 		            when 'h' {
 		                nav_help;
@@ -267,14 +267,17 @@ sub plot_header(%json) {
     mark_cursor('bottom_of_header');
 }
 
-sub print_child_page($page?) {
+sub print_section_page($page?) {
     return unless $show_tree;
     my $curi = cached_uri();
     return unless $curi;
 
-    my $sect = $curi.section(<children>);
+    my $sect = $curi.focussed_section;
 
-    return unless $sect.size;
+    if $sect !~~ PagedSection || !$sect.size {
+        print BEL;
+        return;
+    }
 
     if (given $page {
         when /^ \d+ $/ { $sect.page($page.Int); }
@@ -284,7 +287,7 @@ sub print_child_page($page?) {
         when <last>    { $sect.last_page; }
         default        { $sect.page; }
        }) {
-        cursor_reset(:mark(<top_of_children>));
+        cursor_reset(:line($sect.start_row));
         cursored_print($sect.render, :indent($tree_indent), :fill(True));
         print_nav_cursor;
     } else {
@@ -313,8 +316,8 @@ sub plot_tree(%json) {
                         $curi.add_item(<parents>, $uri, $label);
                     }
                 }
-                cached_uri.section(<parents>).start_row = cursor_mark(<top_of_parents>) + 1;
-                cursored_print(ansi($curi.section(<parents>).size ~ ' parent' ~ ($curi.section(<parents>).size > 1 ?? 's' !! ''), 'cyan'), :indent(6), :fill);
+                cached_uri.section(<parents>).start_row = cursor_mark(<top_of_parents>);
+                cached_uri.section(<parents>).show_header = True;
                 cursored_print($curi.section(<parents>).render, :indent(6));
                 cursored_print('', :indent(6), :fill);
             }
@@ -322,7 +325,7 @@ sub plot_tree(%json) {
             if %json<tree><_resolved><child_count> > 0 {
                 mark_cursor(<top_of_children>);
 
-                cached_uri.section(<children>).start_row = cursor_mark(<top_of_children>) + 1;
+                cached_uri.section(<children>).start_row = cursor_mark(<top_of_children>);
 
                 unless $curi.section(<children>).item_count {
                     $curi.section(<children>).item_count = %json<tree><_resolved><child_count>;
@@ -439,7 +442,7 @@ sub plot_ref($uri, %hash, $parent, $indent) {
 sub plot_nav_page {
     cursor_reset(:mark('top_of_nav'));
 
-    cached_uri.section(<refs>).start_row = cursor_mark(<top_of_nav>) + 1;
+    cached_uri.section(<refs>).start_row = cursor_mark(<top_of_nav>);
 
     cursored_print(cached_uri().section(<refs>).render(), :indent($tree_indent), :fill(True));
 }
