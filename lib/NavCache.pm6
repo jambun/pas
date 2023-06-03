@@ -1,3 +1,5 @@
+use Functions;
+
 class CachedRef {
     has $.uri;
     has $.label;
@@ -109,7 +111,11 @@ class PagedSection is Section {
     }
 
     method render {
-        self.header() ~ "\n" ~ self.items[self.start_index()..self.end_index()].map({$_ ?? $_.label !! ''}).grep({$!page > 1 || $_}).join("\n");
+        my $out = ansi(self.header(), 'cyan');
+        if self.size > 0 {
+            $out ~= "\n" ~ self.items[self.start_index()..self.end_index()].map({$_ ?? $_.label !! ''}).grep({$!page > 1 || $_}).join("\n");
+        }
+        $out;
     }
 
     method last_page {

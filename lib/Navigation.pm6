@@ -184,7 +184,7 @@ sub clear_screen {
 }
 
 sub print_nav_cursor {
-    print_at(ansi('>>', 'bold'), $nav_cursor_col, cached_uri().focus_row);
+    print_at(ansi("\x25ac\x25b6", '255,200,120'), $nav_cursor_col, cached_uri().focus_row);
     True;
 }
 
@@ -314,7 +314,7 @@ sub plot_tree(%json) {
                     }
                 }
                 cached_uri.section(<parents>).start_row = cursor_mark(<top_of_parents>) + 1;
-                cursored_print($curi.section(<parents>).size ~ ' parent' ~ ($curi.section(<parents>).size > 1 ?? 's' !! ''), :indent(6), :fill);
+                cursored_print(ansi($curi.section(<parents>).size ~ ' parent' ~ ($curi.section(<parents>).size > 1 ?? 's' !! ''), 'cyan'), :indent(6), :fill);
                 cursored_print($curi.section(<parents>).render, :indent(6));
                 cursored_print('', :indent(6), :fill);
             }
@@ -343,12 +343,10 @@ sub plot_tree(%json) {
                         }
                     }
                 }
-                cursored_print($curi.section(<children>).render, :indent($tree_indent), :fill(True));
-            } else {
-                cursored_print(ansi('-- no children --', 'yellow'), :indent($tree_indent));
             }
+            cursored_print($curi.section(<children>).render, :indent($tree_indent), :fill(True));
         } else {
-            cursored_print(ansi('-- no tree --', 'yellow'), :indent($tree_indent));
+            cursored_print(ansi('no tree', 'cyan'), :indent($tree_indent));
         }
     }
 
