@@ -111,7 +111,7 @@ class Command {
         token keyword       { <[\w\d\_]>+ }
         rule  arglist       { <argitem>* }
         rule  argitem       { <argvalue> }
-        token argvalue      { [ <arg> | <singlequoted> | <doublequoted> ] }
+        token argvalue      { [ <arg> | <singlequoted> | <doublequoted> | <qualifier> ] }
         token arg           { <[\w\d\=\-\_\/\+\,\;\.]> \S* }
         token value         { [ <str> | <singlequoted> | <doublequoted> ] }
         token str           { <-['"\\\s]>+ }
@@ -145,7 +145,7 @@ class Command {
 
         method action($/)     { $!cmd.action = $/<keyword>.Str; }
         method qualifier($/)  { $!cmd.qualifier = $/<keyword>.Str; }
-        method argvalue($/)   { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) }
+        method argvalue($/)   { $!cmd.args.push(($<arg> || $<singlequoted>[0] || $<doublequoted>[0]).Str) unless $<qualifier> }
 
         method postfile($/)   { $!cmd.action = 'post'; $!cmd.postfile = $<file>.Str }
         method redirect($/)   { $!cmd.savefile = $<file>.Str;
