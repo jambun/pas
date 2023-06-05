@@ -9,6 +9,7 @@ use JSON::Tiny;
 use Digest::MD5;
 use Crypt::Random;
 use Terminal::ANSIColor;
+use Base64;
 
 
 my constant   LAST_DIR           = 'last';
@@ -108,6 +109,17 @@ sub ansi(Str $s, Str $ansi_fmt) is export {
     } else {
         $s;
     }
+}
+
+sub inline_image_supported is export {
+    %*ENV<LC_TERMINAL> eq <iTerm2>;
+}
+
+sub inline_image($data, :$height) is export {
+    return unless inline_image_supported;
+    my $datab64 = encode-base64($data, :str);
+    my $args = 'height=' ~ $height ~ ';';
+    "\e]1337;File=inline=1;{$args}size={$datab64.chars}:{$datab64}\cG";
 }
 
 

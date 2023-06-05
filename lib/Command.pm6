@@ -30,13 +30,13 @@ class Command {
     my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
-                           session who asam doc assb find
+                           session who asam doc ass assb find
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
                                       stub.n search.parse search.public login.prompt
                                       session.delete users.create users.me users.pass
-                                      endpoints.reload doc.get doc.post doc.delete
+                                      endpoints.reload doc.get doc.post doc.delete ass.big
                                       assb.keys assb.install assb.plugins assb.catalog
                                       schemas.reload schemas.property
                                       enums.add enums.remove enums.tr enums.reload
@@ -74,7 +74,7 @@ class Command {
         build_cc($line, '', <list request install remove switch>) if $line ~~ /^ ('assb.keys' \s+) $/;
         build_cc($line, $1.Str, assb_cat_names) if $line ~~ s/^ ('assb.install' \s+) (\w*) $/$0/;
 
-        build_cc($line, $1.Str, QUALIFIED_ACTIONS.grep({ $_.starts-with($0[0].Str)}).map({$_.split('.')[1]})) if $line ~~ s/((@(ACTIONS)) .+ \s+ '.') (\w*) $/$0/;
+        build_cc($line, $1.Str, QUALIFIED_ACTIONS.grep({ $_.starts-with($0[0].Str)}).map({$_.split('.')[1]})) if $line ~~ s/((@(ACTIONS)) .* \s+ '.') (\w*) $/$0/;
 
         @out;
     }
@@ -566,6 +566,14 @@ class Command {
                 }).join("\n");
 
         $out;
+    }
+
+    method ass {
+        if inline_image_supported() {
+            "\n" ~ inline_image(slurp($*PROGRAM.dirname ~ '/img/pas.jpg', :bin), :height($!qualifier eq <big> ?? (term_lines() - 2, 20).min !! 5)) ~ "\n\n";
+        } else {
+            "Sorry, only supported on iTerm2. Please imagine an image of a {$!qualifier eq <big> ?? 'big ' !! ''}porcelain ass!";
+        }
     }
 
     method search {
