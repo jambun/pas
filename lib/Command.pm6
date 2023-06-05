@@ -74,6 +74,8 @@ class Command {
         build_cc($line, '', <list request install remove switch>) if $line ~~ /^ ('assb.keys' \s+) $/;
         build_cc($line, $1.Str, assb_cat_names) if $line ~~ s/^ ('assb.install' \s+) (\w*) $/$0/;
 
+        build_cc($line, $1.Str, QUALIFIED_ACTIONS.grep({ $_.starts-with($0[0].Str)}).map({$_.split('.')[1]})) if $line ~~ s/((@(ACTIONS)) .+ \s+ '.') (\w*) $/$0/;
+
         @out;
     }
 
