@@ -534,6 +534,8 @@ sub nav_help {
     cursor_reset;
     print_nav_help('');
     print_nav_help(ansi('UP', 'bold') ~ '/' ~ ansi('DOWN', 'bold') ~ '  Select Previous/Next uri');
+    print_nav_help(ansi('<', 'bold') ~ '        Previous page of current section');
+    print_nav_help(ansi('>', 'bold') ~ '        Next page of current section');
     print_nav_help(ansi('LEFT', 'bold') ~ '     Back to last uri');
     print_nav_help(ansi('RIGHT', 'bold') ~ '    Load selected uri');
     print_nav_help(ansi('SPACE', 'bold') ~ '    View json for selected uri');
