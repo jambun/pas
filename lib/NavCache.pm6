@@ -69,24 +69,25 @@ class PagedSection is Section {
         self.show_header = True;
     }
 
+    # the number of items on the current page
     method size {
-        if $!page !== 1 && $!page == (self.items / $!page_size).ceiling {
-            self.items % $!page_size;
+        if $!page !== 1 && $!page == (self.items / self.page_size).ceiling {
+            self.items % self.page_size;
         } else {
-            $!page_size;
+            self.page_size;
         }
     }
 
     method page_size($size?) {
         if $size {
-            $!page_size = ($size, +self.items).min;
+            $!page_size = $size;
         } else {
-            $!page_size;
+            ($!page_size, +self.items).min;
         }
     }
 
     method next_page {
-        if $!page * $!page_size < self.items {
+        if $!page * self.page_size < self.items {
             $!page++;
         } else {
             False;
@@ -102,15 +103,15 @@ class PagedSection is Section {
     }
 
     method start_index {
-        (($!page - 1) * $!page_size);
+        (($!page - 1) * self.page_size);
     }
 
     method end_index {
-        (($!page * $!page_size) - 1);
+        (($!page * self.page_size) - 1);
     }
 
     method header {
-        if +self.items > $!page_size {
+        if +self.items > self.page_size {
             (self.start_index() + 1) ~ ' to ' ~ (+self.items, (self.end_index() + 1)).min ~ ' of ' ~ (self.item_count || self.items.elems) ~ ' ' ~ self.label;
         } else {
             +self.items ~ ' ' ~ self.label;
@@ -127,7 +128,7 @@ class PagedSection is Section {
     }
 
     method last_page {
-        $!page = (self.items / $!page_size).ceiling;
+        $!page = (self.items / self.page_size).ceiling;
     }
 
     multi method page {
@@ -135,7 +136,7 @@ class PagedSection is Section {
     }
 
     multi method page($i) {
-        if $i >= 1 && ($i - 1) * $!page_size < self.items {
+        if $i >= 1 && ($i - 1) * self.page_size < self.items {
             $!page = $i;
         } else {
             False;

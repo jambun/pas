@@ -1,5 +1,5 @@
-use Functions;
 use NavCache;
+use Functions;
 use Terminal::ANSIColor;
 use JSON::Tiny;
 
@@ -12,8 +12,6 @@ my Int $nav_cursor_col = 1;
 
 my $current_uri;
 my @resolves;
-my $term_cols;
-my $term_lines;
 my Str $default_nav_message;
 my Str $nav_message;
 my Int $current_nav_offset = 0;
@@ -58,7 +56,7 @@ method start {
 	          plot_uri($uri, @resolves) || ($message = "No record for $uri") && last;
 	          print_at('.' x @uri_history, 2, 1);
 	          print_at(ansi('h', 'bold') ~ 'elp ' ~ ansi('q', 'bold') ~ 'uit',
-		                 $term_cols - 9, 1);
+		                 term_cols() - 9, 1);
 	          $new_uri = False;
 	      }
 
@@ -154,15 +152,13 @@ sub get_char {
 
 
 sub print_at($s, $col, $row, Bool :$fill) {
-    if $row <= $term_lines {
+    if $row <= term_lines() {
         cursor($col, $row);
-        $term_cols ||= q:x/tput cols/.chomp.Int; # find the number of columns
-        $term_lines ||= q:x/tput lines/.chomp.Int; # find the number of lines
 
-        my $out = visible_trim($s, $term_cols - $col);
+        my $out = visible_trim($s, term_cols() - $col);
         print $out;
         if $fill {
-            print ' ' x ($term_cols - visible_length($out) - $col);
+            print ' ' x (term_cols() - visible_length($out) - $col);
         }
     }
 }
@@ -173,8 +169,7 @@ sub nav_message(Str $message = '', Bool :$default, Bool :$set_default) {
     $nav_message = $message if $message;
     $default_nav_message = $message if $set_default;
     $nav_message = $default_nav_message if $default;
-    $term_lines ||= q:x/tput lines/.chomp.Int;
-    print_at(sprintf("%-*s", $term_cols - 1, $nav_message), 0, $term_lines);
+    print_at(sprintf("%-*s", term_cols() - 1, $nav_message), 0, term_lines());
 }
 
 
@@ -304,6 +299,10 @@ sub plot_tree(%json) {
         if (%json<tree>:exists) {
             my $curi = $nav_cache.uri(%json<uri>);
 
+            resolve_tree(%json);
+
+            $curi.json = %json;
+
             if %json<tree><_resolved><parents> {
                 mark_cursor(<top_of_parents>);
                 unless $curi.section(<parents>).size {
@@ -333,17 +332,15 @@ sub plot_tree(%json) {
                     my %width;
                     for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
                     for @tree -> $c {
-                        if $c {
-                            my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
-                            my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
-                            my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
-                            my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
-                                            $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
-                                            $c<level>,
-                                            $c<identifier> || '--',
-                                            $c<title>.substr(0, 100));
-                            $curi.add_item(<children>, $c<uri>, $s);
-                        }
+                        my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+                        my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
+                        my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
+                        my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
+                                        $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
+                                        $c<level>,
+                                        $c<identifier> || '--',
+                                        $c<title>.substr(0, 100));
+                        $curi.add_item(<children>, $c<uri>, $s);
                     }
                 }
             }
@@ -376,21 +373,18 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     $current_uri = $uri;
 
     nav_message("plotting $uri ...");
-    $term_cols = q:x/tput cols/.chomp.Int; # find the number of columns
-    $term_lines = q:x/tput lines/.chomp.Int; # find the number of lines
     clear_screen;
+
+    resolve_tree(%json) if $show_tree;
 
     plot_header(%json);
     plot_tree(%json);
     map_refs(%json, 'top', 6);
 
-    cached_uri().section(<refs>).page_size($term_lines - cursor_mark(<top_of_nav>) - 2);
-    cached_uri().section(<children>).page_size(10);
+    cached_uri().section(<refs>).page_size(term_lines() - cursor_mark(<top_of_nav>) - 2);
 
     plot_nav_page;
-
     print_nav_cursor;
-
     nav_message(:default);
     True;
 }
@@ -434,19 +428,32 @@ sub link_label($prop, %hash) {
 
 sub plot_ref($uri, %hash, $parent, $indent) {
     my $link_label = link_label($parent, %hash);
-#    my $s = sprintf("%-*s %s", $nav_cursor_col - 5, $uri, $link_label);
     cached_uri().add_item(<refs>, $uri, $link_label, $parent);
 }
 
 
 sub plot_nav_page {
     cursor_reset(:mark('top_of_nav'));
-
     cached_uri.section(<refs>).start_row = cursor_mark(<top_of_nav>);
-
-    cursored_print(cached_uri().section(<refs>).render(), :indent($tree_indent), :fill(True));
+    cursored_print(cached_uri().section(<refs>).render(), :indent($tree_indent), :fill);
 }
-    
+
+sub resolve_tree(%hash) {
+    my %tree;
+    if %hash<tree> {
+        unless %hash<tree><_resolved> {
+            %tree = from-json client.get(%hash<uri> ~ (%hash<jsonmodel_type> eq <resource> ?? '/tree/root' !! '/tree/node'));
+            unless %hash<jsonmodel_type> eq <resource> {
+                my $id =  %hash<uri>.split('/').tail;
+                %tree<parents> = (from-json client.get(%hash<resource><ref> ~ '/tree/node_from_root', ['node_ids[]=' ~ $id])){$id};
+            }
+            %hash<tree><_resolved> = %tree;
+        }
+        return %hash<tree><_resolved>;
+    }
+
+    %tree;
+}    
 
 sub record_context(%hash) {
     my $out;
@@ -458,16 +465,10 @@ sub record_context(%hash) {
 
     $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
 
-    if %hash<tree> && !%hash<tree><_resolved> {
-        my %tree = from-json client.get(%hash<uri> ~ (%hash<jsonmodel_type> eq <resource> ?? '/tree/root' !! '/tree/node'));
-        unless %hash<jsonmodel_type> eq <resource> {
-            my $id =  %hash<uri>.split('/').tail;
-            %tree<parents> = (from-json client.get(%hash<resource><ref> ~ '/tree/node_from_root', ['node_ids[]=' ~ $id])){$id};
-        }
-        if %tree<child_count> > 0 {
-            $out ~= ' > ' ~ ansi(%tree<child_count> ~ (%tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
-        }
-        %hash<tree><_resolved> = %tree;
+    my %tree = resolve_tree(%hash);
+
+    if %tree && %tree<child_count> > 0 {
+        $out ~= ' > ' ~ ansi(%tree<child_count> ~ (%tree<child_count> == 1 ?? ' child' !! ' children'), 'yellow');
     }
 
     $out;
@@ -525,7 +526,7 @@ sub record_summary(%hash) {
 
 
 sub print_nav_help($s) {
-    cursored_print(" $s", :indent($term_cols - 50), :fill);
+    cursored_print(" $s", :indent(term_cols() - 50), :fill);
 }
 
 
@@ -559,16 +560,15 @@ sub stripped($t) {
 
     @tl = map {
 	      my $line = $_;
-	      if $line.chars > $term_cols-2 {
+	      if $line.chars > term_cols()-2 {
 	          my $left = $line.index(':') || $line.index('"') || 10;
-	          my $offset = $term_cols;
+	          my $offset = term_cols();
 	          while $offset < $line.chars {
 		            my $off = $line.substr(0, $offset).rindex(' ') || $offset;
 		            $off += 1 unless $off == $offset;
-		            # $line = $line.substr(0, $off) ~ "\n" ~ ' ' x $left ~ $line.substr($off);
 		            $line.substr-rw($off, 0) = "\n" ~ ' ' x $left;
-                last if $line.chars - ($offset + ("\n" ~ ' ' x $left).chars) < $term_cols-2;
-		            $offset = $off + ($term_cols-2);
+                last if $line.chars - ($offset + ("\n" ~ ' ' x $left).chars) < term_cols()-2;
+		            $offset = $off + (term_cols()-2);
 	          }
 	      }
 	      $line;
