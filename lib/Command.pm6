@@ -1316,7 +1316,7 @@ class Command {
 
             (if $e<value_translations> && $!qualifier eq 'tr' {
                 ($e<values>.map(-> $v {
-                                       $v ~ ': ' ~ ansi($e<value_translations>{$v}, 'yellow')
+                                       ($e<readonly_values>.grep($v) ?? ansi($v, 'red') !! $v) ~ ': ' ~ ansi($e<value_translations>{$v}, 'yellow')
                                    })).join("\n    ");
             } else {
                 ($e<values>.map(-> $v {
