@@ -184,6 +184,7 @@ sub print_nav_cursor {
         print_at('  ', $nav_cursor_col, $last_focus_row);
     }
     print_at(ansi("\x25ac\x25b6", '255,200,120'), $nav_cursor_col, cached_uri().focus_row);
+    print_at('Selected uri: ' ~ ansi(cached_uri().selected_ref.uri, '255,200,120'), 1, term_lines() - 1, :fill);
     $last_focus_row = cached_uri().focus_row;
 }
 
