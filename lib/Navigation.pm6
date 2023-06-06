@@ -20,6 +20,7 @@ my Int $cursor_line = 1;
 my %cursor_marks;
 my $nav_cache;
 my $tree_indent = 6;
+my $last_focus_row;
 
 my constant UP_ARROW    =  "\x[1b][A";
 my constant DOWN_ARROW  =  "\x[1b][B";
@@ -179,15 +180,15 @@ sub clear_screen {
 }
 
 sub print_nav_cursor {
+    if $last_focus_row && $last_focus_row !== cached_uri().focus_row {
+        print_at('  ', $nav_cursor_col, $last_focus_row);
+    }
     print_at(ansi("\x25ac\x25b6", '255,200,120'), $nav_cursor_col, cached_uri().focus_row);
-    True;
+    $last_focus_row = cached_uri().focus_row;
 }
 
 sub move_nav_cursor($direction) {
-    my $old_cursor = cached_uri().focus_row;
-
     if cached_uri().move_focus($direction) {
-        print_at('  ', $nav_cursor_col, $old_cursor);
         print_nav_cursor;
     }
 }
@@ -283,7 +284,7 @@ sub print_section_page($page?) {
         default        { $sect.page; }
        }) {
         cursor_reset(:line($sect.start_row));
-        cursored_print($sect.render, :indent($tree_indent), :fill(True));
+        cursored_print($sect.render, :indent($tree_indent), :fill);
         print_nav_cursor;
     } else {
         print BEL; 

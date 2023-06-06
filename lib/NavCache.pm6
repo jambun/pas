@@ -171,6 +171,10 @@ class CachedUri {
         %!sections{$!focus_section};
     }
 
+    method focus_position {
+        ($!focus_position, self.focussed_section.size).min;
+    }
+
     method add_item($section_name, $uri, $label, $property?) {
         if (my $section = %!sections{$section_name}) {
             $section.add_item(CachedRef.new(:$uri, :$label, :$property));
@@ -180,7 +184,7 @@ class CachedUri {
     method focus_row {
         if (my $start = self.focussed_section.start_row) {
             $start++ if self.focussed_section.show_header;
-            $start + $!focus_position - 1;
+            $start + self.focus_position - 1;
         } else {
             $!focus_section = @!section_layout[0];
             $!focus_position = 1;
@@ -217,7 +221,7 @@ class CachedUri {
     }
 
     method prev_focus {
-        $!focus_position--;
+        $!focus_position = self.focus_position - 1;
 
         if $!focus_position < 1 {
             if (my $sect = self.prev_active_section) {
@@ -228,7 +232,7 @@ class CachedUri {
                 return False;
             }
         }
-        ($!focus_section, $!focus_position);
+        ($!focus_section, self.focus_position);
     }
 
     method next_focus {
@@ -244,12 +248,12 @@ class CachedUri {
             }
             
         }
-        ($!focus_section, $!focus_position);
+        ($!focus_section, self.focus_position);
     }
 
     method selected_ref {
         my $sect = self.active_section;
-        $sect.items[$sect.start_index() + $!focus_position - 1];
+        $sect.items[$sect.start_index() + self.focus_position - 1];
     }
 }
 
