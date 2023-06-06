@@ -340,7 +340,7 @@ sub plot_tree(%json) {
                                         $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
                                         $c<level>,
                                         $c<identifier> || '--',
-                                        $c<title>.substr(0, 100));
+                                        $c<title>.substr(0, term_cols() - $tree_indent));
                         $curi.add_item(<children>, $c<uri>, $s);
                     }
                 }
