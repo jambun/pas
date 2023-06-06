@@ -39,7 +39,7 @@ sub cached_uri { $nav_cache.uri($current_uri) }
 
 method start {
     my $uri = $!uri;
-    nav_message(cmd_prompt() ~ " $!line", :set_default);
+    nav_message(cmd_prompt() ~ $!line, :set_default);
     clear_screen;
 
     $nav_cache = NavCache.new;
@@ -111,8 +111,8 @@ method start {
                     $nav_cache.remove($current_uri);
 		                $new_uri = True;
 		            }
-		            when 't' {
-                    $show_tree = !$show_tree;
+                when 't' {
+                    $nav_cache.show_tree = $show_tree = !$show_tree;
                     plot_uri($current_uri);
                 }
 		            when '.' {

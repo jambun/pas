@@ -1,5 +1,7 @@
 use Functions;
 
+class NavCache {...}
+
 class CachedRef {
     has $.uri;
     has $.label;
@@ -18,8 +20,11 @@ class Section {
     has $.start_row is rw;
     has Bool $.sorted is rw;
     has Bool $.show_header is rw;
+    has NavCache $.cache is rw;
 
     method is_active {
+        return False if ($!label eq <parents> | <children>) && !$!cache.show_tree;
+
         $!start_row && @!items;
     }
 
@@ -148,16 +153,17 @@ class PagedSection is Section {
 class CachedUri {
     has Str $.uri;
     has $.json is rw;
+    has NavCache $.cache is rw;
     has $.focus_section is rw;
     has $.focus_position is rw;
     has Str @.section_layout = <title parents children refs>;
     has Section %!sections;
 
     submethod TWEAK {
-        %!sections = title    => Section.new(:label(<title>), :start_row(1)),
-                     parents  => Section.new(:label(<parents>)),
-                     children => PagedSection.new(:label(<children>)),
-                     refs     => PagedSection.new(:label(<references>), :sorted);
+        %!sections = title    => Section.new(:label(<title>), :start_row(1), :cache($!cache)),
+                     parents  => Section.new(:label(<parents>), :cache($!cache)),
+                     children => PagedSection.new(:label(<children>), :cache($!cache)),
+                     refs     => PagedSection.new(:label(<references>), :sorted, :cache($!cache));
 
         $!focus_section ||= <title>;
         $!focus_position ||= 1;
@@ -182,7 +188,7 @@ class CachedUri {
     }
 
     method focus_row {
-        if (my $start = self.focussed_section.start_row) {
+        if !(($!focus_section eq <parents> | <children>) && !$!cache.show_tree) && (my $start = self.focussed_section.start_row) {
             $start++ if self.focussed_section.show_header;
             $start + self.focus_position - 1;
         } else {
@@ -200,10 +206,6 @@ class CachedUri {
         } else {
             @!section_layout[$sectix];
         }
-    }
-
-    method active_section {
-        %!sections{$!focus_section};
     }
 
     method next_active_section {
@@ -252,16 +254,17 @@ class CachedUri {
     }
 
     method selected_ref {
-        my $sect = self.active_section;
+        my $sect = self.focussed_section;
         $sect.items[$sect.start_index() + self.focus_position - 1];
     }
 }
 
 class NavCache {
     has CachedUri %.uris;
+    has Bool $.show_tree is rw;
 
     method add_uri($uri, :$json) {
-        %!uris{$uri} = CachedUri.new(:$uri, :$json);
+        %!uris{$uri} = CachedUri.new(:$uri, :$json, :cache(self));
     }
 
     method is_cached($uri) {
