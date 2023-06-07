@@ -1440,6 +1440,7 @@ sub shell_help {
        -date    only show revisions at or before date
        -[n]d    only show revisions at n days ago
       session   show sessions or switch to a session
+       [n]      switch to session n
        .delete  delete a session
       schedules show current schedules
         .cancel cancel numbered schedule
@@ -1458,7 +1459,7 @@ sub shell_help {
        q        the query string
        [n]      page number (defaults to 1)
       find      formatted search
-       q?       the query string
+       [q]      the query string
        [=m]+    only show results for model m
        [,n]     page number (defaults to 1)
       config    show pas config
