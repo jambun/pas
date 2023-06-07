@@ -1391,6 +1391,7 @@ sub shell_help {
       post      post a file (default if last arg is a file)
       search    show search index document
        .public  show pui document
+      nav       enter navigation mode
       revisions show revision history
        .restore attempt to restore revision n
        n        show revision n
@@ -1457,7 +1458,7 @@ sub shell_help {
        q        the query string
        [n]      page number (defaults to 1)
       find      formatted search
-       q        the query string
+       q?       the query string
        [=m]+    only show results for model m
        [,n]     page number (defaults to 1)
       config    show pas config
