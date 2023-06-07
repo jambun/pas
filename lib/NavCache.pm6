@@ -9,7 +9,7 @@ class CachedRef {
     has $.sort;
 
     submethod TWEAK {
-        $!sort = $!label ~ $!uri;
+        $!sort ||= $!label ~ $!uri;
     }
 }
 
@@ -181,9 +181,9 @@ class CachedUri {
         ($!focus_position, self.focussed_section.size).min;
     }
 
-    method add_item($section_name, $uri, $label, $property?) {
+    method add_item($section_name, $uri, $label, $property?, :$sort) {
         if (my $section = %!sections{$section_name}) {
-            $section.add_item(CachedRef.new(:$uri, :$label, :$property));
+            $section.add_item(CachedRef.new(:$uri, :$label, :$property, :$sort));
         }
     }
 

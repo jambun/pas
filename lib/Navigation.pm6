@@ -382,7 +382,7 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
 
     plot_header(%json);
     plot_tree(%json);
-    map_refs(%json, 'top', 6);
+    map_refs(%json, 'top');
 
     cached_uri().section(<refs>).page_size(term_lines() - cursor_mark(<top_of_nav>) - 2);
 
@@ -392,21 +392,21 @@ sub plot_uri(Str $uri, @args = (), Bool :$reload) {
     True;
 }
 
-sub map_refs(%hash, $parent, $indent) {
+sub map_refs(%hash, $parent, :$depth = 0, :$seq, :@path) {
     return if $parent eq <top> && cached_uri().section(<refs>).items;
 
     my $found_ref = 0;
     for %hash.keys.sort: { %hash{$^a}.WHAT ~~ Str ?? -1 !! 1 } -> $prop {
 	      my $val = %hash{$prop};
 	      if $prop eq 'ref' || $prop eq 'record_uri' || ($parent eq 'results' && $prop eq 'uri') {
-	          plot_ref($val, %hash, $parent, $indent);
+	          plot_ref($val, %hash, $parent, $depth, :path(@path));
 	          $found_ref = 1;
 	      } elsif $val.WHAT ~~ Hash {
-	          map_refs($val, $prop, $indent+$found_ref);
+	          map_refs($val, $prop, :depth($depth+$found_ref), :path((@path, $prop => 0).flat));
 	      } elsif $val.WHAT ~~ Array {
-	          for $val.values -> $h {
+	          for $val.kv -> $ix, $h {
 		            if $h.WHAT ~~ Hash {
-		                map_refs($h, $prop, $indent+$found_ref);
+		                map_refs($h, $prop, :depth($depth+$found_ref), :path((@path, $prop => $ix).flat));
 		            }
 	          }
 	      }
@@ -429,9 +429,9 @@ sub link_label($prop, %hash) {
 }
 
 
-sub plot_ref($uri, %hash, $parent, $indent) {
-    my $link_label = link_label($parent, %hash);
-    cached_uri().add_item(<refs>, $uri, $link_label, $parent);
+sub plot_ref($uri, %hash, $parent, $depth, :@path) {
+    my $link_label = ('  ' x $depth) ~ link_label($parent, %hash);
+    cached_uri().add_item(<refs>, $uri, $link_label, $parent, :sort(@path.map({sprintf("%-50s %10d", $_.key, $_.value)})));
 }
 
 
