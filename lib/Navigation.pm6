@@ -113,7 +113,7 @@ method start {
 		            }
                 when 't' {
                     $nav_cache.show_tree = $show_tree = !$show_tree;
-                    plot_uri($current_uri);
+                    $new_uri = True;
                 }
 		            when '.' {
                     print_section_page(<next>);
