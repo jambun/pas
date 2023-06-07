@@ -415,8 +415,8 @@ sub map_refs(%hash, $parent, :$depth = 0, :$seq, :@path) {
 
 
 sub link_label($prop, %hash) {
-    my $label = $prop;
-    LINK_LABEL_PROPS.map: { $label ~= ": %hash{$_}" if %hash{$_} }
+    my $label = ansi($prop, 'yellow');
+    LINK_LABEL_PROPS.map: { $label ~= ': ' ~ ansi(%hash{$_}, 'green') if %hash{$_} }
     my $record;
     if %hash<_resolved>:exists {
 	      $record = record_label(%hash<_resolved>);
