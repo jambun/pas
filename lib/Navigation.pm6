@@ -42,7 +42,7 @@ method start {
     nav_message(cmd_prompt() ~ $!line, :set_default);
     clear_screen;
 
-    $nav_cache = NavCache.new;
+    $nav_cache = NavCache.new(:show_tree($show_tree));
 
     my Bool $new_uri = True;
     my $c = '';
@@ -135,6 +135,7 @@ method start {
         last_uris(map { $_.uri }, cached_uri().section(<refs>).items);
     }
     $current_uri = Str.new;
+    $nav_cache.clear;
     run 'tput', 'cvvis'; # show the cursor
     $message;
 }
