@@ -40,7 +40,7 @@ class Command {
                                       assb.keys assb.install assb.plugins assb.catalog
                                       schemas.reload schemas.property
                                       enums.add enums.remove enums.tr enums.reload
-                                      {Config.new.prop_defaults.keys.map({'set.' ~ $_})}
+                                      {Config.new.prop_defaults.keys.sort.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
                                       groups.add groups.remove groups.removeall
                                       help.list help.write>>;
@@ -911,8 +911,9 @@ class Command {
                 config.save;
                 return 'Properties reset to default values';
             } else {
-                return (for %prop.kv -> $k, $v {
-                               my $out = $v;
+                return (for %prop.sort.kv -> $ix, $p {
+                               my $k = $p.key;
+                               my $out = $p.value;
                                $out = ansi('on', 'bold green') if $out.WHAT ~~ Bool && $out;
                                $out = ansi('off', 'bold red') if $out.WHAT ~~ Bool && !$out;
                                $out = ansi($out.Str, 'bold white') if $out.WHAT ~~ Int;
