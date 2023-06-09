@@ -2,14 +2,14 @@
 
 An ArchivesSpace commandline client
 
-Needs Raku (Perl6). Currently developing against:
+Needs Raku (Perl6). Currently developing on an M1 Mac against:
 
-    % perl6 --version
-    Welcome to Rakudo™ v2022.06.
+    % raku --version
+    Welcome to Rakudo™ v2023.04.
     Implementing the Raku® Programming Language v6.d.
-    Built on MoarVM version 2022.06.
+    Built on MoarVM version 2023.04.
 
-On an M1 Mac.
+Dependencies:
 
     % zef install JSON::Tiny
     % zef install Terminal::ANSIColor
@@ -18,9 +18,12 @@ On an M1 Mac.
     % zef install XML
     % zef install Digest::MD5
     % zef install Crypt::Random
+    % zef install Base64
+    % zef install Linenoise
+
 
 And an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints)
-to make `endpoints`, `groups` and `stub`, etc work.
+to make `endpoints`, `groups`, `nav` and `stub`, etc work.
 
 
     pas - a terminal client for ArchivesSpace
