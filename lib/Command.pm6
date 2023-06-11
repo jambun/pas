@@ -68,6 +68,7 @@ class Command {
 
         build_cc($line, $1.Str, repo_codes) if $line ~~ s/^ ('import' \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ (\S+) \s+) (\w*) $/$0/;
+        build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ ("'" <-[']>+ "'") \s+) (\w*) $/$0/;
 
         build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
 
@@ -403,7 +404,7 @@ class Command {
         if $resp eq 'y' {
             pretty extract_uris client.multi_part($uri, [], %parts);
         } else {
-            'Chicken';
+            'Chicken ' ~ "\x1F414";
         }
     }
 
@@ -644,6 +645,7 @@ class Command {
             } else {
                 my $out = client.switch_to_session($!first);
                 clear_session_state;
+                load_endpoints;
                 $out;
             }
         } else {
