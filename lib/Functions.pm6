@@ -196,7 +196,7 @@ sub remove_comments($text) is export {
 
 
 sub random_hex(Int $length) {
-    Digest::MD5.new.md5_hex(crypt_random().Str).substr(0, $length);
+    md5(crypt_random().Str)>>.base(16).join.substr(0, $length);
 }
 
 
@@ -285,7 +285,8 @@ sub repo_map(Str $code?, Bool :$force, Bool :$invert) is export {
 }
 
 
-sub import_types(Str $repo_code, Bool :$force) is export {
+sub import_types(Str $repo_code is copy, Bool :$force) is export {
+    $repo_code ~~ s/^ "'" (<-[']>+) "'" $/$0/;
     return %IMPORT_TYPES{$repo_code} if %IMPORT_TYPES{$repo_code} && !$force;
 
     my $repo = repo_map($repo_code);
