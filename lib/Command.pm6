@@ -375,22 +375,25 @@ class Command {
         my $repo_code = $!first;
 
         my $repo_id = repo_map($repo_code);
-        return "Unknown repository '{$!first}'!" unless $repo_id;
+        return "Unknown repository: {$!first}!" unless $repo_id;
 
         my $type = @!args.shift;
-        return "Unknown import type '{$type}' for repository '{$repo_code}'!" unless import_types($repo_code).grep($type);
+        return "Unknown import type: {$type}, for repository: {$repo_code}!" unless import_types($repo_code).grep($type);
 
         my @files = @!args;
         my %parts;
 
-        my @headers =
-            'Content-Type' => 'text/plain',
-            'Content-Transfer-Encoding' => 'binary';
+        # my @headers =
+        #     'Content-Type' => 'text/plain',
+        #     'Content-Transfer-Encoding' => 'binary';
 
         for 0..^@files -> $i {
             my $file = @files[$i];
             return "Can't find file: $file" unless $file.IO.e;
-            %parts{"files[{$i}]"} = [$file, $file.IO.basename, |@headers];
+            # no longer sending headers because can't get HTTP::UserAgent to accept them
+            # and it seems to work fine without them, so yeah
+            # %parts{"files[{$i}]"} = [$file, $file.IO.basename, |@headers];
+            %parts{"files[{$i}]"} = [$file, $file.IO.basename];
         }
 
         my $uri = "/repositories/{$repo_id}/jobs_with_files";
