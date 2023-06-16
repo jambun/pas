@@ -236,35 +236,50 @@ sub extract_from_schema($text) is export {
 
 sub search_models(Bool :$force) is export {
     return @SEARCH_MODELS if @SEARCH_MODELS && !$force;
-    @SEARCH_MODELS = |(from-json client.get('/search', ['facet[]=primary_type', 'page=1']))<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
+    my $resp = from-json client.get('/search', ['facet[]=primary_type', 'page=1']);
+    if $resp<error> {
+        logger.blurt("Error on search models load: {$resp<error>}");
+    } else {
+        @SEARCH_MODELS = |$resp<facets><facet_fields><primary_type>.grep(/\D/).grep(none /'tree'/, /'ordered'/).sort;
+    }
+    @SEARCH_MODELS;
 }
 
 
 sub history_models(Bool :$force) is export {
     return @HISTORY_MODELS if @HISTORY_MODELS && !$force;
-
     if load_endpoints.grep('/history') {
-        @HISTORY_MODELS = |(from-json client.get('/history/models')).map({ $_ ~~ s:g/(<[A..Z]>)/{'_' ~ $0.Str.lc}/; $_.substr(1)});
+        my $resp = from-json client.get('/history/models');
+        if $resp<error> {
+            logger.blurt("Error on history models load: {$resp<error>}");
+        } else {
+            @HISTORY_MODELS = |$resp.map({ $_ ~~ s:g/(<[A..Z]>)/{'_' ~ $0.Str.lc}/; $_.substr(1)});
+        }
     }
-
     @HISTORY_MODELS;
 }
 
 
 sub system_users(Bool :$force) is export {
     return @USERS if @USERS && !$force;
-
-    @USERS = |(from-json client.get('/users', ('page=1', 'page_size=100')))<results>>><username>;
-
+    my $resp = from-json client.get('/users', ('page=1', 'page_size=100'));
+    if $resp<error> {
+        logger.blurt("Error on system users load: {$resp<error>}");
+    } else {
+        @USERS = |$resp<results>>><username>;
+    }
     @USERS;
 }
 
 
 sub history_makers(Bool :$force) is export {
     return @HISTORY_USERS if @HISTORY_USERS && !$force;
-
-    @HISTORY_USERS = |(from-json client.get('/history/editors'));
-
+    my $resp = from-json client.get('/history/editors');
+    if $resp<error> {
+        logger.blurt("Error on history makers load: {$resp<error>}");
+    } else {
+        @HISTORY_USERS = |$resp;
+    }
     @HISTORY_USERS;
 }
 
@@ -276,7 +291,12 @@ sub repo_codes(Bool :$force) is export {
 
 sub repo_map(Str $code?, Bool :$force, Bool :$invert) is export {
     if $force || !%REPO_MAP {
-        %REPO_MAP = |(from-json client.get('/repositories')).map: { $_<repo_code> => $_<uri>.split('/')[*-1] };
+        my $resp = from-json client.get('/repositories');
+        if $resp<error> {
+            logger.blurt("Error on repo map load: {$resp<error>}");
+        } else {
+            %REPO_MAP = |$resp.map: { $_<repo_code> => $_<uri>.split('/')[*-1] };
+        }
     }
 
     my %map = $invert ?? %REPO_MAP.invert !! %REPO_MAP;
@@ -291,9 +311,12 @@ sub import_types(Str $repo_code is copy, Bool :$force) is export {
 
     my $repo = repo_map($repo_code);
     return ["Unknown repository!"] unless $repo;
-
-    %IMPORT_TYPES{$repo_code} = |((from-json client.get("/repositories/$repo/jobs/import_types")).map: { $_<name> });
-
+    my $resp = from-json client.get("/repositories/$repo/jobs/import_types");
+    if $resp<error> {
+        logger.blurt("Error on import types load: {$resp<error>}");
+    } else {
+        %IMPORT_TYPES{$repo_code} = |$resp.map({ $_<name> });
+    }
     %IMPORT_TYPES{$repo_code};
 }
 
@@ -305,9 +328,13 @@ sub assb_cat_names(Bool :$force) is export {
 
 sub assb_catalog(Bool :$force) is export {
     if $force || !@ASSB_CAT {
-        @ASSB_CAT = |((from-json client.get('/assb_admin/catalog'))<plugins>);
+        my $resp = from-json client.get('/assb_admin/catalog');
+        if $resp<error> {
+            logger.blurt("Error on assb catalog load: {$resp<error>}");
+        } else {
+            @ASSB_CAT = |$resp<plugins>;
+        }
     }
-
     @ASSB_CAT;
 }
 
@@ -371,7 +398,14 @@ sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {
 
 sub enums(Bool :$reload, Str :$name) is export {
     if $reload || !$ENUMS {
-        $ENUMS = from-json(client.get(load_endpoints.grep(ENUMS_URI) ?? ENUMS_URI !! OLD_ENUMS_URI));
+        my $resp = from-json client.get(load_endpoints.grep(ENUMS_URI) ?? ENUMS_URI !! OLD_ENUMS_URI);
+        if $resp<error> {
+            logger.blurt("Error on enums load: {$resp<error>}");
+            say "Unable to load enums: {$resp<error>}";
+            return [];
+        } else {
+            $ENUMS = $resp;
+        }
     }
 
     my @enums = $name ?? $ENUMS.grep: { $_<name> ~~ /$name/ } !! $ENUMS.Array;

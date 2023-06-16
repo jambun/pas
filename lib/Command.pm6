@@ -538,6 +538,8 @@ class Command {
         my $results = client.get(SEARCH_URI, @search_args);
         my $parsed = from-json $results;
 
+        return pretty $results if $parsed<error>;
+
         my $out;
 
         if ($parsed<this_page> > $parsed<last_page>) {
@@ -1284,7 +1286,14 @@ class Command {
 
     method enums {
         my @enums = enums(:reload($!qualifier eq 'reload'), :name($!first));
-        return 'No enumerations matching: ' ~ $!first unless @enums;
+        unless @enums {
+            if $!first {
+                return 'No enumerations matching: ' ~ $!first;
+            } else {
+                # there was an error
+                return;
+            }
+        }
 
         if $!qualifier eq 'add' || $!qualifier eq 'remove' {
             if @enums != 1 {
