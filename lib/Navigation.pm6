@@ -335,11 +335,12 @@ sub add_children_for_waypoint(@waypoint) {
         my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
         my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
         my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
+        my $title = $c<title> || ($c<dates> ?? ($c<dates>.head<expression> || ($c<dates>.head<begin> ~ ($c<dates>.head<end> ?? " -- {$c<dates>.head<end>}" !! ''))) !! '-- no title --');
         my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
                         $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
                         $c<level>,
                         $c<identifier> || '--',
-                        $c<title>.substr(0, $title_width));
+                        $title.substr(0, $title_width));
         cached_uri().section(<children>).add_item(CachedRef.new(:label($s), :uri($c<uri>)), :position($c<position>));
     }
 }
