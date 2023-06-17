@@ -302,7 +302,7 @@ sub ensure_page {
     my $sect = $curi.focussed_section;
 
     # this assumes sequential paging from start - ideally we'd do this for end_index too
-    unless $sect.items[$sect.start_index] && $sect.items[$sect.end_index] {
+    unless $sect.items[$sect.start_index] {
         if $sect.label eq <children> {
             my %args = offset => ($sect.start_index / $curi.json<tree><_resolved><waypoint_size>).floor;
 

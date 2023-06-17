@@ -126,7 +126,7 @@ class PagedSection is Section {
 
     method header {
         if self.total_size > self.page_size {
-            (self.start_index() + 1) ~ ' to ' ~ (+self.items, (self.end_index() + 1)).min ~ ' of ' ~ self.total_size ~ ' ' ~ self.label;
+            (self.start_index() + 1) ~ ' to ' ~ (self.total_size, (self.end_index() + 1)).min ~ ' of ' ~ self.total_size ~ ' ' ~ self.label;
         } else {
             self.total_size ~ ' ' ~ self.label;
         }
