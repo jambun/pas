@@ -29,7 +29,7 @@ class Section {
     }
 
     method add_item(CachedRef $ref, Int :$position) {
-        if $position {
+        if $position.defined {
             @!items[$position] = $ref;
         } else {
             @!items.push($ref);
