@@ -159,7 +159,12 @@ class Pas::ASClient {
     }
 
 
-    method get($uri, @pairs = [], Bool :$no_session, Str :$host?, Int :$timeout?) {
+    multi method get($uri, %args, Bool :$no_session, Str :$host?, Int :$timeout?) {
+        self!request($uri, %args.pairs.map({.key ~ '=' ~ .value}), :$no_session, :$host, :$timeout);
+    }
+
+
+    multi method get($uri, @pairs = [], Bool :$no_session, Str :$host?, Int :$timeout?) {
         self!request($uri, @pairs, :$no_session, :$host, :$timeout);
     }
 

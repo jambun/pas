@@ -272,7 +272,7 @@ sub print_section_page($page?) {
 
     my $sect = $curi.focussed_section;
 
-    if $sect !~~ PagedSection || !$sect.size {
+    if $sect !~~ PagedSection || !$sect.total_size {
         print BEL;
         return;
     }
@@ -285,11 +285,62 @@ sub print_section_page($page?) {
         when <last>    { $sect.last_page; }
         default        { $sect.page; }
        }) {
-        cursor_reset(:line($sect.start_row));
-        cursored_print($sect.render, :indent($tree_indent), :fill);
-        print_nav_cursor;
+        if ensure_page() {
+            cursor_reset(:line($sect.start_row));
+            cursored_print($sect.render, :indent($tree_indent), :fill);
+            print_nav_cursor;
+        } else {
+            print BEL; 
+        }
     } else {
         print BEL; 
+    }
+}
+
+sub ensure_page {
+    my $curi = cached_uri();
+    my $sect = $curi.focussed_section;
+
+    # this assumes sequential paging from start - ideally we'd do this for end_index too
+    unless $sect.items[$sect.start_index] && $sect.items[$sect.end_index] {
+        if $sect.label eq <children> {
+            my %args = offset => ($sect.start_index / $curi.json<tree><_resolved><waypoint_size>).floor;
+
+            if $curi.json<jsonmodel_type> eq <archival_object> {
+                %args<parent_node> = $current_uri;
+            }
+
+            my $resp = from-json client.get($curi.json<resource><ref> ~ '/tree/waypoint', %args);
+
+            if $resp<error> {
+                nav_message("Failed to load waypoint: {$resp<error>}");
+                return False;
+            }
+
+            add_children_for_waypoint(@$resp);
+        } else {
+            # oh dear - duck and cover!
+            nav_message("Don't know how to ensure page for: {$sect.label}");
+            return False;
+        }
+    }
+    True;
+}
+
+sub add_children_for_waypoint(@waypoint) {
+    my %width;
+    for <level child_count identifier> -> $prop { %width{$prop} = @waypoint.map({(($_{$prop} || '').chars, 2).max}).max }
+    my $title_width = term_cols() - ($tree_indent + (%width.values.reduce: &infix:<+>) + 7);
+    for @waypoint -> $c {
+        my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
+        my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
+        my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
+        my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
+                        $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
+                        $c<level>,
+                        $c<identifier> || '--',
+                        $c<title>.substr(0, $title_width));
+        cached_uri().section(<children>).add_item(CachedRef.new(:label($s), :uri($c<uri>)), :position($c<position>));
     }
 }
 
@@ -332,22 +383,11 @@ sub plot_tree(%json) {
                 unless $curi.section(<children>).item_count {
                     $curi.section(<children>).item_count = %json<tree><_resolved><child_count>;
                     my @tree = %json<tree><_resolved><precomputed_waypoints>.values.first.values.first.List;
-                    my %width;
-                    for <level child_count identifier> -> $prop { %width{$prop} = @tree.map({(($_{$prop} || '').chars, 2).max}).max }
-                    for @tree -> $c {
-                        my $level_fmt = ansi("%-{%width<level>}s", 'yellow');
-                        my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
-                        my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
-                        my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
-                                        $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
-                                        $c<level>,
-                                        $c<identifier> || '--',
-                                        $c<title>.substr(0, term_cols() - $tree_indent));
-                        $curi.add_item(<children>, $c<uri>, $s);
-                    }
+
+                    add_children_for_waypoint(@tree);
                 }
             }
-            cursored_print($curi.section(<children>).render, :indent($tree_indent), :fill(True));
+            cursored_print($curi.section(<children>).render, :indent($tree_indent), :fill);
         } else {
             cursored_print(ansi('no tree', 'cyan'), :indent($tree_indent));
         }

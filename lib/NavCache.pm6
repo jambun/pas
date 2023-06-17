@@ -28,8 +28,12 @@ class Section {
         $!start_row && @!items;
     }
 
-    method add_item(CachedRef $ref) {
-        @!items.push($ref);
+    method add_item(CachedRef $ref, Int :$position) {
+        if $position {
+            @!items[$position] = $ref;
+        } else {
+            @!items.push($ref);
+        }
     }
 
     method items {
@@ -76,23 +80,28 @@ class PagedSection is Section {
 
     # the number of items on the current page
     method size {
-        if $!page !== 1 && $!page == (self.items / self.page_size).ceiling {
-            self.items % self.page_size;
+        if $!page !== 1 && $!page == (self.total_size / self.page_size).ceiling {
+            self.total_size % self.page_size;
         } else {
             self.page_size;
         }
+    }
+
+    # the actual size if all items were loaded
+    method total_size {
+        self.item_count || self.items.elems;
     }
 
     method page_size($size?) {
         if $size {
             $!page_size = $size;
         } else {
-            ($!page_size, +self.items).min;
+            ($!page_size, self.total_size).min;
         }
     }
 
     method next_page {
-        if $!page * self.page_size < self.items {
+        if $!page * self.page_size < self.total_size {
             $!page++;
         } else {
             False;
@@ -116,10 +125,10 @@ class PagedSection is Section {
     }
 
     method header {
-        if +self.items > self.page_size {
-            (self.start_index() + 1) ~ ' to ' ~ (+self.items, (self.end_index() + 1)).min ~ ' of ' ~ (self.item_count || self.items.elems) ~ ' ' ~ self.label;
+        if self.total_size > self.page_size {
+            (self.start_index() + 1) ~ ' to ' ~ (+self.items, (self.end_index() + 1)).min ~ ' of ' ~ self.total_size ~ ' ' ~ self.label;
         } else {
-            +self.items ~ ' ' ~ self.label;
+            self.total_size ~ ' ' ~ self.label;
         }
     }
 
@@ -133,7 +142,7 @@ class PagedSection is Section {
     }
 
     method last_page {
-        $!page = (self.items / self.page_size).ceiling;
+        $!page = (self.total_size / self.page_size).ceiling;
     }
 
     multi method page {
@@ -141,7 +150,7 @@ class PagedSection is Section {
     }
 
     multi method page($i) {
-        if $i >= 1 && ($i - 1) * self.page_size < self.items {
+        if $i >= 1 && ($i - 1) * self.page_size < self.total_size {
             $!page = $i;
         } else {
             False;
