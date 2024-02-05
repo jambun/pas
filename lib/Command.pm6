@@ -988,7 +988,7 @@ class Command {
            groups.map({ |$asam<groups>{$_} });
         }
 
-        my $longest_name = max($asam<statuses>.keys>>.chars);
+        my $longest_name = max(statuses>>.chars);
         my $name_fmt = ansi("%-{$longest_name}s", 'bold white');
         my $n_fmt = ansi("%02d", 'cyan');
         my $days = 60*60*24;
