@@ -42,7 +42,7 @@ class Command {
                                       enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.sort.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
-                                      groups.add groups.remove groups.removeall
+                                      groups.add groups.remove groups.removeall groups.perms
                                       help.list help.write>>;
 
     method actions { ACTIONS }
@@ -1198,18 +1198,21 @@ class Command {
 
 
     method groups {
-        sub render-group($groups, $ix) {
-            # have to reget it to get the member_usernames
+        sub render-group($groups, $ix, :@perms) {
+            # have to reget it to get the member_usernames or grants_permissions
             my $g = from-json(client.get($groups[$ix]<uri>));
             return $g<error> if $g<error>;
+
+            return unless @perms (<=) $g<grants_permissions>;
 
             my $ix_fmt = ansi("%02d", 'cyan');
             my $code_fmt = ansi("%-35s", "bold white");
             my $out = sprintf("[$ix_fmt] $code_fmt %s",
                               $ix + 1,
                               $g<group_code>,
-                              ansi($g<member_usernames>.sort.join(', '), "bold green"));
+                              ansi(($!qualifier eq 'perms' ?? $g<grants_permissions> !! $g<member_usernames>).sort.join(', '), "bold green"));
 
+            # FIXME: only snips first overflow
             if visible_length($out) > term_cols() {
                 my $snip;
                 $out.indices(' ').reverse.map({($snip = $_) && last if visible_length($out.substr(0..$_)) < term_cols()});
@@ -1243,11 +1246,9 @@ class Command {
                 return pretty to-json $groups
             }
 
-            my $ix = @!args.shift;
-            if $ix {
-                unless ($ix = $ix.Int) {
-                    return 'Give an integer to select a group';
-                }
+            if @!args && @!args.head.Int {
+                my $ix = @!args.shift;
+
                 my $g = from-json(client.get($groups[$ix - 1]<uri>));
 
                 given $!qualifier {
@@ -1269,14 +1270,15 @@ class Command {
                         update-users($g, :removeall);
                     }
                     default {
-                        render-group($groups, $ix - 1);
+                        render-group($groups, $ix - 1, :perms(@!args));
                     }
                 }
             } else {
                 (('Groups for repository:',
                   ansi($repo<repo_code>, 'bold yellow'),
                   ansi($repo<name>, 'bold white')).join(' '),
-                 |(await (start { render-group($groups, $_) } for ^$groups))).join("\n");
+                 @!args ?? ('With permissions:', |@!args.map({ansi($_, 'bold green')})).join(' ') !! Any,
+                 |(await (start { render-group($groups, $_, :perms(@!args)) } for ^$groups))).grep(Str:D).join("\n");
             }
         } else {
             "Give a repo id or code like this:\n> groups 2\n> groups REPO"
@@ -1430,12 +1432,14 @@ sub shell_help {
        .me      show the current user
        .pass    set password for current user
          name   set password for user name
-      group     no op without repo_id
+      groups    no op without repo_id
        .add     add user to group
        .remove  remove user from group
        .removeall remove all users from group
+       .perms   list permissions rather than users
        repo_id  list groups for repo_id
        [n]      group listing number
+       [perms]  list of permissions to filter groups
        user     the user to add or remove
       enums     list enumerations
        .add     add val to enum str
