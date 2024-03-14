@@ -129,6 +129,7 @@ sub modify_json($json, @pairs) is export {
         my ($k, $v) = $q.split('=', 2);
 	      $v = True if $v eq 'true';
 	      $v = False if $v eq 'false';
+        $v = '' if $v eq '[X]';
 
 	      my @binder;
 	      @binder[0] = %hash;

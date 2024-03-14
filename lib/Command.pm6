@@ -1395,6 +1395,12 @@ sub shell_help {
     uri pairs* action? [ < file ] [ > file ] [ @d[xt] ]
     action args* [ > file ]
 
+    pair: key=value
+          key="value with spaces"
+          key=true   True
+          key=false  False
+          key=[X]    no value
+
     uri actions:
       show      show (default)
       update    update with the pairs
