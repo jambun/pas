@@ -1212,13 +1212,7 @@ class Command {
                               $g<group_code>,
                               ansi(($!qualifier eq 'perms' ?? $g<grants_permissions> !! $g<member_usernames>).sort.join(', '), "bold green"));
 
-            # FIXME: only snips first overflow
-            if visible_length($out) > term_cols() {
-                my $snip;
-                $out.indices(' ').reverse.map({($snip = $_) && last if visible_length($out.substr(0..$_)) < term_cols()});
-                $out = $out.substr(0..$snip) ~ "\n" ~ (' ' x 41) ~ $out.substr($snip+1);
-            }
-            $out;
+            split_to_screen($out, ' ', :41indent);
         }
 
         sub update-users($g, :$add, :$remove, :$removeall) {

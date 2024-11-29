@@ -111,6 +111,10 @@ sub ansi(Str $s, Str $ansi_fmt) is export {
     }
 }
 
+sub unansi(Str:D $str) is export {
+    colorstrip($str);
+}
+
 sub inline_image_supported is export {
     %*ENV<LC_TERMINAL> eq <iTerm2>;
 }
@@ -532,4 +536,23 @@ sub import_job($type, @files) is export {
         }
       }
     END
+}
+
+sub split_to_screen(Str $str is copy, $split, Int :$indent = 0, Int :$width is copy) is export {
+    $width ||= q:x/tput cols/.chomp.Int - 1;
+    my @lines;
+
+    while (my $unstr = unansi($str)).chars > $width {
+        if my $unsplix = $unstr.rindex($split, $width) {
+            my $splix = $str.indices($split)[$unstr.substr(0, $unsplix).indices($split).elems];
+            @lines.push($str.substr(0, $splix + 1));
+            $str = (' ' x $indent) ~ $str.substr($splix + 1);
+        } else {
+            @lines.push($str);
+        }
+    }
+    if $str {
+        @lines.push($str);
+    }
+    @lines.join("\n");
 }
