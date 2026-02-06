@@ -94,7 +94,7 @@ method start {
 		            }
 		            when 's' {
                     my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $selected.uri]);
-                    if $results<total_hits> == 2 {
+                    if $results<total_hits> == 1 {
                         my $record = $results<results>[0];
                         $record<json> = from-json $record<json>;
                         page(pretty extract_uris to-json $record);
