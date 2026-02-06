@@ -92,6 +92,16 @@ method start {
                     page(pretty client.get($selected.uri,
                                            to_resolve_params(@resolves)));
 		            }
+		            when 's' {
+                    my $results = from-json client.get(SEARCH_RECORDS_URI, ['uri[]=' ~ $selected.uri]);
+                    if $results<total_hits> == 2 {
+                        my $record = $results<results>[0];
+                        $record<json> = from-json $record<json>;
+                        page(pretty extract_uris to-json $record);
+                    } else {
+                        nav_message 'No record in search index for ' ~ $selected.uri;
+                    }
+		            }
 		            when "\r" {
                     page(stripped pretty client.get($selected.uri,
                                                     to_resolve_params(@resolves)));
