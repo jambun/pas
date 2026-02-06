@@ -594,6 +594,7 @@ sub nav_help {
     print_nav_help(ansi('RIGHT', 'bold') ~ '    Load selected uri');
     print_nav_help(ansi('SPACE', 'bold') ~ '    View json for selected uri');
     print_nav_help(ansi('RETURN', 'bold') ~ '   View summary for selected uri');
+    print_nav_help(ansi('s', 'bold') ~ '        View search index json selected uri');
     print_nav_help(ansi('t', 'bold') ~ '        Toggle tree view');
     print_nav_help(ansi('r', 'bold') ~ '        Resolve refs like the selected uri');
     print_nav_help(ansi('q', 'bold') ~ '        Quit navigator');
