@@ -346,6 +346,7 @@ sub add_children_for_waypoint(@waypoint) {
         my $id_fmt = ansi("%-{%width<identifier>}s", 'green');
         my $count_fmt = ansi("%{%width<child_count> + 1}s", 'cyan');
         my $title = $c<title> || ($c<dates> ?? ($c<dates>.head<expression> || ($c<dates>.head<begin> ~ ($c<dates>.head<end> ?? " -- {$c<dates>.head<end>}" !! ''))) !! '-- no title --');
+        $title ~~ s:g/'<' .+? '>'//;
         my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
                         $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
                         $c<level>,
