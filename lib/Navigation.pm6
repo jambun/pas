@@ -519,7 +519,7 @@ sub record_context(%hash) {
         $out ~= ' > ' ~ ansi($a<level>, 'yellow') if $a<level>;
     }
 
-    $out ~= ' > ' ~ ansi(%hash<level>, 'bold yellow') if %hash<level>;
+    $out ~= ' > ' ~ ansi((%hash<level> eq 'otherlevel' ?? %hash<other_level> !! %hash<level>), 'bold yellow') if %hash<level>;
 
     my %tree = resolve_tree(%hash);
 
