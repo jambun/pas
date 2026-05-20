@@ -378,6 +378,7 @@ sub plot_tree(%json) {
                         my $uri = $p<node> || $p<root_record_uri>;
                         my $level = %json<ancestors>.grep({$_<ref> eq $uri}).head<level>;
                         my $label = (' ' x $ix * 3) ~ ($ix ?? "\x2517\x2501 " !! " \x25fc ") ~ ansi($level, 'yellow') ~ ' ' x ($level_width - $level.chars - $ix * 3) ~ '  ' ~ $p<title>;
+                        $label ~~ s:g/'<' .+? '>'//;
                         $curi.add_item(<parents>, $uri, $label);
                     }
                 }
