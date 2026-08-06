@@ -383,17 +383,12 @@ class Command {
         my @files = @!args;
         my %parts;
 
-        # my @headers =
-        #     'Content-Type' => 'text/plain',
-        #     'Content-Transfer-Encoding' => 'binary';
+        my %headers = 'Content-Type' => 'text/xml; charset=utf-8';
 
         for 0..^@files -> $i {
             my $file = @files[$i];
             return "Can't find file: $file" unless $file.IO.e;
-            # no longer sending headers because can't get HTTP::UserAgent to accept them
-            # and it seems to work fine without them, so yeah
-            # %parts{"files[{$i}]"} = [$file, $file.IO.basename, |@headers];
-            %parts{"files[{$i}]"} = [$file, $file.IO.basename];
+            %parts{"files[{$i}]"} = [$file, $file.IO.basename, |%headers];
         }
 
         my $uri = "/repositories/{$repo_id}/jobs_with_files";
