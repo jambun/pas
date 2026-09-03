@@ -138,15 +138,19 @@ method start {
 	          }
 	      }
     }
-    nav_message(' ');
-    clear_screen;
-    cursor(0, q:x/tput lines/.chomp.Int);
-    if $nav_cache.is_cached($current_uri) {
-        last_uris(map { $_.uri }, cached_uri().section(<refs>).items);
+
+    LEAVE {
+        nav_message(' ');
+        clear_screen;
+        cursor(0, q:x/tput lines/.chomp.Int);
+        if $nav_cache.is_cached($current_uri) {
+            last_uris(map { $_.uri }, cached_uri().section(<refs>).items);
+        }
+        $current_uri = Str.new;
+        $nav_cache.clear;
+        run 'tput', 'cvvis'; # show the cursor
     }
-    $current_uri = Str.new;
-    $nav_cache.clear;
-    run 'tput', 'cvvis'; # show the cursor
+
     $message;
 }
 
