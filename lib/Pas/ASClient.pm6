@@ -132,7 +132,7 @@ class Pas::ASClient {
     method build_url($uri, @pairs is copy, Str :$host?) {
         # remove any file upload pairs
         @pairs = @pairs.grep: {! .Str.comb('=<<')}
-        my $url = ($host || $!config.attr<url>) ~ $uri;
+        my $url = ($host || $!config.attr<url>) ~ ($uri || '/');
         $url ~= '?' ~ @pairs.join('&') if @pairs;
 
         # uri_encode drops # and anything after it
