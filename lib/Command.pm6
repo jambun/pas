@@ -69,6 +69,8 @@ class Command {
         build_cc($line, $1.Str, repo_codes) if $line ~~ s/^ ('import' \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ (\S+) \s+) (\w*) $/$0/;
         build_cc($line, $1.Str, import_types($0[0].Str)) if $line ~~ s/('import' \s+ ("'" <-[']>+ "'") \s+) (\w*) $/$0/;
+        build_cc($line, $1.Str, files()) if $line ~~ s/('import' \s+ \S+ \s+ \S+ \s+) (\S*) $/$0/;
+        build_cc($line, $1.Str, files()) if $line ~~ s/('import' \s+ ("'" <-[']>+ "'") \s+ \S+ \s+) (\S*) $/$0/;
 
         build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
 

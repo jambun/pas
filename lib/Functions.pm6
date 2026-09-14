@@ -325,6 +325,9 @@ sub import_types(Str $repo_code is copy, Bool :$force) is export {
     %IMPORT_TYPES{$repo_code};
 }
 
+sub files() is export {
+    $*CWD.dir>>.basename;
+}
 
 sub assb_cat_names(Bool :$force) is export {
     (assb_catalog(:$force).map: { $_<name> }).sort;
