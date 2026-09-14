@@ -92,7 +92,7 @@ class Pas::ASClient {
 
         my $response;
         try {
-            $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout, :%parts) || die "Timed out";
+            $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout, :%parts) || die "No response";
 
             CATCH {
                 self.log.blurt("Sadly, something went wrong: " ~ .Str);
@@ -109,7 +109,7 @@ class Pas::ASClient {
 
             try {
                 # and try the request again
-                $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout) || die "Timed out";
+                $response = self!handle_request($url, %header, $body, %files, :$delete, :$timeout) || die "No response";
 
                 CATCH {
                     self.log.blurt("Sadly, something went wrong: " ~ .Str);
