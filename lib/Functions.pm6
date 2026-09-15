@@ -325,8 +325,12 @@ sub import_types(Str $repo_code is copy, Bool :$force) is export {
     %IMPORT_TYPES{$repo_code};
 }
 
-sub files() is export {
-    $*CWD.dir>>.basename;
+sub files(Str $path is copy) is export {
+    $path ~~ s|'/' (<-[/]>+)? $|/|;
+    my $last-bit = $0 ?? $0.Str !! '';
+    $path ||= './';
+    my $d = $last-bit ?? dir($path, test => /^ $last-bit /) !! dir($path);
+    $path.starts-with('/') ?? $d>>.Str !! $d.map({ $path ~ $_.basename });
 }
 
 sub assb_cat_names(Bool :$force) is export {
