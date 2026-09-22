@@ -72,6 +72,9 @@ class Command {
         build_cc($line, '', files($1.Str)) if $line ~~ s/('import' \s+ \S+ \s+ \S+ \s+) (\S*) $/$0/;
         build_cc($line, '', files($1.Str)) if $line ~~ s/('import' \s+ ("'" <-[']>+ "'") \s+ \S+ \s+) (\S*) $/$0/;
 
+        build_cc($line, '', files($1.Str)) if $line ~~ s/('>' \s+) (\S*) $/$0/;
+        build_cc($line, '', files($1.Str)) if $line ~~ s/('<' \s+) (\S*) $/$0/;
+
         build_cc($line, $1.Str, schemas) if $line ~~ s/^ ('schemas' ( '.' \S+ )? \s+) (\w*) $/$0/;
 
         build_cc($line, '', <on off>) if $line ~~ /^ ('set.' \w+ \s+) $/;
