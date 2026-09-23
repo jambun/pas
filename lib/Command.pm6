@@ -28,9 +28,9 @@ class Command {
 
 
     my constant ACTIONS = <show update create edit stub revisions post delete import
-                           search nav login logout script schedules
+                           search nav login logout script schedules waitup
                            endpoints schemas config groups users enums
-                           session who asam doc ass assb find waitup
+                           session who asam doc ass assb find
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
