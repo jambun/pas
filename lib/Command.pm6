@@ -30,7 +30,7 @@ class Command {
     my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules
                            endpoints schemas config groups users enums
-                           session who asam doc ass assb find
+                           session who asam doc ass assb find waitup
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
@@ -574,6 +574,36 @@ class Command {
                 }).join("\n");
 
         $out;
+    }
+
+    method waitup {
+        my $wait = $!qualifier || 30;
+        my $response;
+
+        printf "Waiting {$wait}s for a response (^C to exit) ";
+
+        react {
+            whenever signal(SIGINT) {
+                done();
+            }
+            whenever Supply.interval(1) -> $tick {
+                done() if $tick >= $wait;
+
+                $response = client.get('/');
+
+                my $r = from-json $response;
+                if ($r<error>) {
+                    printf '.';
+                    $response = client.get('/');
+                } else {
+                    done();
+                }
+            }
+        }
+
+        print "\r\e[2K";
+        print "\e[0G";
+        $response;
     }
 
     method ass {
@@ -1483,6 +1513,8 @@ sub shell_help {
        [q]      the query string
        [=m]+    only show results for model m
        [,n]     page number (defaults to 1)
+      waitup    wait until the backend is up
+       .[n]     seconds to wait (default 30)
       config    show pas config
       last      show the last saved temp file
       set       show pas properties
