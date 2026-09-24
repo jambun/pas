@@ -920,9 +920,17 @@ class Command {
         }
 
 
-        my $schema = schemas(:reload($!qualifier eq 'reload'), :name($!first), :prop($!qualifier eq 'property'));
+        my $name;
+        if $!first ~~ /^ '/' / { # uri
+            my $json = from-json client.get($!first);
+            $name = $json<jsonmodel_type>;
+        } else {
+            $name = $!first;
+        }
 
-        return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $!first) if $schema.WHAT ~~ Array;
+        my $schema = schemas(:reload($!qualifier eq 'reload'), :$name, :prop($!qualifier eq 'property'));
+
+        return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $name) if $schema.WHAT ~~ Array;
 
         my $out = "\n" ~ ansi("JSONModel(:$!first)", 'bold green');
         $out ~= '  ' ~ $schema<uri> if $schema<uri>;
@@ -1505,6 +1513,7 @@ sub shell_help {
        .reload  force a reload
        .property show schemas with a property that matches name
        [name]   show a named record schema, or list that match name
+       [uri]    show the schema for the jsonmodel_type returned by the uri
       search    perform a search (page defaults to 1)
        .parse   parse the 'json' property
        q        the query string
