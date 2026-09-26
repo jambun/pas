@@ -30,7 +30,7 @@ class Command {
     my constant ACTIONS = <show update create edit stub revisions post delete import
                            search nav login logout script schedules waitup
                            endpoints schemas config groups users enums
-                           session who asam doc ass assb find
+                           session who asam doc ass assb find image
                            history last set ls help comment quit>;
 
     my constant QUALIFIED_ACTIONS = <<update.no_get edit.no_get edit.last revisions.restore
@@ -38,7 +38,7 @@ class Command {
                                       session.delete users.create users.me users.pass
                                       endpoints.reload doc.get doc.post doc.delete ass.big
                                       assb.keys assb.install assb.plugins assb.catalog
-                                      schemas.reload schemas.property
+                                      schemas.reload schemas.property image.big
                                       enums.add enums.remove enums.tr enums.reload
                                       {Config.new.prop_defaults.keys.sort.map({'set.' ~ $_})}
                                       schedules.cancel schedules.clean asam.reset history.n
@@ -604,6 +604,33 @@ class Command {
         print "\r\e[2K";
         print "\e[0G";
         $response;
+    }
+
+    method image {
+        if inline_image_supported() {
+            my $json = from-json client.get($!uri);
+            unless (my $image_url = $json<image_url>) {
+                if $json<file_versions> {
+                    if (my $fv = $json<file_versions>.first: { $_<file_uri> ~~ /^ 'http' .+ '.' [ 'jpg' | 'png' | 'gif' ] $/}) {
+                        $image_url = $fv<file_uri>;
+                    }
+                }
+            }
+            if $image_url {
+                my $resp = client.nonas_get($image_url, :bin);
+                if $resp.is-success {
+                    my $size = $!qualifier eq 'big' ?? '80%' !! '30%';
+                    my $label = $json<display_string> || $json<title> || '';
+                    "\n" ~ inline_image($resp.content, :height($size), :width($size)) ~ "\n{ansi($label, 'bold')}\n\n";
+                } else {
+                    "Failed to retrieve image: $image_url";
+                }
+            } else {
+                'No image';
+            }
+        } else {
+            "Sorry, only supported on iTerm2.";
+        }
     }
 
     method ass {

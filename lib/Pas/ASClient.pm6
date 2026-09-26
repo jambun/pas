@@ -15,6 +15,10 @@ class Pas::ASClient {
 
     my constant LOGOUT_URI     = '/logout';
 
+    method nonas_get($url, :$bin) {
+        self!http.get($url, :$bin);
+    }
+
     method log { $!log ||= Pas::Logger.new(:config($!config)); }
     method !http { $!http //= HTTP::UserAgent.new(:timeout($!config.attr<properties><timeout>)); }
 
