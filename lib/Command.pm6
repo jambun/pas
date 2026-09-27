@@ -28,8 +28,8 @@ class Command {
 
 
     my constant ACTIONS = <show update create edit stub revisions post delete import
-                           search nav login logout script schedules waitup
-                           endpoints schemas config groups users enums
+                           search nav login logout schemas script waitup
+                           endpoints schedules config groups users enums
                            session who asam doc ass assb find image
                            history last set ls help comment quit>;
 
