@@ -143,12 +143,12 @@ method start {
         nav_message(' ');
         clear_screen;
         cursor(0, q:x/tput lines/.chomp.Int);
+        run 'tput', 'cvvis'; # show the cursor
         if $nav_cache.is_cached($current_uri) {
-            last_uris(map { $_.uri }, cached_uri().section(<refs>).items);
+            last_uris((|$current_uri, |map { $_.uri }, cached_uri().section(<refs>).items));
         }
         $current_uri = Str.new;
         $nav_cache.clear;
-        run 'tput', 'cvvis'; # show the cursor
     }
 
     $message;
