@@ -110,6 +110,11 @@ sub ansi(Str $s, Str $ansi_fmt) is export {
     }
 }
 
+sub ansify(Str $s is copy) is export {
+    $s ~~ s:g/'<' \w+ \s+ 'render="' (['italic' | 'bold']) '">' (.+?) '</' \w+ '>'/{ ansi($1.Str, $0.Str) }/;
+    $s;
+}
+
 sub unansi(Str:D $str) is export {
     colorstrip($str);
 }

@@ -569,7 +569,7 @@ class Command {
                                   $_<primary_type>,
                                   $_<_id>,
                                   $_<identifier> || '--',
-                                  $_<title>);
+                                  ansify($_<title>));
                   $s.substr(0, ($s.chars - visible_length($s)) + $cols);
                 }).join("\n");
 
