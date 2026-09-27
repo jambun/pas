@@ -959,7 +959,7 @@ class Command {
 
         return ($schema ?? $schema.join("\n") !! 'No schema matches: ' ~ $name) if $schema.WHAT ~~ Array;
 
-        my $out = "\n" ~ ansi("JSONModel(:$!first)", 'bold green');
+        my $out = "\n" ~ ansi("JSONModel(:$name)", 'bold green');
         $out ~= '  ' ~ $schema<uri> if $schema<uri>;
         $out ~= "\n";
         $out ~= render_props($schema<property_list>, $schema<properties>);
