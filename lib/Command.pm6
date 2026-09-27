@@ -343,7 +343,7 @@ class Command {
             last if $model ~~ s/'JSONModel(:' (\w+) ')'/$0/;
         }
 
-        save_tmp(interpolate_help() ~ pretty(client.get('/stub/' ~ $model, $repo_id ?? (|@!args, "repo_id=$repo_id") !! @!args)));
+        save_tmp(pretty(client.get('/stub/' ~ $model, $repo_id ?? (|@!args, "repo_id=$repo_id") !! @!args)) ~ interpolate_help());
 
         my Int $times = (so $!qualifier.Int) ?? $!qualifier.Int !! 1;
         if edit(tmp_file) {
