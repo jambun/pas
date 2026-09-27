@@ -948,8 +948,8 @@ class Command {
 
 
         my $name;
-        if $!first ~~ /^ '/' / { # uri
-            my $json = from-json client.get($!first);
+        if $!uri {
+            my $json = from-json client.get($!uri);
             $name = $json<jsonmodel_type>;
         } else {
             $name = $!first;
