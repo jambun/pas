@@ -154,7 +154,7 @@ method start {
 
     LEAVE {
         nav_message(' ');
-        clear_screen;
+#        clear_screen;
         cursor(0, q:x/tput lines/.chomp.Int);
         run 'tput', 'cvvis'; # show the cursor
         if $nav_cache.is_cached($current_uri) {
