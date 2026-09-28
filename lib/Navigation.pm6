@@ -333,11 +333,12 @@ sub ensure_page {
         if $sect.label eq <children> {
             my %args = offset => ($sect.start_index / $curi.json<tree><_resolved><waypoint_size>).floor;
 
-            if $curi.json<jsonmodel_type> eq <archival_object> {
+            if $curi.json<jsonmodel_type> eq any <archival_object digital_object_component> {
                 %args<parent_node> = $current_uri;
             }
 
-            my $resp = from-json client.get($curi.json<resource><ref> ~ '/tree/waypoint', %args);
+            my $root_type = $curi.json<jsonmodel_type> eq 'archival_object' ?? 'resource' !! 'digital_object';
+            my $resp = from-json client.get($curi.json{$root_type}<ref> ~ '/tree/waypoint', %args);
 
             if $resp<error> {
                 nav_message("Failed to load waypoint: {$resp<error>}");
@@ -366,7 +367,7 @@ sub add_children_for_waypoint(@waypoint) {
         $title ~~ s:g/'<' .+? '>'//;
         my $s = sprintf("$count_fmt  $level_fmt  $id_fmt  %s",
                         $c<child_count> ?? '+' ~ $c<child_count>.Str !! '--',
-                        $c<level>,
+                        $c<level> || '  ',
                         $c<identifier> || '--',
                         $title.substr(0, $title_width));
         cached_uri().section(<children>).add_item(CachedRef.new(:label($s), :uri($c<uri>)), :position($c<position>));
@@ -389,11 +390,11 @@ sub plot_tree(%json) {
             if %json<tree><_resolved><parents> {
                 mark_cursor(<top_of_parents>);
                 unless $curi.section(<parents>).size {
-                    my $level_width = %json<ancestors>.map({$_<level>.chars}).max;
+                    my $level_width = %json<ancestors>.map({($_<level> || '  ').chars}).max;
                     $level_width += 3 if %json<ancestors> > 1;
                     for %json<tree><_resolved><parents>.kv -> $ix, $p {
                         my $uri = $p<node> || $p<root_record_uri>;
-                        my $level = %json<ancestors>.grep({$_<ref> eq $uri}).head<level>;
+                        my $level = %json<ancestors>.grep({$_<ref> eq $uri}).head<level> || '  ';
                         my $label = (' ' x $ix * 3) ~ ($ix ?? "\x2517\x2501 " !! " \x25fc ") ~ ansi($level, 'yellow') ~ ' ' x ($level_width - $level.chars - $ix * 3) ~ '  ' ~ $p<title>;
                         $label ~~ s:g/'<' .+? '>'//;
                         $curi.add_item(<parents>, $uri, $label);
@@ -515,10 +516,12 @@ sub resolve_tree(%hash) {
     my %tree;
     if %hash<tree> {
         unless %hash<tree><_resolved> {
-            %tree = from-json client.get(%hash<uri> ~ (%hash<jsonmodel_type> eq <resource> ?? '/tree/root' !! '/tree/node'));
-            unless %hash<jsonmodel_type> eq <resource> {
+            my $root = %hash<jsonmodel_type> eq any <resource digital_object>;
+            %tree = from-json client.get(%hash<uri> ~ ($root ?? '/tree/root' !! '/tree/node'));
+            unless $root {
                 my $id =  %hash<uri>.split('/').tail;
-                %tree<parents> = (from-json client.get(%hash<resource><ref> ~ '/tree/node_from_root', ['node_ids[]=' ~ $id])){$id};
+                my $root_type = %hash<jsonmodel_type> eq 'archival_object' ?? 'resource' !! 'digital_object';
+                %tree<parents> = (from-json client.get(%hash{$root_type}<ref> ~ '/tree/node_from_root', ['node_ids[]=' ~ $id])){$id};
             }
             %hash<tree><_resolved> = %tree;
         }
