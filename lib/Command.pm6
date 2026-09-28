@@ -609,25 +609,8 @@ class Command {
     method image {
         if inline_image_supported() {
             my $json = from-json client.get($!uri);
-            unless (my $image_url = $json<image_url>) {
-                if $json<file_versions> {
-                    if (my $fv = $json<file_versions>.first: { $_<file_uri> ~~ /^ 'http' .+ '.' [ 'jpg' | 'png' | 'gif' ] $/}) {
-                        $image_url = $fv<file_uri>;
-                    }
-                }
-            }
-            if $image_url {
-                my $resp = client.nonas_get($image_url, :bin);
-                if $resp.is-success {
-                    my $size = $!qualifier eq 'big' ?? '80%' !! '30%';
-                    my $label = $json<display_string> || $json<title> || '';
-                    "\n" ~ inline_image($resp.content, :height($size), :width($size)) ~ "\n{ansi($label, 'bold')}\n\n";
-                } else {
-                    "Failed to retrieve image: $image_url";
-                }
-            } else {
-                'No image';
-            }
+            my $size = $!qualifier eq 'big' ?? '80%' !! '30%';
+            "\n" ~ image_for_json($json, :$size, :label($json<display_string> || $json<title> || '')) ~ "\n\n";
         } else {
             "Sorry, only supported on iTerm2.";
         }

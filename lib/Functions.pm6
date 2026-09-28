@@ -133,6 +133,32 @@ sub inline_image($data, :$height, :$width) is export {
     "\e]1337;File=inline=1;{$args}size={$datab64.chars}:{$datab64}\cG";
 }
 
+sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is export {
+    if inline_image_supported() {
+        unless (my $image_url = $json<image_url>) {
+            if $json<file_versions> {
+                if (my $fv = $json<file_versions>.first: { $_<file_uri> ~~ /^ 'http' .+ '.' [ 'jpg' | 'png' | 'gif' ] $/}) {
+                    $image_url = $fv<file_uri>;
+                }
+            }
+        }
+        if $image_url {
+            my $resp = client.nonas_get($image_url, :bin);
+            if $resp.is-success {
+                my $rendered_label = $label ?? "\n\n" ~ ansi($label, 'bold') !! '';
+                $height ||= $size || '30%';
+                $width ||= $size || '30%';
+                inline_image($resp.content, :$height, :$width) ~ $rendered_label;
+            } else {
+                "Failed to retrieve image: $image_url";
+            }
+        } else {
+            'No image';
+        }
+    } else {
+        "Sorry, only supported on iTerm2.";
+    }
+}
 
 sub modify_json($json, @pairs) is export {
     my %hash = from-json $json;

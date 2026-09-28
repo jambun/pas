@@ -131,6 +131,19 @@ method start {
 		            when ',' {
                     print_section_page(<prev>);
                 }
+                when 'i' {
+                    my $label = (' ' x (term_cols()/4).Int ~ "Image for $current_uri. Any key to dismiss.");
+                    my $resp = image_for_json(cached_uri().json, :size('50%'), :$label);
+
+                    if $resp.chars > 100 { # dodgy test for image rather then error message
+                        cursor((term_cols()/4).Int, (term_lines()/4).Int);
+                        print $resp;
+                        $new_uri = True;
+                        get_char;
+                    } else {
+                        nav_message($resp);
+                    }
+                }
 		            when 'h' {
 		                nav_help;
 		                $new_uri = True;
@@ -603,6 +616,7 @@ sub nav_help {
     print_nav_help(ansi('s', 'bold') ~ '        View search index json selected uri');
     print_nav_help(ansi('t', 'bold') ~ '        Toggle tree view');
     print_nav_help(ansi('r', 'bold') ~ '        Resolve refs like the selected uri');
+    print_nav_help(ansi('i', 'bold') ~ '        View image for current uri');
     print_nav_help(ansi('q', 'bold') ~ '        Quit navigator');
     print_nav_help(ansi('h', 'bold') ~ '        This help');
     print_nav_help('');
