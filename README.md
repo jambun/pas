@@ -20,6 +20,7 @@ Dependencies:
     % zef install Crypt::Random
     % zef install Base64
     % zef install Linenoise
+    % zef install Base64::Native
 
 
 And an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints)
