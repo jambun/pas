@@ -1,5 +1,8 @@
 use Functions;
 
+use Terminal::LineEditor;
+use Terminal::LineEditor::RawTerminalInput;
+
 class FormField {
     has $.prop;
     has $.value is rw;
@@ -158,7 +161,20 @@ class Editor {
                             $field.value = @values[$next-ix];
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
-                            # hmm
+                            cursor($!cursor-offset + 2, $!first-display-line + $!selected-field-ix - $!top-field-ix);
+                            run <tput cvvis>;
+                            my $cli = Terminal::LineEditor::CLIInput.new;
+
+                            # these don't work :( i see the value appear but gets blatted immediately
+                            # $cli.replace-input-field(:50display-width, :0field-start, :content($field.value));
+                            # $cli.do-edit('insert-string', $field.value);
+
+                            # so use history instead - sigh
+                            $cli.add-history($field.value);
+
+                            $field.value = $cli.prompt;
+                            run <tput civis>;
+                            self.draw-field;
                         }
 
                     } else {

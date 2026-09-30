@@ -13,6 +13,7 @@ Dependencies:
 
     % zef install JSON::Tiny
     % zef install Terminal::ANSIColor
+    % zef install Terminal::LineEditor
     % zef install HTTP::UserAgent
     % zef install URI::Encode
     % zef install XML
@@ -21,7 +22,6 @@ Dependencies:
     % zef install Base64
     % zef install Linenoise
     % zef install Base64::Native
-
 
 And an ArchivesSpace [plugin](https://github.com/jambun/pas_endpoints)
 to make `endpoints`, `groups`, `nav` and `stub`, etc work.
