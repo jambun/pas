@@ -112,7 +112,9 @@ class Editor {
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
 
-        if $new-ix < 0 || $new-ix >= @!fields.elems {
+        if $new-ix < 0 || $new-ix < $!top-field-ix
+                       || $new-ix >= @!fields.elems
+                       || $new-ix > $!max-top-field-ix + $!top-field-ix + 4 {
             print BEL;
         } else {
             $!selected-field-ix = $new-ix;
@@ -261,6 +263,8 @@ class Editor {
 		            when RIGHT_ARROW {
                     if $!top-field-ix + 1 >= $!max-top-field-ix {
                         print BEL;
+                    } elsif $!top-field-ix + 1 > $!selected-field-ix {
+                        print BEL;
                     } else {
                         $!top-field-ix++;
                         self.draw-form();
@@ -268,6 +272,8 @@ class Editor {
 		            }
 		            when LEFT_ARROW {
                     if $!top-field-ix < 1 {
+                        print BEL;
+                    } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
                         print BEL;
                     } else {
                         $!top-field-ix--;
