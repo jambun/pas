@@ -2,11 +2,12 @@ use Functions;
 
 use Terminal::LineEditor;
 use Terminal::LineEditor::RawTerminalInput;
+use JSON::Tiny;
 
 class FormField {
     has $.prop;
     has $.value is rw;
-    has $.original-value;
+    has $.original-value is rw;
     has Bool $.open-for-update is rw = False;
 
     submethod TWEAK {
@@ -81,6 +82,10 @@ class Editor {
         $!max-top-field-ix = [0, @!fields.elems - $!number-of-display-lines].max;
     }
 
+    method message($s) {
+        print-at(2, 3, ansi($s, 'yellow'), :fill);
+    }
+
     method move-cursor(Int $d) {
         my $old-field = @!fields[$!selected-field-ix];
         $old-field.open-for-update = False;
@@ -134,6 +139,28 @@ class Editor {
 	          $k = get-key-in;
 
 	          given $k {
+                when 's' {
+                    for @!fields.grep(*.updated) -> $field {
+                        $field.original-value = $field.value;
+                        %!json{$field.prop} = $field.value;
+                    }
+
+                    my %resp = from-json client.post(%!json<uri>, Empty, to-json %!json);
+
+                    self.draw-form;
+                    if %resp<error> {
+                        my $msg = '';
+                        for %resp<error>.kv -> $k, $v {
+                            $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
+                        }
+
+                        self.message($msg);
+                    } else {
+                        %!json<lock_version> = %resp<lock_version>;
+                        self.message(%resp<status>);
+                    }
+
+                }
                 when "\t" {
                     my $field = @!fields[$!selected-field-ix];
                     $field.open-for-update = False;
@@ -161,22 +188,32 @@ class Editor {
                             $field.value = @values[$next-ix];
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
-                            cursor($!cursor-offset + 2, $!first-display-line + $!selected-field-ix - $!top-field-ix);
-                            run <tput cvvis>;
-                            my $cli = Terminal::LineEditor::CLIInput.new;
+                            if $field.value.chars > term_cols() - $!cursor-offset - 20 {
+                                save_tmp($field.value);
+                                if edit(tmp_file) {
+                                    $field.value = slurp(tmp_file);
+                                    self.message('Edits applied');
+                                } else {
+                                    self.message('No edits');
+                                }
+                                run <tput civis>;
+                            } else {
+                                cursor($!cursor-offset + 2, $!first-display-line + $!selected-field-ix - $!top-field-ix);
+                                run <tput cvvis>;
+                                my $cli = Terminal::LineEditor::CLIInput.new;
 
-                            # these don't work :( i see the value appear but gets blatted immediately
-                            # $cli.replace-input-field(:50display-width, :0field-start, :content($field.value));
-                            # $cli.do-edit('insert-string', $field.value);
+                                # these don't work :( i see the value appear but gets blatted immediately
+                                # $cli.replace-input-field(:50display-width, :0field-start, :content($field.value));
+                                # $cli.do-edit('insert-string', $field.value);
 
-                            # so use history instead - sigh
-                            $cli.add-history($field.value);
+                                # so use history instead - sigh
+                                $cli.add-history($field.value);
 
-                            $field.value = $cli.prompt;
-                            run <tput civis>;
-                            self.draw-field;
+                                $field.value = $cli.prompt;
+                                run <tput civis>;
+                                self.draw-field;
+                            }
                         }
-
                     } else {
                         $field.open-for-update = True;
                         self.draw-field;
