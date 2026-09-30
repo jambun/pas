@@ -188,7 +188,7 @@ class Editor {
                             $field.value = @values[$next-ix];
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
-                            if $field.value.chars > term_cols() - $!cursor-offset - 20 {
+                            if ($field.value || '').chars > term_cols() - $!cursor-offset - 20 {
                                 save_tmp($field.value);
                                 if edit(tmp_file) {
                                     $field.value = slurp(tmp_file);
