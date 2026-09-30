@@ -109,8 +109,7 @@ method start {
 		            }
 		            when 'e' {
 		                plot_edit(cached_uri().json);
-		                get_char;
-		                plot_uri($uri, @resolves) || ($message = "No record for $uri");
+		                plot_uri($uri, @resolves, :reload) || ($message = "No record for $uri");
 		            }
 		            when 'r' {
                     my $prop = cached_uri().selected_ref.property;
@@ -232,7 +231,7 @@ sub edit_uri($uri) {
 }
 
 sub plot_edit(%json) {
-    nav_message(Editor.new(:%json).edit-screen);
+    nav_message(Editor.new(:%json).edit-screen(:embedded));
 }
 
 sub cursor_reset(Int :$line = 1, :$mark) {

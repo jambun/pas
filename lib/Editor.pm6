@@ -9,12 +9,23 @@ class FormField {
     has $.value is rw;
     has $.original-value is rw;
     has Bool $.open-for-update is rw = False;
+    has Int $.value-ix is rw;
+    has Str $.translation is rw;
 
     submethod TWEAK {
         $!original-value = $!value;
     }
 
     my $.prop-width;
+
+    method next-value {
+        if $!value-ix.defined {
+            $!value-ix = ($!value-ix + 1) % $!value.elems;
+            if $!value-ix == 0 { $!value-ix = Int; }
+        } else {
+            $!value-ix = 0;
+        }
+    }
 
     method updated {
         $!value !eqv $!original-value;
@@ -32,10 +43,19 @@ class FormField {
         if !$val.defined {
             $val //= ansi('--', $value-style);
         } elsif $val ~~ Iterable {
-            $val = "{ansi($val.elems.Str, "bold $value-style")} $!prop";
+            if $!value-ix.defined {
+                $val = ansi($val[$!value-ix]<ref>, "bold $value-style");
+            } else {
+                $val = "{ansi($val.elems.Str, "bold $value-style")} $!prop";
+            }
         } else {
             $val.=trans("\n" => ' ');
             my $max_val_length = term_cols() - self.prop-width - 20;
+
+            if $!translation {
+                $val ~= " | $!translation";
+            }
+
             if $val.chars > $max_val_length {
                 $val = $val.substr(0,$max_val_length) ~ ' ...';
             }
@@ -115,16 +135,17 @@ class Editor {
             self.draw-field($ix);
         }
 
-        print-at($!number-of-display-lines + $!first-display-line + 2, 2, "{@!fields.elems - $!number-of-display-lines - $!top-field-ix - 1} more fields", :fill);
+        print-at($!number-of-display-lines + $!first-display-line + 2, 2,
+                 "{@!fields.elems - $!number-of-display-lines - $!top-field-ix - 1} more fields", :fill);
     }
 
-    method edit-screen {
+    method edit-screen(:$embedded) {
         ENTER {
-            run <tput civis>;
+            run <tput civis> unless $embedded;
         }
         LEAVE {
             cursor(0, term_lines());
-            run <tput cvvis>;
+            run <tput cvvis> unless $embedded;
         }
 
         clear-screen();
@@ -186,6 +207,7 @@ class Editor {
                             my $next-ix = @values.first($field.value, :k) + 1;
                             $next-ix %= @values.elems;
                             $field.value = @values[$next-ix];
+                            $field.translation = $enum<value_translations>{$field.value};
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
                             if ($field.value || '').chars > term_cols() - $!cursor-offset - 20 {
@@ -212,6 +234,15 @@ class Editor {
                                 $field.value = $cli.prompt;
                                 run <tput civis>;
                                 self.draw-field;
+                            }
+                        } elsif $prop<type> eq 'array' {
+                            while (my $ak = get-key-in) ne 'q' {
+                                given $ak {
+                                    when ' ' {
+                                        $field.next-value;
+                                        self.draw-field;
+                                    }
+                                }
                             }
                         }
                     } else {
