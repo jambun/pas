@@ -1,4 +1,5 @@
 use NavCache;
+use Editor;
 use Functions;
 use Terminal::ANSIColor;
 use JSON::Tiny;
@@ -107,7 +108,7 @@ method start {
                                                     to_resolve_params(@resolves)));
 		            }
 		            when 'e' {
-		                plot_edit($selected.uri, @resolves) || ($message = "No record for $uri");
+		                plot_edit(cached_uri().json);
 		                get_char;
 		                plot_uri($uri, @resolves) || ($message = "No record for $uri");
 		            }
@@ -230,21 +231,8 @@ sub edit_uri($uri) {
 
 }
 
-sub plot_edit(Str $uri, @args = (), Bool :$reload) {
-    my %rec = from-json client.get($uri);
-    my $c = '';
-    my $refresh = True;
-    while $c ne 'q' {
-	      print_at(%rec.map({ .perl.say }), 4, 2) if $refresh;
-	      $refresh = False;
-	      $c = get_char;
-	      given $c {
-	          when "\r" {
-		            client.post($uri, @args, to-json %rec);
-		            $refresh = True;
-	          }
-	      }
-    }
+sub plot_edit(%json) {
+    nav_message(Editor.new(:%json).edit-screen);
 }
 
 sub cursor_reset(Int :$line = 1, :$mark) {

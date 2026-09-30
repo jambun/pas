@@ -3,6 +3,7 @@ use Pas::ASClient;
 use Pas::Help;
 use Functions;
 use Navigation;
+use Editor;
 
 use Linenoise;
 use Terminal::ANSIColor;
@@ -27,7 +28,7 @@ class Command {
     has Bool $.cancelled;
 
 
-    my constant ACTIONS = <show update create edit stub revisions post delete import
+    my constant ACTIONS = <show update create form edit stub revisions post delete import
                            search nav login logout schemas script waitup
                            endpoints schedules config groups users enums
                            session who asam doc ass assb find image
@@ -318,6 +319,16 @@ class Command {
         pretty extract_uris client.post($!uri, @!args, modify_json('{}', @!args));
     }
 
+
+    method form {
+        my $json = client.get($!uri);
+        if (from-json($json)<error>) {
+            pretty $json;
+        } else {
+            my %json = from-json($json);
+            Editor.new(:%json).edit-screen;
+        }
+    }
 
     method edit {
         if ($!qualifier eq 'no_get') {

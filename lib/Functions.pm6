@@ -24,6 +24,13 @@ our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
 
+our constant UP_ARROW    =  "\x[1b][A";
+our constant DOWN_ARROW  =  "\x[1b][B";
+our constant RIGHT_ARROW =  "\x[1b][C";
+our constant LEFT_ARROW  =  "\x[1b][D";
+our constant BEL         =  "\x[07]";
+
+
 my $SCHEMAS;
 my $SCHEMAS_PARSED;
 my $ENUMS;
@@ -440,6 +447,9 @@ sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {
      }
 }
 
+sub enum-by-name($name) is export {
+    enums(:$name).head;
+}
 
 sub enums(Bool :$reload, Str :$name) is export {
     if $reload || !$ENUMS {
@@ -595,4 +605,39 @@ sub split_to_screen(Str $str is copy, $split, Int :$indent = 0, Int :$width is c
         @lines.push($str);
     }
     @lines.join("\n");
+}
+
+sub clear-screen is export {
+    print state $ = qx[clear];
+}
+
+sub print-at($row, $col, $s, Bool :$fill) is export {
+    if $row <= term_lines() {
+        if $fill {
+            cursor(1, $row);
+            run('tput', 'el');
+        }
+
+        cursor($col, $row);
+
+        my $out = visible_trim($s, term_cols() - $col);
+
+        print $out;
+    }
+}
+
+sub cursor(Int $col, Int $row) is export {
+    print "\e[{$row};{$col}H";
+}
+
+sub get-key-in is export {
+    ENTER shell "stty raw -echo min 1 time 1";
+    LEAVE shell "stty sane";
+    my $k = $*IN.read(1).decode;
+
+	  if $k eq "\x[1b]" {
+        $k ~= $*IN.read(1).decode ~ $*IN.read(1).decode;
+    }
+
+    $k;
 }
