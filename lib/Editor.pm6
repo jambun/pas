@@ -127,18 +127,40 @@ class Editor {
         my $line = $!first-display-line + $ix - $!top-field-ix;
         if @!fields[$ix] && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
             print-at($line, 2, @!fields[$ix].render(:selected($ix == $!selected-field-ix)), :fill);
+        } else {
+            print-at($line, 2, ' ', :fill);
         }
     }
 
     method draw-form {
         for 0 .. $!number-of-display-lines -> $i {
             my $ix = $i + $!top-field-ix;
-            last unless @!fields[$ix];
             self.draw-field($ix);
         }
 
-        print-at($!number-of-display-lines + $!first-display-line + 2, 2,
-                 "{@!fields.elems - $!number-of-display-lines - $!top-field-ix - 1} more fields", :fill);
+        my $leading-count = $!top-field-ix;
+
+        if $leading-count <= 0 {
+            print-at($!first-display-line - 1,
+                     $!cursor-offset,
+                     ' ', :fill);
+        } elsif $leading-count > 0 {
+            print-at($!first-display-line - 1,
+                     $!cursor-offset,
+                     ansi('.', 'green') x $leading-count, :fill);
+        }
+
+        my $trailing-count = @!fields.elems - $!number-of-display-lines - $!top-field-ix - 1;
+
+        if $trailing-count <= 0 {
+            print-at($!number-of-display-lines + $!first-display-line + 1,
+                     $!cursor-offset,
+                     ' ', :fill);
+        } elsif $trailing-count > 0 {
+            print-at($!number-of-display-lines + $!first-display-line + 1,
+                     $!cursor-offset,
+                     ansi('.', 'green') x $trailing-count, :fill);
+        }
     }
 
     method edit-screen(:$embedded) {
@@ -250,6 +272,16 @@ class Editor {
                     } else {
                         $field.open-for-update = True;
                         self.draw-field;
+                    }
+                }
+                when /\d/ {
+                    my $ix = $!number-of-display-lines * ($k - 1);
+                    if $ix > +@!fields {
+                        print BEL;
+                    } else {
+                        $!top-field-ix = $ix;
+                        $!selected-field-ix = $ix;
+                        self.draw-form;
                     }
                 }
 		            when UP_ARROW {
