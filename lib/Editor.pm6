@@ -114,7 +114,7 @@ class Editor {
 
         if $new-ix < 0 || $new-ix < $!top-field-ix
                        || $new-ix >= @!fields.elems
-                       || $new-ix > $!max-top-field-ix + $!top-field-ix + 4 {
+                       || $new-ix > $!number-of-display-lines + $!top-field-ix {
             print BEL;
         } else {
             $!selected-field-ix = $new-ix;
