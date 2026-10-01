@@ -320,7 +320,8 @@ class Editor {
                             self.field.translation = $enum<value_translations>{self.field.value};
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
-                            if (self.field.value || '').chars > term_cols() - $!cursor-offset - 20 || self.field.value ~~ /\n/ {
+                            my $val = self.field.value // '';
+                            if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
                                 save_tmp(self.field.value);
                                 if edit(tmp_file) {
                                     self.field.value = slurp(tmp_file).chomp;
