@@ -28,7 +28,9 @@ class FormField {
     }
 
     method updated {
-        if $!value ~~ Iterable {
+        if $!value ~~ Hash {
+            $!value !eqv $!original-value;
+        } elsif $!value ~~ Iterable {
             # $!value might have been populated with _resolveds
             $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $!original-value;
         } else {
@@ -47,6 +49,12 @@ class FormField {
         my $val = $!value;
         if !$val.defined || $val ~~ '' {
             $val = ansi('--', $value-style);
+        } elsif $val ~~ Hash {
+            if $val.elems > 1 {
+                $val = ansi($!prop, "bold $value-style") ~ " {$val.elems} properties";
+            } else {
+                $val = ansi($val.head.key ~ ': ' ~ $val.head.value, "bold $value-style");
+            }
         } elsif $val ~~ Iterable {
             if $!value-ix.defined {
                 my $item = $val[$!value-ix];
