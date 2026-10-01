@@ -128,12 +128,22 @@ class Editor {
         $!cursor-offset = $longest + 3;
         FormField.prop-width = $longest;
 
-        for @props -> $prop {
+        self.load-fields;
+    }
+
+    method load-fields {
+        @!fields = Empty;
+
+        for |$!schema<property_list> -> $prop {
             my $schema_prop = $!schema<properties>{$prop};
             next if $schema_prop<readonly>;
             next if @!skip_props.grep($prop);
 
-            @!fields.push(FormField.new(:$prop, :value(%!json{$prop})));
+            my $translation = $schema_prop<dynamic_enum> && %!json{$prop}
+                              ?? enum-by-name($schema_prop<dynamic_enum>)<value_translations>{%!json{$prop}}
+                              !! '';
+
+            @!fields.push(FormField.new(:$prop, :value(%!json{$prop}), :$translation));
         }
 
         $!max-top-field-ix = [0, @!fields.elems - $!number-of-display-lines].max;
@@ -257,13 +267,11 @@ class Editor {
 	          given $k {
                 when 's' {
                     for @!fields.grep(*.updated) -> $field {
-                        $field.original-value = $field.value;
                         %!json{$field.prop} = $field.value;
                     }
 
                     my %resp = from-json client.post(%!json<uri>, Empty, to-json %!json);
 
-                    self.draw-form;
                     if %resp<error> {
                         my $msg = '';
                         for %resp<error>.kv -> $k, $v {
@@ -276,7 +284,23 @@ class Editor {
                         self.message(%resp<status>);
                     }
 
-                }
+                    # reload json after the update
+                    %resp = from-json client.get(%!json<uri>);
+
+                    if %resp<error> {
+                        my $msg = '';
+                        for %resp<error>.kv -> $k, $v {
+                            $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
+                        }
+
+                        self.message($msg);
+                    } else {
+                        %!json = %resp;
+                        self.load-fields;
+                    }
+
+                    self.draw-form;
+               }
                 when "\t" {
                     self.field.open-for-update = False;
                     self.field.value = self.field.original-value;
@@ -373,6 +397,8 @@ class Editor {
                                 }
                             }
                             self.draw-help(@array-help, :add);
+                        } elsif $prop<dynamic_enum> {
+                            self.field.translation = enum-by-name($prop<dynamic_enum>)<value_translations>{self.field.value};
                         }
 
                         self.draw-field;
