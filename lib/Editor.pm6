@@ -372,6 +372,9 @@ class Editor {
                 when 'j' {
                     page(pretty to-json %!json{self.field.prop});
                 }
+                when 'J' {
+                    page(pretty to-json %!json);
+                }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
                     if $ix > +@!fields {
