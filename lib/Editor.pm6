@@ -45,8 +45,8 @@ class FormField {
         }
 
         my $val = $!value;
-        if !$val.defined {
-            $val //= ansi('--', $value-style);
+        if !$val.defined || $val ~~ '' {
+            $val = ansi('--', $value-style);
         } elsif $val ~~ Iterable {
             if $!value-ix.defined {
                 my $item = $val[$!value-ix];
@@ -102,11 +102,11 @@ class Editor {
         "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
         '1 2 ..' => 'Page',
         'SPACE' => 'Edit',
-        'TAB' => 'Revert';
+        'TAB' => 'Revert',
+        'D' => 'Delete';
 
     my @array-help =
-        'A' => 'Add',
-        'D' => 'Delete';
+        'A' => 'Add';
 
     submethod TWEAK {
         $!schema = schemas(:name(%!json<jsonmodel_type>));
@@ -205,8 +205,9 @@ class Editor {
     method draw-help(@items?, :$add) {
         if $add && @items {
             @items = |@default-help, |@items;
+        } else {
+            @items ||= @default-help;
         }
-        @items ||= @default-help;
         my $help-txt;
         for @items -> $i {
             $help-txt ~= ' | ' if $help-txt;
@@ -268,6 +269,24 @@ class Editor {
                     my $field = @!fields[$!selected-field-ix];
                     $field.open-for-update = False;
                     $field.value = $field.original-value;
+                    self.draw-field;
+                }
+                when 'd' {
+                    my $field = @!fields[$!selected-field-ix];
+                    if $field.value ~~ Iterable {
+                        if $field.value-ix.defined {
+                            $field.value.splice($field.value-ix, 1);
+                            self.message("Item deleted from {$field.prop}");
+                            if $field.value-ix >= $field.value.elems {
+                                $field.value-ix = Nil;
+                            }
+                        } else {
+                            $field.value = [];
+                            self.message("All {$field.prop} deleted");
+                        }
+                    } else {
+                        $field.value = '';
+                    }
                     self.draw-field;
                 }
                 when ' ' {
