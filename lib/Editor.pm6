@@ -214,7 +214,7 @@ class Editor {
         self.draw-help;
     }
 
-    method draw-help(@items?, :$add) {
+    method draw-help(@items? is copy, :$add) {
         if $add && @items {
             @items = |@default-help, |@items;
         } else {
