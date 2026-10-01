@@ -108,8 +108,9 @@ class Editor {
         'S' => 'Save',
         "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
         "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
-        '1 2 ..' => 'Page',
+        '1 2 +' => 'Page',
         'J' => 'JSON',
+        'V' => 'Value',
         'SPACE' => 'Edit',
         'TAB' => 'Revert',
         'D' => 'Delete';
@@ -447,6 +448,9 @@ class Editor {
 
                         self.draw-field;
                     }
+                }
+                when 'v' {
+                    page(pretty to-json self.field.value);
                 }
                 when 'j' {
                     page(pretty to-json %!json{self.field.prop});
