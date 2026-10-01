@@ -80,6 +80,15 @@ class Editor {
     has $.first-display-line = 3;
     has @.skip_props = <uri created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
 
+    my @default-help =
+        'Q' => 'Quit',
+        'S' => 'Save',
+        "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
+        "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
+        '1 2 ..' => 'Page',
+        'SPACE' => 'Edit field',
+        'TAB' => 'Revert field';
+
     submethod TWEAK {
         $!schema = schemas(:name(%!json<jsonmodel_type>));
 
@@ -163,6 +172,27 @@ class Editor {
         }
     }
 
+    method draw-header {
+        print-at(1, 3, ansi(%!json<uri>, 'bold'));
+    }
+
+    method draw-footer {
+        self.draw-help(@default-help);
+    }
+
+    method draw-help(@items) {
+        my $help-txt;
+        for @items -> $i {
+            $help-txt ~= ' | ' if $help-txt;
+            if $i.key eq $i.value.substr(0,1) {
+                $help-txt ~= ansi($i.key, 'bold green') ~ $i.value.substr(1);
+            } else {
+                $help-txt ~= ansi($i.key, 'bold green') ~ ' ' ~ $i.value;
+            }
+        }
+        print-at(term_lines(), 3, $help-txt);
+    }
+
     method edit-screen(:$embedded) {
         ENTER {
             run <tput civis> unless $embedded;
@@ -173,7 +203,9 @@ class Editor {
         }
 
         clear-screen();
-        print-at(1, 3, ansi(%!json<uri>, 'bold'));
+
+        self.draw-header;
+        self.draw-footer;
 
         my $k = '';
 
@@ -316,6 +348,7 @@ class Editor {
 
         }
 
+        print-at(term_lines(), 1, ' ', :fill);
 
         "Closed form for {%!json<uri>}";
     }
