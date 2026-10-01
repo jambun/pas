@@ -279,7 +279,7 @@ class Editor {
                 }
                 when "\t" {
                     self.field.open-for-update = False;
-                    self.value = self.field.original-value;
+                    self.field.value = self.field.original-value;
                     self.draw-field;
                 }
                 when 'd' {
