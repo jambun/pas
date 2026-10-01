@@ -101,6 +101,7 @@ class Editor {
         "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
         "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
         '1 2 ..' => 'Page',
+        'J' => 'JSON',
         'SPACE' => 'Edit',
         'TAB' => 'Revert',
         'D' => 'Delete';
@@ -132,6 +133,10 @@ class Editor {
 
     method message($s) {
         print-at(term_lines() - 1, 3, ansi($s, 'yellow'), :fill);
+    }
+
+    method field {
+        @!fields[$!selected-field-ix];
     }
 
     method move-cursor(Int $d) {
@@ -367,6 +372,9 @@ class Editor {
 
                         self.draw-field;
                     }
+                }
+                when 'j' {
+                    page(pretty to-json %!json{self.field.prop});
                 }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
