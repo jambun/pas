@@ -117,6 +117,12 @@ class Editor {
     my @array-help =
         'A' => 'Add';
 
+    my @add-value-help =
+        'Query' => 'Type search query',
+        'SPACE' => 'Next result',
+        'RETURN' => 'Add selected result',
+        'TAB' => 'Exit';
+
     submethod TWEAK {
         $!schema = schemas(:name(%!json<jsonmodel_type>));
 
@@ -150,7 +156,7 @@ class Editor {
     }
 
     method message($s) {
-        print-at(term_lines() - 1, 3, ansi($s, 'yellow'), :fill);
+        print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :fill);
     }
 
     method field {
@@ -323,6 +329,52 @@ class Editor {
                     }
                     self.draw-field;
                 }
+                when 'a' {
+                    my %search;
+                    my $ix = 0;
+                    my $q;
+                    my $type = $!schema<properties>{self.field.prop}<items><properties><ref><type>;
+                    $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+
+                    self.draw-help(@add-value-help);
+
+                    while (my $ak = get-key-in) {
+                        given $ak {
+                            when "\t" {
+                                self.message("Exited add mode");
+                                last;
+                            }
+                            when /\n/ {
+                                self.field.value.push({ref => %search<results>[$ix]<uri>});
+                                self.draw-field;
+                                self.message('Added ' ~ %search<results>[$ix]<uri> ~ ' to ' ~ self.field.prop);
+                                last;
+                            }
+                            when ' ' {
+                                $ix = ($ix + 1) % +%search<results>;
+                                my $msg = %search<results>[$ix]<uri>;
+                                if %search<results>[$ix]<title> {
+                                    $msg ~= ' | ' ~ %search<results>[$ix]<title>;
+                                }
+                                self.message($msg);
+                            }
+                            default {
+                                if $ak ~~ /\w/ {
+                                    $q ~= $ak;
+                                } elsif $ak.ord == 127 {
+                                    $q.=substr(0, *-1) if $q;
+                                }
+                                if $q {
+                                    %search = self.search-type($type, $q);
+                                } else {
+                                    self.message("Type to search");
+                                }
+                            }
+                        }
+                    }
+
+                    self.draw-help;
+                }
                 when ' ' {
                     my $prop = $!schema<properties>{self.field.prop};
 
@@ -374,14 +426,6 @@ class Editor {
                             if $prop<items><subtype> ~~ <ref> {
                                 self.field.next-value;
                                 self.draw-field;
-                                # while (my $ak = get-key-in) ne 'q' {
-                                #     given $ak {
-                                #         when ' ' {
-                                #             $field.next-value;
-                                #             self.draw-field;
-                                #         }
-                                #     }
-                                # }
                             }
                         }
                     } else {
@@ -457,4 +501,17 @@ class Editor {
         "Closed form for {%!json<uri>}";
     }
 
+    method search-type($type, $q) {
+        my @args = "type[]=$type", 'page=1', "q=$q";
+
+        my %resp = from-json client.get(SEARCH_URI, @args);
+
+        if %resp<error> {
+            self.message("Error searching for $type with '$q': " ~ %resp<error>);
+        } else {
+            self.message("Found " ~ %resp<total_hits> ~ ' ' ~ $type ~ "s with '$q'");
+        }
+
+        %resp;
+    }
 }
