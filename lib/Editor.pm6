@@ -44,7 +44,17 @@ class FormField {
             $val //= ansi('--', $value-style);
         } elsif $val ~~ Iterable {
             if $!value-ix.defined {
-                $val = ansi($val[$!value-ix]<ref>, "bold $value-style");
+                my $item = $val[$!value-ix];
+                if $item<ref> {
+                    if $item<_resolved> {
+                        my $label = $item<_resolved>{'display_string', 'title', 'name'}.grep(*.defined).head;
+                        $val = ansi($item<ref> ~ ' | ' ~ $label, "bold $value-style");
+                    } else {
+                        $val = ansi($item<ref>, "bold $value-style");
+                    }
+                } else {
+                    $val = ansi($item.gist, "bold $value-style");;
+                }
             } else {
                 $val = "{ansi($val.elems.Str, "bold $value-style")} $!prop";
             }
@@ -246,9 +256,9 @@ class Editor {
                 }
                 when ' ' {
                     my $field = @!fields[$!selected-field-ix];
-                    if $field.open-for-update {
-                        my $prop = $!schema<properties>{$field.prop};
+                    my $prop = $!schema<properties>{$field.prop};
 
+                    if $field.open-for-update {
                         if $prop<type> eq 'boolean' {
                             $field.value = !$field.value;
                             self.draw-field;
@@ -292,17 +302,31 @@ class Editor {
                                 self.draw-field;
                             }
                         } elsif $prop<type> eq 'array' {
-                            while (my $ak = get-key-in) ne 'q' {
-                                given $ak {
-                                    when ' ' {
-                                        $field.next-value;
-                                        self.draw-field;
-                                    }
-                                }
+                            if $prop<items><subtype> ~~ <ref> {
+                                $field.next-value;
+                                self.draw-field;
+                                # while (my $ak = get-key-in) ne 'q' {
+                                #     given $ak {
+                                #         when ' ' {
+                                #             $field.next-value;
+                                #             self.draw-field;
+                                #         }
+                                #     }
+                                # }
                             }
                         }
                     } else {
                         $field.open-for-update = True;
+
+                        if $prop<type> eq <array> && $prop<items><subtype> ~~ <ref> && !$field.value.head<_resolved> {
+                            my $resp = from-json client.get(%!json<uri>, ['resolve[]=' ~ $field.prop,]);
+                            if $resp<error> {
+                                self.message($resp<error>);
+                            } else {
+                                $field.value = $resp{$field.prop};
+                            }
+                        }
+
                         self.draw-field;
                     }
                 }
