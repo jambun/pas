@@ -112,7 +112,7 @@ class Editor {
     }
 
     method message($s) {
-        print-at(2, 3, ansi($s, 'yellow'), :fill);
+        print-at(term_lines() - 1, 3, ansi($s, 'yellow'), :fill);
     }
 
     method move-cursor(Int $d) {
