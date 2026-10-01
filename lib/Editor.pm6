@@ -21,14 +21,19 @@ class FormField {
     method next-value {
         if $!value-ix.defined {
             $!value-ix = ($!value-ix + 1) % $!value.elems;
-            if $!value-ix == 0 { $!value-ix = Int; }
+            if $!value-ix == 0 { $!value-ix = Nil; }
         } else {
             $!value-ix = 0;
         }
     }
 
     method updated {
-        $!value !eqv $!original-value;
+        if $!value ~~ Iterable {
+            # $!value might have been populated with _resolveds
+            $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $!original-value;
+        } else {
+            $!value !eqv $!original-value;
+        }
     }
 
     method render(:$selected) {
@@ -96,8 +101,12 @@ class Editor {
         "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
         "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
         '1 2 ..' => 'Page',
-        'SPACE' => 'Edit field',
-        'TAB' => 'Revert field';
+        'SPACE' => 'Edit',
+        'TAB' => 'Revert';
+
+    my @array-help =
+        'A' => 'Add',
+        'D' => 'Delete';
 
     submethod TWEAK {
         $!schema = schemas(:name(%!json<jsonmodel_type>));
@@ -128,6 +137,8 @@ class Editor {
     method move-cursor(Int $d) {
         my $old-field = @!fields[$!selected-field-ix];
         $old-field.open-for-update = False;
+        $old-field.value-ix = Nil;
+
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
 
@@ -139,6 +150,7 @@ class Editor {
             $!selected-field-ix = $new-ix;
             self.draw-field($old-ix);
             self.draw-field;
+            self.draw-help;
         }
     }
 
@@ -187,10 +199,14 @@ class Editor {
     }
 
     method draw-footer {
-        self.draw-help(@default-help);
+        self.draw-help;
     }
 
-    method draw-help(@items) {
+    method draw-help(@items?, :$add) {
+        if $add && @items {
+            @items = |@default-help, |@items;
+        }
+        @items ||= @default-help;
         my $help-txt;
         for @items -> $i {
             $help-txt ~= ' | ' if $help-txt;
@@ -200,7 +216,7 @@ class Editor {
                 $help-txt ~= ansi($i.key, 'bold green') ~ ' ' ~ $i.value;
             }
         }
-        print-at(term_lines(), 3, $help-txt);
+        print-at(term_lines(), 3, $help-txt, :fill);
     }
 
     method edit-screen(:$embedded) {
@@ -318,13 +334,16 @@ class Editor {
                     } else {
                         $field.open-for-update = True;
 
-                        if $prop<type> eq <array> && $prop<items><subtype> ~~ <ref> && !$field.value.head<_resolved> {
-                            my $resp = from-json client.get(%!json<uri>, ['resolve[]=' ~ $field.prop,]);
-                            if $resp<error> {
-                                self.message($resp<error>);
-                            } else {
-                                $field.value = $resp{$field.prop};
+                        if $prop<type> eq <array> {
+                            if $prop<items><subtype> ~~ <ref> && !$field.value.head<_resolved> {
+                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ $field.prop,));
+                                if $resp<error> {
+                                    self.message($resp<error>);
+                                } else {
+                                    $field.value = $resp{$field.prop};
+                                }
                             }
+                            self.draw-help(@array-help, :add);
                         }
 
                         self.draw-field;
