@@ -140,9 +140,8 @@ class Editor {
     }
 
     method move-cursor(Int $d) {
-        my $old-field = @!fields[$!selected-field-ix];
-        $old-field.open-for-update = False;
-        $old-field.value-ix = Nil;
+        self.field.open-for-update = False;
+        self.field.value-ix = Nil;
 
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
@@ -271,55 +270,52 @@ class Editor {
 
                 }
                 when "\t" {
-                    my $field = @!fields[$!selected-field-ix];
-                    $field.open-for-update = False;
-                    $field.value = $field.original-value;
+                    self.field.open-for-update = False;
+                    self.value = self.field.original-value;
                     self.draw-field;
                 }
                 when 'd' {
-                    my $field = @!fields[$!selected-field-ix];
-                    if $field.value ~~ Iterable {
-                        if $field.value-ix.defined {
-                            $field.value.splice($field.value-ix, 1);
-                            self.message("Item deleted from {$field.prop}");
-                            if $field.value-ix >= $field.value.elems {
-                                $field.value-ix = Nil;
+                    if self.field.value ~~ Iterable {
+                        if self.field.value-ix.defined {
+                            self.field.value.splice(self.field.value-ix, 1);
+                            self.message("Item deleted from {self.field.prop}");
+                            if self.field.value-ix >= self.field.value.elems {
+                                self.field.value-ix = Nil;
                             }
                         } else {
-                            $field.value = [];
-                            self.message("All {$field.prop} deleted");
+                            self.field.value = [];
+                            self.message("All {self.field.prop} deleted");
                         }
                     } else {
-                        $field.value = '';
+                        self.field.value = '';
                     }
                     self.draw-field;
                 }
                 when ' ' {
-                    my $field = @!fields[$!selected-field-ix];
-                    my $prop = $!schema<properties>{$field.prop};
+                    my $prop = $!schema<properties>{self.field.prop};
 
-                    if $field.open-for-update {
+                    if self.field.open-for-update {
                         if $prop<type> eq 'boolean' {
-                            $field.value = !$field.value;
+                            self.field.value = !self.field.value;
                             self.draw-field;
                         } elsif $prop<enum> {
-                            my $next-ix = $prop<enum>.first($field.value, :k) + 1;
+                            my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
                             $next-ix %= $prop<enum>.elems;
-                            $field.value = $prop<enum>[$next-ix];
+                            self.field.value = $prop<enum>[$next-ix];
                             self.draw-field;
                         } elsif $prop<dynamic_enum> {
                             my $enum = enum-by-name($prop<dynamic_enum>);
                             my @values = |$enum<values>;
-                            my $next-ix = @values.first($field.value, :k) + 1;
+                            my $next-ix = @values.first(self.field.value, :k) + 1;
                             $next-ix %= @values.elems;
-                            $field.value = @values[$next-ix];
-                            $field.translation = $enum<value_translations>{$field.value};
+                            self.field.value = @values[$next-ix];
+                            self.field.translation = $enum<value_translations>{self.field.value};
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
-                            if ($field.value || '').chars > term_cols() - $!cursor-offset - 20 || $field.value ~~ /\n/ {
-                                save_tmp($field.value);
+                            if (self.field.value || '').chars > term_cols() - $!cursor-offset - 20 || self.field.value ~~ /\n/ {
+                                save_tmp(self.field.value);
                                 if edit(tmp_file) {
-                                    $field.value = slurp(tmp_file).chomp;
+                                    self.field.value = slurp(tmp_file).chomp;
                                     self.message('Edits applied');
                                 } else {
                                     self.message('No edits');
@@ -335,15 +331,15 @@ class Editor {
                                 # $cli.do-edit('insert-string', $field.value);
 
                                 # so use history instead - sigh
-                                $cli.add-history($field.value);
+                                $cli.add-history(self.field.value);
 
-                                $field.value = $cli.prompt;
+                                self.field.value = $cli.prompt;
                                 run <tput civis>;
                                 self.draw-field;
                             }
                         } elsif $prop<type> eq 'array' {
                             if $prop<items><subtype> ~~ <ref> {
-                                $field.next-value;
+                                self.field.next-value;
                                 self.draw-field;
                                 # while (my $ak = get-key-in) ne 'q' {
                                 #     given $ak {
@@ -356,15 +352,15 @@ class Editor {
                             }
                         }
                     } else {
-                        $field.open-for-update = True;
+                        self.field.open-for-update = True;
 
                         if $prop<type> eq <array> {
-                            if $prop<items><subtype> ~~ <ref> && !$field.value.head<_resolved> {
-                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ $field.prop,));
+                            if $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
+                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                 if $resp<error> {
                                     self.message($resp<error>);
                                 } else {
-                                    $field.value = $resp{$field.prop};
+                                    self.field.value = $resp{self.field.prop};
                                 }
                             }
                             self.draw-help(@array-help, :add);
