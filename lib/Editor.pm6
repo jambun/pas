@@ -410,7 +410,7 @@ class Editor {
                             my $next-ix = @values.first(self.field.value, :k) + 1;
                             $next-ix %= @values.elems;
                             self.field.value = @values[$next-ix];
-                            self.field.translation = $enum<value_translations>{self.field.value};
+                            self.field.set-translation;
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
                             my $val = self.field.value // '';
@@ -459,7 +459,7 @@ class Editor {
                             }
                             self.draw-help(@array-help, :add);
                         } elsif $prop<dynamic_enum> {
-                            self.field.translation = enum-by-name($prop<dynamic_enum>)<value_translations>{self.field.value};
+                            self.field.set-translation;
                         }
 
                         self.draw-field;
