@@ -404,6 +404,11 @@ class Editor {
                         self.message(%resp<status>);
                     }
 
+                    my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
+                    if $open-subrecord-ix.defined {
+                        $!selected-field-ix = $open-subrecord-ix;
+                    }
+
                     # reload json after the update
                     %resp = from-json client.get(%!json<uri>);
 
