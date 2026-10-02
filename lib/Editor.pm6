@@ -123,6 +123,7 @@ class Editor {
         "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
         "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
         '1 2 +' => 'Page',
+        'M' => 'Model',
         'J' => 'JSON',
         'V' => 'Value',
         'SPACE' => 'Edit',
@@ -464,6 +465,12 @@ class Editor {
 
                         self.draw-field;
                     }
+                }
+                when 'm' {
+                    page(pretty to-json self.field.schema);
+                }
+                when 'M' {
+                    page(pretty to-json self.schema);
                 }
                 when 'v' {
                     page(pretty to-json self.field.value);
