@@ -47,7 +47,7 @@ class FormField {
         my $ov-parsed = from-json $!original-value;
         if $!value ~~ Hash {
             $!value !eqv $ov-parsed;
-        } elsif $!value ~~ Iterable {
+        } elsif $!value ~~ Iterable && $!value.head ~~ Hash {
             # $!value might have been populated with _resolveds
             $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $ov-parsed;
         } else {
@@ -183,23 +183,20 @@ class Editor {
     }
 
     method load-subrecord-fields {
-        my $properties = $!schema<properties>{self.field.prop};
+        unless self.field.schema<type> eq 'array'
+                   ?? self.is-subrecord(self.field.schema<items><type>)
+                   !! self.is-subrecord(self.field.schema<type>) {
 
-        my $sub-type = $properties<type> eq 'array'
-                           ?? self.subrecord-type($properties<items><type>)
-                           !! self.subrecord-type($properties<type>);
-
-        unless $sub-type {
             self.message(self.field.prop ~ ' does not contain subrecords');
             return;
         }
-
-        my $item-schema = schemas(:name($sub-type));
 
         @!subrecords = Empty;
 
         for |%!json{self.field.prop} -> $rec {
             my @subrecord;
+
+            my $item-schema = schemas(:name($rec<jsonmodel_type>));
 
             for |$item-schema<property_list> -> $prop {
                 next if $prop ~~ /^ '_' /;
@@ -665,12 +662,15 @@ class Editor {
     }
 
    method is-subrecord($type-def --> Bool) {
-        !!($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/);
+       if $type-def ~~ Iterable {
+           so all $type-def.map({ $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
+       } else {
+           ($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+       }
     }
 
    method subrecord-type($type-def) {
-        $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
-        $0.Str;
-    }
-
+       $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+       $0.Str;
+   }
 }
