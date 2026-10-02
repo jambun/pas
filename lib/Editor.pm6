@@ -6,6 +6,7 @@ use JSON::Tiny;
 
 class FormField {
     has $.prop;
+    has $.parent-prop;
     has $.schema;
     has $.value is rw;
     has $.original-value is rw;
@@ -52,7 +53,7 @@ class FormField {
         }
     }
 
-    method render(:$selected) {
+    method render(:$selected, :$subrecord-ix) {
         my $value-style = '';
         if $!open-for-update {
             $value-style = 'green';
@@ -80,10 +81,12 @@ class FormField {
                         $val = ansi($item<ref>, "bold $value-style");
                     }
                 } else {
-                    $val = ansi($item.gist, "bold $value-style");;
+                    $val = ansi($item.gist, "bold $value-style");
                 }
+            } elsif $!open-for-update && $subrecord-ix.defined {
+                $val = ansi("{$subrecord-ix + 1} of {$val.elems}", "bold $value-style") ~ ' ' ~ $!prop;
             } else {
-                $val = "{ansi($val.elems.Str, "bold $value-style")} $!prop";
+                $val = ansi($val.elems.Str, "bold $value-style") ~ ' ' ~ $!prop;
             }
         } else {
             $val.=trans("\n" => ' ');
@@ -101,15 +104,21 @@ class FormField {
 
         my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
 
-        sprintf("%{self.prop-width}s $cursor %s\n", $!prop, $val);
+        if $!parent-prop {
+            sprintf("%{self.prop-width}s    $cursor %s\n", $!prop, $val);
+        } else {
+            sprintf("%{self.prop-width}s $cursor %s\n", $!prop, $val);
+        }
     }
 }
 
 class Editor {
-    has %.json;
-    has FormField @.fields;
-    has $.schema;
-    has $.selected-field-ix = 0;
+    has %.json; # the parsed json of the record
+    has $.schema; # the JSONModel schema for the record's type
+    has FormField @.fields; # a FormField for each editable property in the schema
+    has $.selected-field-ix = 0; # the array index of the currently selected field
+    has @.subrecords; # a FormField array for each sub-record in the selected field 
+    has $.subrecord-ix; # the array index of the currently selected subrecord
     has $.cursor-offset;
     has $.top-field-ix = 0;
     has $.max-top-field-ix;
@@ -167,6 +176,67 @@ class Editor {
         $!max-top-field-ix = [0, @!fields.elems - $!number-of-display-lines].max;
     }
 
+    method load-subrecord-fields {
+        my $properties = $!schema<properties>{self.field.prop};
+
+        my $sub-type = $properties<type> eq 'array'
+                           ?? self.subrecord-type($properties<items><type>)
+                           !! self.subrecord-type($properties<type>);
+
+        unless $sub-type {
+            self.message(self.field.prop ~ ' does not contain subrecords');
+            return;
+        }
+
+        my $item-schema = schemas(:name($sub-type));
+
+        @!subrecords = Empty;
+
+        for |%!json{self.field.prop} -> $rec {
+            my @subrecord;
+
+            for |$item-schema<property_list> -> $prop {
+                next if $prop ~~ /^ '_' /;
+                my $schema_prop = $item-schema<properties>{$prop};
+                next if $schema_prop<readonly>;
+                next if @!skip_props.grep($prop);
+
+                @subrecord.push(FormField.new(:$prop,
+                                              :parent-prop(self.field.prop),
+                                              :schema($schema_prop),
+                                              :value($rec{$prop})));
+            }
+
+            @!subrecords.push(@subrecord);
+        }
+
+        @!fields.=grep({ !.parent-prop });
+        $!subrecord-ix = Nil;
+        self.draw-next-subrecord;
+    }
+
+    method draw-remove-subrecord {
+        @!fields.=grep({ !.parent-prop });
+        self.draw-form;
+    }
+
+    method draw-next-subrecord {
+        if $!subrecord-ix.defined {
+            $!subrecord-ix++;
+        } else {
+            $!subrecord-ix = 0;
+        }
+
+        $!subrecord-ix = $!subrecord-ix % @!subrecords;
+
+        @!fields.=grep({ !.parent-prop });
+
+        # and in with the new
+        @!fields.splice($!selected-field-ix + 1, 0, @!subrecords[$!subrecord-ix]);
+
+        self.draw-form;
+    }
+
     method message($s) {
         print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :fill);
     }
@@ -197,7 +267,8 @@ class Editor {
     method draw-field($ix = $!selected-field-ix) {
         my $line = $!first-display-line + $ix - $!top-field-ix;
         if @!fields[$ix] && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
-            print-at($line, 2, @!fields[$ix].render(:selected($ix == $!selected-field-ix)), :fill);
+            print-at($line, 2, @!fields[$ix].render(:selected($ix == $!selected-field-ix),
+                                                    :$!subrecord-ix), :fill);
         } else {
             print-at($line, 2, ' ', :fill);
         }
@@ -444,13 +515,17 @@ class Editor {
                             if $prop<items><subtype> ~~ <ref> {
                                 self.field.next-value;
                                 self.draw-field;
+                            } else {
+                                self.draw-next-subrecord;
                             }
                         }
                     } else {
                         self.field.open-for-update = True;
 
                         if $prop<type> eq <array> {
-                            if $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
+                            if self.is-subrecord($prop<items><type>) {
+                                self.load-subrecord-fields;
+                            } elsif $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                 if $resp<error> {
                                     self.message($resp<error>);
@@ -545,4 +620,14 @@ class Editor {
 
         %resp;
     }
+
+   method is-subrecord($type-def --> Bool) {
+        !!($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/);
+    }
+
+   method subrecord-type($type-def) {
+        $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+        $0.Str;
+    }
+
 }
