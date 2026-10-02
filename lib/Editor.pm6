@@ -120,8 +120,8 @@ class Editor {
     my @default-help =
         'Q' => 'Quit',
         'S' => 'Save',
-        "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor up/down',
-        "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll up/down',
+        "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor',
+        "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll',
         '1 2 +' => 'Page',
         'M' => 'Model',
         'J' => 'JSON',
