@@ -407,6 +407,7 @@ class Editor {
                     my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
                     if $open-subrecord-ix.defined {
                         $!selected-field-ix = $open-subrecord-ix;
+                        $!subrecord-ix = Nil;
                     }
 
                     # reload json after the update
