@@ -11,11 +11,12 @@ class FormField {
     has $.value is rw;
     has $.original-value is rw;
     has Bool $.open-for-update is rw = False;
+    has Bool $.subrecord-open is rw = False;
     has Int $.value-ix is rw;
     has Str $.translation is rw;
 
     submethod TWEAK {
-        $!original-value = $!value;
+        $!original-value ||= to-json $!value;
         self.set-translation;
     }
 
@@ -29,7 +30,7 @@ class FormField {
 
     method revert {
         $!open-for-update = False;
-        $!value = $!original-value;
+        $!value = from-json $!original-value;
         self.set-translation;
     }
 
@@ -43,13 +44,14 @@ class FormField {
     }
 
     method updated {
+        my $ov-parsed = from-json $!original-value;
         if $!value ~~ Hash {
-            $!value !eqv $!original-value;
+            $!value !eqv $ov-parsed;
         } elsif $!value ~~ Iterable {
             # $!value might have been populated with _resolveds
-            $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $!original-value;
+            $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $ov-parsed;
         } else {
-            $!value !eqv $!original-value;
+            $!value !eqv $ov-parsed;
         }
     }
 
@@ -83,7 +85,7 @@ class FormField {
                 } else {
                     $val = ansi($item.gist, "bold $value-style");
                 }
-            } elsif $!open-for-update && $subrecord-ix.defined {
+            } elsif $!subrecord-open {
                 $val = ansi("{$subrecord-ix + 1} of {$val.elems}", "bold $value-style") ~ ' ' ~ $!prop;
             } else {
                 $val = ansi($val.elems.Str, "bold $value-style") ~ ' ' ~ $!prop;
@@ -148,6 +150,10 @@ class Editor {
         'RETURN' => 'Add selected result',
         'TAB' => 'Exit';
 
+    my @subrecord-help =
+         'A' => 'Add subrecord',
+         'C' => 'Close subrecords';
+
     submethod TWEAK {
         $!schema = schemas(:name(%!json<jsonmodel_type>));
 
@@ -203,6 +209,7 @@ class Editor {
 
                 @subrecord.push(FormField.new(:$prop,
                                               :parent-prop(self.field.prop),
+                                              :original-value(), #jjj
                                               :schema($schema_prop),
                                               :value($rec{$prop})));
             }
@@ -210,14 +217,22 @@ class Editor {
             @!subrecords.push(@subrecord);
         }
 
-        @!fields.=grep({ !.parent-prop });
-        $!subrecord-ix = Nil;
+        self.draw-remove-subrecord;
         self.draw-next-subrecord;
+        self.draw-help(@subrecord-help, :add);
     }
 
     method draw-remove-subrecord {
+        my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
+        if $open-subrecord-ix {
+            $!selected-field-ix = $open-subrecord-ix;
+        }
+
+        $!subrecord-ix = Nil;
+        for @!fields { .subrecord-open = False };
         @!fields.=grep({ !.parent-prop });
         self.draw-form;
+        self.draw-help;
     }
 
     method draw-next-subrecord {
@@ -231,10 +246,18 @@ class Editor {
 
         @!fields.=grep({ !.parent-prop });
 
-        # and in with the new
+        self.field.subrecord-open = True;
+
         @!fields.splice($!selected-field-ix + 1, 0, @!subrecords[$!subrecord-ix]);
 
         self.draw-form;
+    }
+
+    method set-value($value) {
+        self.field.value = $value;
+        if $!subrecord-ix.defined {
+            @!fields.first({ .subrecord-open }).value[$!subrecord-ix]{self.field.prop} = $value;
+        }
     }
 
     method message($s) {
@@ -251,10 +274,13 @@ class Editor {
 
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
+        my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
 
         if $new-ix < 0 || $new-ix < $!top-field-ix
                        || $new-ix >= @!fields.elems
-                       || $new-ix > $!number-of-display-lines + $!top-field-ix {
+                       || $new-ix > $!number-of-display-lines + $!top-field-ix
+                       || ($open-subrecord-ix.defined && $new-ix < $open-subrecord-ix)
+                       || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + @!subrecords.first.elems) {
             print BEL;
         } else {
             $!selected-field-ix = $new-ix;
@@ -265,12 +291,18 @@ class Editor {
     }
 
     method draw-field($ix = $!selected-field-ix) {
+        my $field = @!fields[$ix];
         my $line = $!first-display-line + $ix - $!top-field-ix;
-        if @!fields[$ix] && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
-            print-at($line, 2, @!fields[$ix].render(:selected($ix == $!selected-field-ix),
-                                                    :$!subrecord-ix), :fill);
+        if $field && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
+            print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix),
+                                             :$!subrecord-ix), :fill);
         } else {
             print-at($line, 2, ' ', :fill);
+        }
+
+        if $field.parent-prop {
+            my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
+            self.draw-field($open-subrecord-ix);
         }
     }
 
@@ -369,7 +401,6 @@ class Editor {
 
                         self.message($msg);
                     } else {
-                        %!json<lock_version> = %resp<lock_version>;
                         self.message(%resp<status>);
                     }
 
@@ -398,16 +429,17 @@ class Editor {
                     if self.field.value ~~ Iterable {
                         if self.field.value-ix.defined {
                             self.field.value.splice(self.field.value-ix, 1);
+                            self.set-value(self.field.value);
                             self.message("Item deleted from {self.field.prop}");
                             if self.field.value-ix >= self.field.value.elems {
                                 self.field.value-ix = Nil;
                             }
                         } else {
-                            self.field.value = [];
+                            self.set-value([]);
                             self.message("All {self.field.prop} deleted");
                         }
                     } else {
-                        self.field.value = '';
+                        self.set-value('');
                     }
                     self.draw-field;
                 }
@@ -435,6 +467,7 @@ class Editor {
                             }
                             when /\n/ {
                                 self.field.value.push({ref => %search<results>[$ix]<uri>});
+                                self.set-value(self.field.value);
                                 self.draw-field;
                                 self.message('Added ' ~ %search<results>[$ix]<uri> ~ ' to ' ~ self.field.prop);
                                 last;
@@ -465,23 +498,23 @@ class Editor {
                     self.draw-help;
                 }
                 when ' ' {
-                    my $prop = $!schema<properties>{self.field.prop};
+                    my $prop = self.field.schema;
 
                     if self.field.open-for-update {
                         if $prop<type> eq 'boolean' {
-                            self.field.value = !self.field.value;
+                            self.set-value(!self.field.value);
                             self.draw-field;
                         } elsif $prop<enum> {
                             my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
                             $next-ix %= $prop<enum>.elems;
-                            self.field.value = $prop<enum>[$next-ix];
+                            self.set-value($prop<enum>[$next-ix]);
                             self.draw-field;
                         } elsif $prop<dynamic_enum> {
                             my $enum = enum-by-name($prop<dynamic_enum>);
                             my @values = |$enum<values>;
                             my $next-ix = @values.first(self.field.value, :k) + 1;
                             $next-ix %= @values.elems;
-                            self.field.value = @values[$next-ix];
+                            self.set-value(@values[$next-ix]);
                             self.field.set-translation;
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
@@ -489,14 +522,15 @@ class Editor {
                             if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
                                 save_tmp(self.field.value);
                                 if edit(tmp_file) {
-                                    self.field.value = slurp(tmp_file).chomp;
+                                    self.set-value(slurp(tmp_file).chomp);
                                     self.message('Edits applied');
                                 } else {
                                     self.message('No edits');
                                 }
                                 run <tput civis>;
                             } else {
-                                cursor($!cursor-offset + 2, $!first-display-line + $!selected-field-ix - $!top-field-ix);
+                                my $coo = self.field.parent-prop ?? 5 !! 2;
+                                cursor($!cursor-offset + $coo, $!first-display-line + $!selected-field-ix - $!top-field-ix);
                                 run <tput cvvis>;
                                 my $cli = Terminal::LineEditor::CLIInput.new;
 
@@ -507,7 +541,7 @@ class Editor {
                                 # so use history instead - sigh
                                 $cli.add-history(self.field.value);
 
-                                self.field.value = $cli.prompt;
+                                self.set-value($cli.prompt);
                                 run <tput civis>;
                                 self.draw-field;
                             }
@@ -530,7 +564,7 @@ class Editor {
                                 if $resp<error> {
                                     self.message($resp<error>);
                                 } else {
-                                    self.field.value = $resp{self.field.prop};
+                                    self.set-value($resp{self.field.prop});
                                 }
                             }
                             self.draw-help(@array-help, :add);
@@ -540,6 +574,9 @@ class Editor {
 
                         self.draw-field;
                     }
+                }
+                when 'c' {
+                    self.draw-remove-subrecord;
                 }
                 when 'm' {
                     page(pretty to-json self.field.schema);
