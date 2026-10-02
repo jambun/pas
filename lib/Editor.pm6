@@ -344,7 +344,14 @@ class Editor {
                     my $ix = 0;
                     my $q;
                     my $type = $!schema<properties>{self.field.prop}<items><properties><ref><type>;
-                    $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+                    if $type ~~ Array {
+                        for |$type -> $t {
+                            $t<type> ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+                        }
+                        $type = $type.map(*.<type>).Array;
+                    } else {
+                        $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+                    }
 
                     self.draw-help(@add-value-help);
 
@@ -515,7 +522,11 @@ class Editor {
     }
 
     method search-type($type, $q) {
-        my @args = "type[]=$type", 'page=1', "q=$q";
+        my @args = 'page=1', "q=$q";
+
+        for |$type -> $t {
+            @args.push("type[]=$t");
+        }
 
         my %resp = from-json client.get(SEARCH_URI, @args);
 
