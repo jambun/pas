@@ -6,6 +6,7 @@ use JSON::Tiny;
 
 class FormField {
     has $.prop;
+    has $.schema;
     has $.value is rw;
     has $.original-value is rw;
     has Bool $.open-for-update is rw = False;
@@ -14,9 +15,22 @@ class FormField {
 
     submethod TWEAK {
         $!original-value = $!value;
+        self.set-translation;
     }
 
     my $.prop-width;
+
+    method set-translation {
+        $!translation = $!schema<dynamic_enum> && $!value
+        ?? enum-by-name($!schema<dynamic_enum>)<value_translations>{$!value}
+        !! '';
+    }
+
+    method revert {
+        $!open-for-update = False;
+        $!value = $!original-value;
+        self.set-translation;
+    }
 
     method next-value {
         if $!value-ix.defined {
@@ -146,11 +160,7 @@ class Editor {
             next if $schema_prop<readonly>;
             next if @!skip_props.grep($prop);
 
-            my $translation = $schema_prop<dynamic_enum> && %!json{$prop}
-                              ?? enum-by-name($schema_prop<dynamic_enum>)<value_translations>{%!json{$prop}}
-                              !! '';
-
-            @!fields.push(FormField.new(:$prop, :value(%!json{$prop}), :$translation));
+            @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(%!json{$prop})));
         }
 
         $!max-top-field-ix = [0, @!fields.elems - $!number-of-display-lines].max;
@@ -309,8 +319,7 @@ class Editor {
                     self.draw-form;
                }
                 when "\t" {
-                    self.field.open-for-update = False;
-                    self.field.value = self.field.original-value;
+                    self.field.revert;
                     self.draw-field;
                 }
                 when 'd' {
