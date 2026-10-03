@@ -69,8 +69,9 @@ class FormField {
             $value-style = 'cyan';
         }
 
-        my $val = $!value;
-        if !$val.defined || $val ~~ '' {
+        my $val = $!value.clone;
+
+        if !$val.defined || ($val.Str && $val eq '') {
             $val = ansi('--', $value-style);
         } elsif $val ~~ Hash {
             if $val.elems > 1 {
@@ -243,6 +244,8 @@ class Editor {
     }
 
     method draw-next-subrecord {
+        return unless @!subrecords;
+
         if $!subrecord-ix.defined {
             $!subrecord-ix++;
         } else {
