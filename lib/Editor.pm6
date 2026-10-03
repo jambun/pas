@@ -9,18 +9,24 @@ class FormField {
     has $.parent-prop;
     has $.schema;
     has $.value is rw;
-    has $.original-value is rw;
+    has $.original-value;
     has Bool $.open-for-update is rw = False;
     has Bool $.subrecord-open is rw = False;
     has Int $.value-ix is rw;
     has Str $.translation is rw;
 
     submethod TWEAK {
-        $!original-value ||= to-json $!value;
+        # storing it as json - annoying but deep structures are passed by ref
+        # so get mutated when they change in $!value - tried deepmap, no go
+        $!original-value = to-json $!original-value || $!value;
         self.set-translation;
     }
 
     my $.prop-width;
+
+    method original-value {
+        from-json $!original-value;
+    }
 
     method set-translation {
         $!translation = $!schema<dynamic_enum> && $!value
@@ -30,7 +36,7 @@ class FormField {
 
     method revert {
         $!open-for-update = False;
-        $!value = from-json $!original-value;
+        $!value = self.original-value;
         self.set-translation;
     }
 
@@ -44,14 +50,14 @@ class FormField {
     }
 
     method updated {
-        my $ov-parsed = from-json $!original-value;
+        my $ov = self.original-value;
         if $!value ~~ Hash {
-            $!value !eqv $ov-parsed;
+            $!value !eqv $ov;
         } elsif $!value ~~ Iterable && $!value.head ~~ Hash {
             # $!value might have been populated with _resolveds
-            $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $ov-parsed;
+            $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $ov;
         } else {
-            $!value !eqv $ov-parsed;
+            $!value !eqv $ov;
         }
     }
 
@@ -194,21 +200,24 @@ class Editor {
 
         @!subrecords = Empty;
 
-        for |%!json{self.field.prop} -> $rec {
+        my @ov = |self.field.original-value;
+
+#        for |%!json{self.field.prop} -> $rec {
+        for |self.field.value -> $rec {
             my @subrecord;
 
             my $item-schema = schemas(:name($rec<jsonmodel_type>));
 
             for |$item-schema<property_list> -> $prop {
                 next if $prop ~~ /^ '_' /;
-                my $schema_prop = $item-schema<properties>{$prop};
-                next if $schema_prop<readonly>;
+                my $schema-prop = $item-schema<properties>{$prop};
+                next if $schema-prop<readonly>;
                 next if @!skip_props.grep($prop);
 
                 @subrecord.push(FormField.new(:$prop,
                                               :parent-prop(self.field.prop),
-                                              :original-value(), #jjj
-                                              :schema($schema_prop),
+                                              :original-value(@ov[@!subrecords.elems]{$prop}),
+                                              :schema($schema-prop),
                                               :value($rec{$prop})));
             }
 
@@ -592,6 +601,9 @@ class Editor {
                 }
                 when 'v' {
                     page(pretty to-json self.field.value);
+                }
+                when 'V' {
+                    page(pretty to-json self.field.original-value);
                 }
                 when 'j' {
                     page(pretty to-json %!json{self.field.prop});
