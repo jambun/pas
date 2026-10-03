@@ -123,7 +123,6 @@ class Editor {
     has $.subrecord-ix; # the array index of the currently selected subrecord
     has $.cursor-offset;
     has $.top-field-ix = 0;
-    has $.max-top-field-ix;
     has $.number-of-display-lines = term_lines() - 6;
     has $.first-display-line = 3;
     has @.skip_props = <uri created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
@@ -168,6 +167,10 @@ class Editor {
         self.load-fields;
     }
 
+    method max-top-field-ix {
+        [0, @!fields.elems - $!number-of-display-lines].max;
+    }
+
     method load-fields {
         @!fields = Empty;
 
@@ -178,8 +181,6 @@ class Editor {
 
             @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(%!json{$prop})));
         }
-
-        $!max-top-field-ix = [0, @!fields.elems - $!number-of-display-lines].max;
     }
 
     method load-subrecord-fields {
@@ -289,17 +290,19 @@ class Editor {
 
     method draw-field($ix = $!selected-field-ix) {
         my $field = @!fields[$ix];
+
         my $line = $!first-display-line + $ix - $!top-field-ix;
+
         if $field && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
             print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix),
                                              :$!subrecord-ix), :fill);
+
+            if $field.parent-prop {
+                my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
+                self.draw-field($open-subrecord-ix);
+            }
         } else {
             print-at($line, 2, ' ', :fill);
-        }
-
-        if $field.parent-prop {
-            my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
-            self.draw-field($open-subrecord-ix);
         }
     }
 
@@ -615,7 +618,7 @@ class Editor {
 
 		            }
 		            when RIGHT_ARROW {
-                    if $!top-field-ix + 1 >= $!max-top-field-ix {
+                    if $!top-field-ix + 1 >= self.max-top-field-ix {
                         print BEL;
                     } elsif $!top-field-ix + 1 > $!selected-field-ix {
                         print BEL;
