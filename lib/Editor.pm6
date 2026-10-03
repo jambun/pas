@@ -178,6 +178,10 @@ class Editor {
         [0, @!fields.elems - $!number-of-display-lines].max;
     }
 
+    method last-display-line {
+        $!number-of-display-lines + $!first-display-line;
+    }
+
     method load-fields {
         @!fields = Empty;
 
@@ -230,10 +234,17 @@ class Editor {
         self.draw-help(@subrecord-help, :add);
     }
 
+    method field-with-open-subrecord {
+        @!fields.first: *.subrecord-open;
+    }
+
+    method ix-of-field-with-open-subrecord {
+        @!fields.first: *.subrecord-open, :k;
+    }
+
     method draw-remove-subrecord {
-        my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
-        if $open-subrecord-ix {
-            $!selected-field-ix = $open-subrecord-ix;
+        if (my $open-ix = self.ix-of-field-with-open-subrecord).defined {
+            $!selected-field-ix = $open-ix;
         }
 
         $!subrecord-ix = Nil;
@@ -266,7 +277,7 @@ class Editor {
     method set-value($value) {
         self.field.value = $value;
         if $!subrecord-ix.defined {
-            @!fields.first({ .subrecord-open }).value[$!subrecord-ix]{self.field.prop} = $value;
+            self.field-with-open-subrecord.value[$!subrecord-ix]{self.field.prop} = $value;
         }
     }
 
@@ -284,7 +295,7 @@ class Editor {
 
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
-        my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
+        my $open-subrecord-ix = self.ix-of-field-with-open-subrecord;
 
         if $new-ix < 0 || $new-ix < $!top-field-ix
                        || $new-ix >= @!fields.elems
@@ -301,17 +312,18 @@ class Editor {
     }
 
     method draw-field($ix = $!selected-field-ix) {
-        my $field = @!fields[$ix];
-
         my $line = $!first-display-line + $ix - $!top-field-ix;
 
-        if $field && $line >= 0 && $line <= $!number-of-display-lines + $!first-display-line {
+        if $line < $!first-display-line || $line > self.last-display-line {
+            return;
+        }
+
+        if (my $field = @!fields[$ix]) {
             print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix),
                                              :$!subrecord-ix), :fill);
 
             if $field.parent-prop {
-                my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
-                self.draw-field($open-subrecord-ix);
+                self.draw-field(self.ix-of-field-with-open-subrecord);
             }
         } else {
             print-at($line, 2, ' ', :fill);
@@ -416,8 +428,7 @@ class Editor {
                         self.message(%resp<status>);
                     }
 
-                    my $open-subrecord-ix = @!fields.first: *.subrecord-open, :k;
-                    if $open-subrecord-ix.defined {
+                    if (my $open-subrecord-ix = self.ix-of-field-with-open-subrecord).defined {
                         $!selected-field-ix = $open-subrecord-ix;
                         $!subrecord-ix = Nil;
                     }
@@ -614,7 +625,7 @@ class Editor {
                 }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
-                    if $ix > +@!fields {
+                    if $ix > +@!fields || self.field-with-open-subrecord {
                         print BEL;
                     } else {
                         $!top-field-ix = $ix;
