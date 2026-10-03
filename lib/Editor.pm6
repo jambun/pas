@@ -31,6 +31,8 @@ class FormField {
     method set-label {
         if $!schema<dynamic_enum> && $!value {
             $!label = enum-by-name($!schema<dynamic_enum>)<value_translations>{$!value};
+        } elsif $!value ~~ Hash && $!value<_resolved> {
+            $!label = label-for-json($!value<_resolved>);
         }
     }
 
@@ -47,9 +49,8 @@ class FormField {
     method updated {
         my $ov = self.original-value;
         if $!value ~~ Hash {
-            $!value !eqv $ov;
+            $!value.grep({ .key ne <_resolved> }).Hash !eqv $ov;
         } elsif $!value ~~ Iterable && $!value.head ~~ Hash {
-            # $!value might have been populated with _resolveds
             $!value.map({ %(.grep({ .key ne <_resolved> }))}).Array !eqv $ov;
         } else {
             $!value !eqv $ov;
@@ -69,17 +70,21 @@ class FormField {
         if !$val.defined || ($val ~~ Str && $val eq '') {
             $val = ansi('--', $value-style);
         } elsif $val ~~ Hash {
-            if $val.elems > 1 {
+            if $val.keys.grep({ $_ !~~ /^ '_'/ }).elems > 1 {
                 $val = ansi($!prop, "bold $value-style") ~ " {$val.elems} properties";
             } else {
-                $val = ansi($val.head.key ~ ': ' ~ $val.head.value, "bold $value-style");
+                if $val<ref> && self.label {
+                    $val = ansi($val<ref> ~ ' | ' ~ self.label, "bold $value-style");
+                } else {
+                    $val = ansi($val.head.key ~ ': ' ~ $val.head.value, "bold $value-style");
+                }
             }
         } elsif $val ~~ Iterable {
             if $!value-ix.defined {
                 my $item = $val[$!value-ix];
                 if $item<ref> {
                     if $item<_resolved> {
-                        my $label = self.label-for-json($item<_resolved>);
+                        my $label = label-for-json($item<_resolved>);
                         $val = ansi($item<ref> ~ ' | ' ~ $label, "bold $value-style");
                     } else {
                         $val = ansi($item<ref>, "bold $value-style");
@@ -109,9 +114,9 @@ class FormField {
         my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
 
         if $!parent-prop {
-            sprintf("%{self.prop-width}s    $cursor %s\n", $!prop, $val);
+            sprintf("%{self.prop-width}s    $cursor %s", $!prop, $val);
         } else {
-            sprintf("%{self.prop-width}s $cursor %s\n", $!prop, $val);
+            sprintf("%{self.prop-width}s $cursor %s", $!prop, $val);
         }
     }
 }
@@ -190,7 +195,7 @@ class Editor {
     }
 
     method load-subrecord-fields {
-        unless self.field.schema<type> eq 'array' {
+        unless self.field.schema<type> eq 'array' | 'object' {
             self.message(self.field.prop ~ ' does not contain subrecords');
             return;
         }
@@ -198,8 +203,11 @@ class Editor {
         @!subrecords = Empty;
 
         my @ov = |self.field.original-value;
+        my @subrecs = self.field.schema<type> eq 'object'
+                          ?? [self.field.value]
+                          !! |self.field.value;
 
-        for |self.field.value -> $rec {
+        for @subrecs -> $rec {
             my @subrecord;
 
             my @prop-names;
@@ -210,8 +218,10 @@ class Editor {
                 @prop-names = |$item-schema<property_list>;
                 %props = $item-schema<properties>;
             } else {
-                @prop-names = self.field.schema<items><properties>.keys;
-                %props = self.field.schema<items><properties>;
+                %props = self.field.schema<type> eq 'object'
+                             ?? self.field.schema<properties>
+                             !! self.field.schema<items><properties>;
+                @prop-names = %props.keys;
             }
 
             for @prop-names -> $prop {
@@ -220,7 +230,7 @@ class Editor {
                 next if $schema-prop<readonly>;
                 next if @!skip_props.grep($prop);
 
-                my $label = ($prop eq <ref> && $rec<_resolved>) ?? self.label-for-json($rec<_resolved>) !! '';
+                my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
 
                 @subrecord.push(FormField.new(:$prop,
                                               :parent-prop(self.field.prop),
@@ -284,6 +294,7 @@ class Editor {
 
     method set-value($value) {
         self.field.value = $value;
+        self.field.set-label;
         if $!subrecord-ix.defined {
             self.field-with-open-subrecord.value[$!subrecord-ix]{self.field.prop} = $value;
         }
@@ -319,8 +330,82 @@ class Editor {
         }
     }
 
+    method draw-ref-search {
+        my %search;
+        my $ix = 0;
+        my $q = '';
+        my $type = self.field.schema<type>;
+        if $type ~~ Array {
+            for |$type -> $t {
+                $t<type> ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+            }
+            $type = $type.map(*.<type>).Array;
+        } else {
+            $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
+        }
+
+        my %c = col => $!cursor-offset + 6, line => self.field-display-line;
+
+        print-at(%c<line>, %c<col>, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
+
+        while (my $ak = get-key-in) {
+            given $ak {
+                when "\t" {
+                    self.message("Exited linker");
+                    last;
+                }
+                when /\n/ {
+                    self.set-value(%search<results>[$ix]<uri>);
+                    self.field.label = %search<results>[$ix]<title>;
+                    # this is a bit yuk - poke this label into <_resolved><display_string>
+                    # so it can be used if the subrecord is cloded and reopened before saving
+                    my $parent = self.field-with-open-subrecord;
+
+                    my $res = $!subrecord-ix.defined
+                                  ?? $parent.value[$!subrecord-ix]<_resolved>
+                                  !! $parent.value<_resolved>;
+
+                    if $res {
+                        $res<display_string> = self.field.label;
+                    }
+
+                    self.draw-field;
+                    self.message('Linked ' ~ self.field.value);
+                    last;
+                }
+                when ' ' {
+                    if %search<results> {
+                        $ix = ($ix + 1) % +%search<results>;
+                        my $msg = %search<results>[$ix]<uri>;
+                        if %search<results>[$ix]<title> {
+                            $msg ~= ' | ' ~ %search<results>[$ix]<title>;
+                        }
+                        self.message($msg);
+                    }
+                }
+                default {
+                    if $ak ~~ /\w/ {
+                        $q ~= $ak;
+                    } elsif $ak.ord == 127 {
+                        $q.=substr(0, *-1) if $q;
+                    }
+                    if $q {
+                        %search = self.search-type($type, $q);
+                        print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
+                    } else {
+                        print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold'), :fill);
+                    }
+                }
+            }
+        }
+    }
+
+    method field-display-line($ix = $!selected-field-ix) {
+        $!first-display-line + $ix - $!top-field-ix;
+    }
+
     method draw-field($ix = $!selected-field-ix) {
-        my $line = $!first-display-line + $ix - $!top-field-ix;
+        my $line = self.field-display-line($ix);
 
         if $line < $!first-display-line || $line > self.last-display-line {
             return;
@@ -481,58 +566,7 @@ class Editor {
                     self.draw-field;
                 }
                 when 'a' {
-                    my %search;
-                    my $ix = 0;
-                    my $q;
-                    my $type = self.field.schema<items><properties><ref><type>;
-                    if $type ~~ Array {
-                        for |$type -> $t {
-                            $t<type> ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
-                        }
-                        $type = $type.map(*.<type>).Array;
-                    } else {
-                        $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
-                    }
 
-                    self.draw-help(@add-value-help);
-
-                    while (my $ak = get-key-in) {
-                        given $ak {
-                            when "\t" {
-                                self.message("Exited add mode");
-                                last;
-                            }
-                            when /\n/ {
-                                self.field.value.push({ref => %search<results>[$ix]<uri>});
-                                self.set-value(self.field.value);
-                                self.draw-field;
-                                self.message('Added ' ~ %search<results>[$ix]<uri> ~ ' to ' ~ self.field.prop);
-                                last;
-                            }
-                            when ' ' {
-                                $ix = ($ix + 1) % +%search<results>;
-                                my $msg = %search<results>[$ix]<uri>;
-                                if %search<results>[$ix]<title> {
-                                    $msg ~= ' | ' ~ %search<results>[$ix]<title>;
-                                }
-                                self.message($msg);
-                            }
-                            default {
-                                if $ak ~~ /\w/ {
-                                    $q ~= $ak;
-                                } elsif $ak.ord == 127 {
-                                    $q.=substr(0, *-1) if $q;
-                                }
-                                if $q {
-                                    %search = self.search-type($type, $q);
-                                } else {
-                                    self.message("Type to search");
-                                }
-                            }
-                        }
-                    }
-
-                    self.draw-help;
                 }
                 when ' ' {
                     my $prop = self.field.schema;
@@ -588,7 +622,9 @@ class Editor {
                     } else {
                         self.field.open-for-update = True;
 
-                        if $prop<type> eq <array> {
+                        if self.field.prop eq <ref> {
+                            self.draw-ref-search;
+                        } elsif $prop<type> eq <array> {
                             if $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                 if $resp<error> {
@@ -598,9 +634,24 @@ class Editor {
                                 }
                             }
 
-                            self.load-subrecord-fields;
+                            if $!subrecord-ix {
+                                self.draw-next-subrecord;
+                            } else {
+                                self.load-subrecord-fields;
+                            }
 
                             self.draw-help(@array-help, :add);
+                        } elsif $prop<type> eq <object> {
+                            if $prop<subtype> ~~ <ref> && !self.field.value<_resolved> {
+                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
+                                if $resp<error> {
+                                    self.message($resp<error>);
+                                } else {
+                                    self.set-value($resp{self.field.prop});
+                                }
+                            }
+
+                            self.load-subrecord-fields;
                         }
 
                         self.draw-field;
@@ -685,8 +736,6 @@ class Editor {
 
         if %resp<error> {
             self.message("Error searching for $type with '$q': " ~ %resp<error>);
-        } else {
-            self.message("Found " ~ %resp<total_hits> ~ ' ' ~ $type ~ "s with '$q'");
         }
 
         %resp;
@@ -703,9 +752,5 @@ class Editor {
    method subrecord-type($type-def) {
        $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
        $0.Str;
-   }
-
-   method label-for-json(%json) {
-       %json{'display_string', 'title', 'name'}.grep(*.defined).head || '';
    }
 }

@@ -515,11 +515,11 @@ sub visible_trim($string is copy, $length) is export {
     my $cols = term_cols;
     return $string if visible_length($string) <= $cols;
 
-    while visible_length($string) > $length {
+    while visible_length($string ~ ansi('', 'reset')) > $length {
         $string = $string.substr(0, $string.chars - 1);
     }
 
-    $string ~ ansi('', 'reset');;
+    $string ~ ansi('', 'reset');
 }
 
 sub visible_length($string is copy) is export {
@@ -588,6 +588,11 @@ sub import_job($type, @files) is export {
     END
 }
 
+
+sub label-for-json(%json) is export {
+    %json{'display_string', 'title', 'name'}.grep(*.defined).head || '';
+}
+
 sub split_to_screen(Str $str is copy, $split, Int :$indent = 0, Int :$width is copy) is export {
     $width ||= q:x/tput cols/.chomp.Int - 1;
     my @lines;
@@ -611,17 +616,20 @@ sub clear-screen is export {
     print state $ = qx[clear];
 }
 
-sub print-at($row, $col, $s, Bool :$fill) is export {
+sub print-at($row, $col, $s, Bool :$fill, Bool :$clear) is export {
     if $row <= term_lines() {
-        if $fill {
+        if $clear {
             cursor(1, $row);
             run('tput', 'el');
         }
 
-        cursor($col, $row);
-
         my $out = visible_trim($s, term_cols() - $col);
 
+        if $fill {
+            $out ~= ' ' x (term_cols() - $col - visible_length($out));
+        }
+
+        cursor($col, $row);
         print $out;
     }
 }
