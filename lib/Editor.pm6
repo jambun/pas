@@ -13,13 +13,13 @@ class FormField {
     has Bool $.open-for-update is rw = False;
     has Bool $.subrecord-open is rw = False;
     has Int $.value-ix is rw;
-    has Str $.translation is rw;
+    has Str $.label is rw;
 
     submethod TWEAK {
         # storing it as json - annoying but deep structures are passed by ref
         # so get mutated when they change in $!value - tried deepmap, no go
         $!original-value = to-json $!original-value || $!value;
-        self.set-translation;
+        self.set-label;
     }
 
     my $.prop-width;
@@ -28,18 +28,13 @@ class FormField {
         from-json $!original-value;
     }
 
-    method set-translation {
-        $!translation = $!schema<dynamic_enum> && $!value
-        ?? enum-by-name($!schema<dynamic_enum>)<value_translations>{$!value}
-        !! '';
+    method set-label {
+        if $!schema<dynamic_enum> && $!value {
+            $!label = enum-by-name($!schema<dynamic_enum>)<value_translations>{$!value};
+        }
     }
 
-    method revert {
-        $!open-for-update = False;
-        $!value = self.original-value;
-        self.set-translation;
-    }
-
+    # not used - delete?
     method next-value {
         if $!value-ix.defined {
             $!value-ix = ($!value-ix + 1) % $!value.elems;
@@ -84,7 +79,7 @@ class FormField {
                 my $item = $val[$!value-ix];
                 if $item<ref> {
                     if $item<_resolved> {
-                        my $label = $item<_resolved>{'display_string', 'title', 'name'}.grep(*.defined).head;
+                        my $label = self.label-for-json($item<_resolved>);
                         $val = ansi($item<ref> ~ ' | ' ~ $label, "bold $value-style");
                     } else {
                         $val = ansi($item<ref>, "bold $value-style");
@@ -101,8 +96,8 @@ class FormField {
             $val.=trans("\n" => ' ');
             my $max_val_length = term_cols() - self.prop-width - 20;
 
-            if $!translation {
-                $val ~= " | $!translation";
+            if $!label {
+                $val ~= " | $!label";
             }
 
             if $val.chars > $max_val_length {
@@ -195,10 +190,7 @@ class Editor {
     }
 
     method load-subrecord-fields {
-        unless self.field.schema<type> eq 'array'
-                   ?? self.is-subrecord(self.field.schema<items><type>)
-                   !! self.is-subrecord(self.field.schema<type>) {
-
+        unless self.field.schema<type> eq 'array' {
             self.message(self.field.prop ~ ' does not contain subrecords');
             return;
         }
@@ -207,22 +199,34 @@ class Editor {
 
         my @ov = |self.field.original-value;
 
-#        for |%!json{self.field.prop} -> $rec {
         for |self.field.value -> $rec {
             my @subrecord;
 
-            my $item-schema = schemas(:name($rec<jsonmodel_type>));
+            my @prop-names;
+            my %props;
 
-            for |$item-schema<property_list> -> $prop {
+            if $rec<jsonmodel_type> {
+                my $item-schema = schemas(:name($rec<jsonmodel_type>));
+                @prop-names = |$item-schema<property_list>;
+                %props = $item-schema<properties>;
+            } else {
+                @prop-names = self.field.schema<items><properties>.keys;
+                %props = self.field.schema<items><properties>;
+            }
+
+            for @prop-names -> $prop {
                 next if $prop ~~ /^ '_' /;
-                my $schema-prop = $item-schema<properties>{$prop};
+                my $schema-prop = %props{$prop};
                 next if $schema-prop<readonly>;
                 next if @!skip_props.grep($prop);
+
+                my $label = ($prop eq <ref> && $rec<_resolved>) ?? self.label-for-json($rec<_resolved>) !! '';
 
                 @subrecord.push(FormField.new(:$prop,
                                               :parent-prop(self.field.prop),
                                               :original-value(@ov[@!subrecords.elems]{$prop}),
                                               :schema($schema-prop),
+                                              :$label,
                                               :value($rec{$prop})));
             }
 
@@ -272,6 +276,10 @@ class Editor {
         @!fields.splice($!selected-field-ix + 1, 0, @!subrecords[$!subrecord-ix]);
 
         self.draw-form;
+    }
+
+    method revert-value {
+        self.set-value(self.field.original-value);
     }
 
     method set-value($value) {
@@ -451,7 +459,7 @@ class Editor {
                     self.draw-form;
                }
                 when "\t" {
-                    self.field.revert;
+                    self.revert-value;
                     self.draw-field;
                 }
                 when 'd' {
@@ -544,7 +552,7 @@ class Editor {
                             my $next-ix = @values.first(self.field.value, :k) + 1;
                             $next-ix %= @values.elems;
                             self.set-value(@values[$next-ix]);
-                            self.field.set-translation;
+                            self.field.set-label;
                             self.draw-field;
                         } elsif $prop<type> eq 'string' {
                             my $val = self.field.value // '';
@@ -575,20 +583,13 @@ class Editor {
                                 self.draw-field;
                             }
                         } elsif $prop<type> eq 'array' {
-                            if $prop<items><subtype> ~~ <ref> {
-                                self.field.next-value;
-                                self.draw-field;
-                            } else {
-                                self.draw-next-subrecord;
-                            }
+                            self.draw-next-subrecord;
                         }
                     } else {
                         self.field.open-for-update = True;
 
                         if $prop<type> eq <array> {
-                            if self.is-subrecord($prop<items><type>) {
-                                self.load-subrecord-fields;
-                            } elsif $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
+                            if $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                 if $resp<error> {
                                     self.message($resp<error>);
@@ -596,6 +597,9 @@ class Editor {
                                     self.set-value($resp{self.field.prop});
                                 }
                             }
+
+                            self.load-subrecord-fields;
+
                             self.draw-help(@array-help, :add);
                         }
 
@@ -699,5 +703,9 @@ class Editor {
    method subrecord-type($type-def) {
        $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
        $0.Str;
+   }
+
+   method label-for-json(%json) {
+       %json{'display_string', 'title', 'name'}.grep(*.defined).head || '';
    }
 }
