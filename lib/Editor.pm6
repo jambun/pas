@@ -465,7 +465,7 @@ class Editor {
                     my %search;
                     my $ix = 0;
                     my $q;
-                    my $type = $!schema<properties>{self.field.prop}<items><properties><ref><type>;
+                    my $type = self.field.schema<items><properties><ref><type>;
                     if $type ~~ Array {
                         for |$type -> $t {
                             $t<type> ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
@@ -586,8 +586,6 @@ class Editor {
                                 }
                             }
                             self.draw-help(@array-help, :add);
-                        } elsif $prop<dynamic_enum> {
-                            self.field.set-translation;
                         }
 
                         self.draw-field;
