@@ -66,7 +66,7 @@ class FormField {
 
         my $val = $!value.clone;
 
-        if !$val.defined || ($val.Str && $val eq '') {
+        if !$val.defined || ($val ~~ Str && $val eq '') {
             $val = ansi('--', $value-style);
         } elsif $val ~~ Hash {
             if $val.elems > 1 {
