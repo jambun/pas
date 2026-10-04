@@ -14,11 +14,14 @@ class FormField {
     has Bool $.subrecord-open is rw = False;
     has Int $.value-ix is rw;
     has Str $.label is rw;
+    has @.original-subrecord-map;
 
     submethod TWEAK {
         # storing it as json - annoying but deep structures are passed by ref
         # so get mutated when they change in $!value - tried deepmap, no go
         $!original-value = to-json $!original-value || $!value;
+
+        self.set-original-subrecord-map;
         self.set-label;
     }
 
@@ -36,6 +39,12 @@ class FormField {
         }
     }
 
+    method set-original-subrecord-map {
+        if $!value ~~ Array {
+            @!original-subrecord-map = ^$!value.elems;
+        }
+    }
+
     # not used - delete?
     method next-value {
         if $!value-ix.defined {
@@ -44,6 +53,15 @@ class FormField {
         } else {
             $!value-ix = 0;
         }
+    }
+
+    method delete-subrecord($ix) {
+        $!value.splice($ix, 1);
+        @!original-subrecord-map.splice($ix, 1);
+    }
+
+    method original-value-ix($ix) {
+        @!original-subrecord-map[$ix];
     }
 
     method updated {
@@ -234,7 +252,7 @@ class Editor {
 
                 @subrecord.push(FormField.new(:$prop,
                                               :parent-prop(self.field.prop),
-                                              :original-value(@ov[@!subrecords.elems]{$prop}),
+                                              :original-value(@ov[self.field.original-value-ix(@!subrecords.elems)]{$prop}),
                                               :schema($schema-prop),
                                               :$label,
                                               :value($rec{$prop})));
@@ -290,12 +308,13 @@ class Editor {
 
     method revert-value {
         self.set-value(self.field.original-value);
+        self.field.set-original-subrecord-map;
     }
 
     method set-value($value) {
         self.field.value = $value;
         self.field.set-label;
-        if $!subrecord-ix.defined {
+        if $!subrecord-ix.defined && self.field.parent-prop {
             self.field-with-open-subrecord.value[$!subrecord-ix]{self.field.prop} = $value;
         }
     }
@@ -549,17 +568,15 @@ class Editor {
                 }
                 when 'd' {
                     if self.field.value ~~ Iterable {
-                        if self.field.value-ix.defined {
-                            self.field.value.splice(self.field.value-ix, 1);
+                        if $!subrecord-ix.defined {
+                            self.field.delete-subrecord($!subrecord-ix);
                             self.set-value(self.field.value);
                             self.message("Item deleted from {self.field.prop}");
-                            if self.field.value-ix >= self.field.value.elems {
-                                self.field.value-ix = Nil;
-                            }
                         } else {
                             self.set-value([]);
                             self.message("All {self.field.prop} deleted");
                         }
+                        self.load-subrecord-fields;
                     } else {
                         self.set-value('');
                     }
