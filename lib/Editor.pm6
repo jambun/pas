@@ -41,9 +41,7 @@ class FormField {
     }
 
     method set-original-subrecord-map {
-        if $!value ~~ Array {
-            @!original-subrecord-map = ^$!value.elems;
-        }
+        @!original-subrecord-map = ^$!value.elems;
     }
 
     # not used - delete?
@@ -97,7 +95,8 @@ class FormField {
                 if $val<ref> && self.label {
                     $val = ansi($val<ref> ~ ' | ' ~ self.label, "bold $value-style");
                 } else {
-                    $val = ansi($val.head.key ~ ': ' ~ $val.head.value, "bold $value-style");
+                    my $k = $val.keys.first({ $_ !~~ /^ '_'/ });
+                    $val = ansi($k ~ ': ' ~ $val{$k}, "bold $value-style");
                 }
             }
         } elsif $val ~~ Iterable {
