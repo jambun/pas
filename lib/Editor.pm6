@@ -9,6 +9,7 @@ class FormField {
     has $.parent-prop;
     has $.schema;
     has $.value is rw;
+    has $.error is rw;
     has $.original-value;
     has Bool $.open-for-update is rw = False;
     has Bool $.subrecord-open is rw = False;
@@ -77,7 +78,9 @@ class FormField {
 
     method render(:$selected, :$subrecord-ix) {
         my $value-style = '';
-        if $!open-for-update {
+        if $!error {
+            $value-style = 'red';
+        } elsif $!open-for-update {
             $value-style = 'green';
         } elsif self.updated {
             $value-style = 'cyan';
@@ -127,6 +130,10 @@ class FormField {
                 $val = $val.substr(0,$max_val_length) ~ ' ...';
             }
             $val = ansi($val, "bold $value-style");
+        }
+
+        if $!error {
+            $val ~= '  ' ~ ansi($!error, 'red');
         }
 
         my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
@@ -266,6 +273,18 @@ class Editor {
         self.draw-help(@subrecord-help, :add);
     }
 
+    method field-for-prop($prop, $ix?, $subprop?) {
+        if $ix {
+            if $subprop {
+                @!subrecords[$ix].first: *.prop eq $subprop;;
+            } else {
+                self.message("Yikes - called field-for-prop with an ix but no subprop");
+            }
+        } else {
+            @!fields.first: *.prop eq $prop;
+        }
+    }
+
     method field-with-open-subrecord {
         @!fields.first: *.subrecord-open;
     }
@@ -314,6 +333,7 @@ class Editor {
     method set-value($value) {
         self.field.value = $value;
         self.field.set-label;
+        self.field.error = Nil;
         if $!subrecord-ix.defined && self.field.parent-prop {
             self.field-with-open-subrecord.value[$!subrecord-ix]{self.field.prop} = $value;
         }
@@ -530,37 +550,56 @@ class Editor {
                     my %resp = from-json client.post(%!json<uri>, Empty, to-json %!json);
 
                     if %resp<error> {
-                        my $msg = '';
+                        my @err-msg;
+                        for @!fields -> $f { $f.error = Nil }
                         for %resp<error>.kv -> $k, $v {
-                            $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
+                            @err-msg.push($k ~ ' :: ' ~ $v.join(','));
+
+                            for @!fields.grep(*.updated) -> $field {
+                                %!json{$field.prop} = $field.original-value;
+                            }
+
+                            if $k eq <identifier> && self.field-for-prop(<id_0>) {
+                                for <id_0 id_1 id_2 id_3> -> $id {
+                                    my $field = self.field-for-prop($id);
+                                    if $field.value {
+                                        last;
+                                    } else {
+                                        $field.error = $v.join(', ');
+                                    }
+                                }
+                            } else {
+                                self.field-for-prop(|$k.split('/')).error = $v.join(', ');
+                            }
+                            self.draw-form;
                         }
 
-                        self.message($msg);
+                        self.message('Error - record not saved: ' ~ @err-msg.join(' | '));
                     } else {
                         self.message(%resp<status>);
-                    }
 
-                    if (my $open-subrecord-ix = self.ix-of-field-with-open-subrecord).defined {
-                        $!selected-field-ix = $open-subrecord-ix;
-                        $!subrecord-ix = Nil;
-                    }
-
-                    # reload json after the update
-                    %resp = from-json client.get(%!json<uri>);
-
-                    if %resp<error> {
-                        my $msg = '';
-                        for %resp<error>.kv -> $k, $v {
-                            $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
+                        if (my $open-subrecord-ix = self.ix-of-field-with-open-subrecord).defined {
+                            $!selected-field-ix = $open-subrecord-ix;
+                            $!subrecord-ix = Nil;
                         }
 
-                        self.message($msg);
-                    } else {
-                        %!json = %resp;
-                        self.load-fields;
-                    }
+                        # reload json after the update
+                        %resp = from-json client.get(%!json<uri>);
 
-                    self.draw-form;
+                        if %resp<error> {
+                            my $msg = '';
+                            for %resp<error>.kv -> $k, $v {
+                                $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
+                            }
+
+                            self.message($msg);
+                        } else {
+                            %!json = %resp;
+                            self.load-fields;
+                        }
+
+                        self.draw-form;
+                    }
                }
                 when "\t" {
                     self.revert-value;
