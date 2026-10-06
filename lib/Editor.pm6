@@ -70,6 +70,14 @@ class FormField {
         }
     }
 
+    method set-labels-for(%ref-map) {
+        if ($!prop eq <ref> && %ref-map{$!value}) {
+            $!label = label-for-json(%ref-map{$!value});
+        }
+
+        for @!subrecords -> $sr { for |$sr { .set-labels-for(%ref-map); } }
+    }
+
     method load-subrecords {
         unless $!schema<type> eq 'array' | 'object' {
             return;
@@ -721,35 +729,27 @@ class Editor {
 
                         if self.field.prop eq <ref> {
                             self.draw-ref-search;
-                        } elsif $prop<type> eq <array> {
-                            if $prop<items><subtype> ~~ <ref> && !self.field.value.head<_resolved> {
-                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
-                                if $resp<error> {
-                                    self.message($resp<error>);
-                                } else {
-                                    # FIXME: need to set labels on subrecord fields
-                                    self.set-value($resp{self.field.prop});
+                        } elsif $prop<type> eq <array> | <object> {
+                            if !self.field.label {
+                                if <ref> ~~ $prop<subtype> | $prop<items><subtype> {
+                                    my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
+                                    if $resp<error> {
+                                        self.message($resp<error>);
+                                    } else {
+                                        my %ref-map;
+                                        if $resp{self.field.prop} ~~ Associative {
+                                            %ref-map = $resp{self.field.prop}<ref> => $resp{self.field.prop}<_resolved>;
+                                            self.field.label = label-for-json(%ref-map.values.head);
+                                        } else {
+                                            %ref-map = $resp{self.field.prop}.map({ .<ref> => .<_resolved> });
+                                            self.field.label = 'Resolved';
+                                        }
+                                        for @!fields { .set-labels-for(%ref-map); }
+                                    }
                                 }
                             }
-
-                            if self.field.subrecord-ix.defined {
-                                self.draw-next-subrecord;
-                            } else {
-                                self.load-subrecord-fields;
-                            }
-
+                            self.draw-next-subrecord;
                             self.draw-help(@array-help, :add);
-                        } elsif $prop<type> eq <object> {
-                            if $prop<subtype> ~~ <ref> && !self.field.value<_resolved> {
-                                my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
-                                if $resp<error> {
-                                    self.message($resp<error>);
-                                } else {
-                                    self.set-value($resp{self.field.prop});
-                                }
-                            }
-
-                            self.load-subrecord-fields;
                         }
 
                         self.draw-field;
