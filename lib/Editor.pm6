@@ -293,7 +293,11 @@ class Editor {
          'C' => 'Close subrecords';
 
     submethod TWEAK {
-        $!schema = schemas(:name(%!json<jsonmodel_type>));
+        self.init;
+    }
+
+    method init(%json = %!json) {
+        $!schema = schemas(:name(%json<jsonmodel_type>));
 
         return unless $!schema;
 
@@ -778,6 +782,16 @@ class Editor {
                 }
                 when 'u' {
                     page(pretty to-json self.field.subrecords.raku);
+                }
+                when 'g' {
+                    if self.field.prop eq <ref> {
+                        my $resp = from-json client.get(self.field.value);
+                        if $resp<error> {
+                            self.message($resp<error>);
+                        } else {
+                            self.init($resp);
+                        }
+                    }
                 }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
