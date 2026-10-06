@@ -23,6 +23,7 @@ our constant  USER_URI           = '/users/current-user';
 our constant  SEARCH_URI         = '/search';
 our constant  SEARCH_RECORDS_URI = '/search/records';
 my constant   LOGOUT_URI         = '/logout';
+our constant  EDIT_SKIP_PROPS    = <uri created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
 
 our constant UP_ARROW    =  "\x[1b][A";
 our constant DOWN_ARROW  =  "\x[1b][B";
@@ -419,7 +420,6 @@ sub check_endpoint($ep, $msg) is export {
     }
     True;
 }
-
 
 sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {
      if $reload || !$SCHEMAS_PARSED {

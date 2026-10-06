@@ -6,21 +6,29 @@ use JSON::Tiny;
 
 class FormField {
     has $.prop;
-    has $.parent-prop;
+    has FormField $.parent;
+    has Int $.depth = 0;
     has $.schema;
     has $.value is rw;
     has $.error is rw;
     has $.original-value;
     has Bool $.open-for-update is rw = False;
-    has Bool $.subrecord-open is rw = False;
-    has Int $.value-ix is rw;
-    has Str $.label is rw;
-    has @.original-subrecord-map;
+
+    has @.subrecords; # a FormField array for each sub-record in this field
+    has $.subrecord-ix is rw; # the array index of the currently selected subrecord
+
+    # probably not required in the new regime
+    has @.original-subrecord-map; # keeps track of original subrecord indexes for comparing with original-value
+
+    has Int $.value-ix is rw; # the array index of the current value in the list of possible values - enum, bool
+    has Str $.label is rw; # added to value when rendered - display string or enum translation
 
     submethod TWEAK {
         # storing it as json - annoying but deep structures are passed by ref
         # so get mutated when they change in $!value - tried deepmap, no go
         $!original-value = to-json $!original-value || $!value;
+
+        self.load-subrecords;
 
         self.set-original-subrecord-map;
         self.set-label;
@@ -32,12 +40,110 @@ class FormField {
         from-json $!original-value;
     }
 
+    method set-value($value) {
+        $!value = $value;
+        self.set-label;
+        $!error = Nil;
+        if $!parent {
+            $!parent.set-child-value(self);
+        }
+    }
+
+    method set-child-value($child, $ix = $!subrecord-ix) {
+        if $!value[$ix] !~~ Iterable {
+            $!value[$ix] = $child.value;
+        } else {
+            $!value[$ix]{$child.prop} = $child.value;
+        }
+        self.set-label;
+        $!error = Nil;
+        if $!parent {
+            $!parent.set-child-value(self);
+        }
+    }
+
     method set-label {
         if $!schema<dynamic_enum> && $!value {
             $!label = enum-by-name($!schema<dynamic_enum>)<value_translations>{$!value};
         } elsif $!value ~~ Hash && $!value<_resolved> {
             $!label = label-for-json($!value<_resolved>);
         }
+    }
+
+    method load-subrecords {
+        unless $!schema<type> eq 'array' | 'object' {
+            return;
+        }
+
+        @!subrecords = Empty;
+
+        my @subrecs = $!schema<type> eq 'object'
+                          ?? [$!value]
+                          !! |$!value;
+
+        for @subrecs -> $rec {
+            my @subrecord;
+            my @prop-names;
+            my %props;
+
+            if $rec<jsonmodel_type> {
+                my $item-schema = schemas(:name($rec<jsonmodel_type>));
+                @prop-names = |$item-schema<property_list>;
+                %props = $item-schema<properties>;
+            } else {
+                %props = $!schema<type> eq 'object'
+                             ?? $!schema<properties>
+                             !! ($!schema<items><properties> || {item => $!schema<items>});
+                @prop-names = %props.keys;
+            }
+
+            for @prop-names -> $prop {
+                next if $prop ~~ /^ '_' /;
+                my $schema-prop = %props{$prop};
+                next if $schema-prop<readonly>;
+                next if EDIT_SKIP_PROPS.grep($prop);
+
+                my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
+                my $val = $prop eq <item> ?? $rec !! $rec{$prop};
+
+                @subrecord.push(FormField.new(:$prop,
+                                              :parent(self),
+                                              :depth(self.depth + 1),
+                                              :schema($schema-prop),
+                                              :$label,
+                                              :value($val)));
+            }
+
+            @!subrecords.push(@subrecord);
+        }
+    }
+
+    method subrecord-open {
+        $!subrecord-ix.defined;
+    }
+
+    method close-subrecord {
+        $!subrecord-ix = Nil;
+    }
+
+    method current-subrecord {
+        return Empty unless @!subrecords && $!subrecord-ix.defined;
+
+        @!subrecords[$!subrecord-ix];
+    }
+
+    method next-subrecord {
+        return Empty unless @!subrecords;
+
+        if $!subrecord-ix.defined {
+            $!subrecord-ix++;
+        } else {
+            $!subrecord-ix = 0;
+        }
+
+        $!subrecord-ix = $!subrecord-ix % @!subrecords;
+
+        @!subrecords[$!subrecord-ix];
     }
 
     method set-original-subrecord-map {
@@ -74,7 +180,7 @@ class FormField {
         }
     }
 
-    method render(:$selected, :$subrecord-ix) {
+    method render(:$selected) {
         my $value-style = '';
         if $!error {
             $value-style = 'red';
@@ -112,8 +218,8 @@ class FormField {
                 } else {
                     $val = ansi($item.gist, "bold $value-style");
                 }
-            } elsif $!subrecord-open {
-                $val = ansi("{$subrecord-ix + 1} of {$val.elems}", "bold $value-style") ~ ' ' ~ $!prop;
+            } elsif self.subrecord-open {
+                $val = ansi("{$!subrecord-ix + 1} of {$val.elems}", "bold $value-style") ~ ' ' ~ $!prop;
             } else {
                 $val = ansi($val.elems.Str, "bold $value-style") ~ ' ' ~ $!prop;
             }
@@ -137,11 +243,7 @@ class FormField {
 
         my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
 
-        if $!parent-prop {
-            sprintf("%{self.prop-width}s    $cursor %s", $!prop, $val);
-        } else {
-            sprintf("%{self.prop-width}s $cursor %s", $!prop, $val);
-        }
+        sprintf("%{self.prop-width}s{'  ' x $!depth} $cursor %s", $!prop, $val);
     }
 }
 
@@ -150,8 +252,6 @@ class Editor {
     has $.schema; # the JSONModel schema for the record's type
     has FormField @.fields; # a FormField for each editable property in the schema
     has $.selected-field-ix = 0; # the array index of the currently selected field
-    has @.subrecords; # a FormField array for each sub-record in the selected field 
-    has $.subrecord-ix; # the array index of the currently selected subrecord
     has $.cursor-offset;
     has $.top-field-ix = 0;
     has $.number-of-display-lines = term_lines() - 6;
@@ -224,50 +324,6 @@ class Editor {
             return;
         }
 
-        @!subrecords = Empty;
-
-        my @ov = |self.field.original-value;
-        my @subrecs = self.field.schema<type> eq 'object'
-                          ?? [self.field.value]
-                          !! |self.field.value;
-
-        for @subrecs -> $rec {
-            my @subrecord;
-
-            my @prop-names;
-            my %props;
-
-            if $rec<jsonmodel_type> {
-                my $item-schema = schemas(:name($rec<jsonmodel_type>));
-                @prop-names = |$item-schema<property_list>;
-                %props = $item-schema<properties>;
-            } else {
-                %props = self.field.schema<type> eq 'object'
-                             ?? self.field.schema<properties>
-                             !! self.field.schema<items><properties>;
-                @prop-names = %props.keys;
-            }
-
-            for @prop-names -> $prop {
-                next if $prop ~~ /^ '_' /;
-                my $schema-prop = %props{$prop};
-                next if $schema-prop<readonly>;
-                next if @!skip_props.grep($prop);
-
-                my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
-
-                @subrecord.push(FormField.new(:$prop,
-                                              :parent-prop(self.field.prop),
-                                              :original-value(@ov[self.field.original-value-ix(@!subrecords.elems)]{$prop}),
-                                              :schema($schema-prop),
-                                              :$label,
-                                              :value($rec{$prop})));
-            }
-
-            @!subrecords.push(@subrecord);
-        }
-
-        self.draw-remove-subrecord;
         self.draw-next-subrecord;
         self.draw-help(@subrecord-help, :add);
     }
@@ -275,7 +331,7 @@ class Editor {
     method field-for-prop($prop, $ix?, $subprop?) {
         if $ix {
             if $subprop {
-                @!subrecords[$ix].first: *.prop eq $subprop;;
+                self.field.subrecords[$ix].first: *.prop eq $subprop;
             } else {
                 self.message("Yikes - called field-for-prop with an ix but no subprop");
             }
@@ -285,11 +341,19 @@ class Editor {
     }
 
     method field-with-open-subrecord {
-        @!fields.first: *.subrecord-open;
+        @!fields.first(:end, *.subrecord-open);
     }
 
     method ix-of-field-with-open-subrecord {
-        @!fields.first: *.subrecord-open, :k;
+        @!fields.first(:end, *.subrecord-open) :k;
+    }
+
+    method ix-of-first-field-with-open-subrecord {
+        @!fields.first(*.subrecord-open) :k;
+    }
+
+    method remove-subrecord-fields {
+        @!fields.=grep({ !(.parent && .parent === self.field) });
     }
 
     method draw-remove-subrecord {
@@ -297,29 +361,20 @@ class Editor {
             $!selected-field-ix = $open-ix;
         }
 
-        $!subrecord-ix = Nil;
-        for @!fields { .subrecord-open = False };
-        @!fields.=grep({ !.parent-prop });
+        self.field.close-subrecord;
+
+        self.remove-subrecord-fields;
+
         self.draw-form;
         self.draw-help;
     }
 
     method draw-next-subrecord {
-        return unless @!subrecords;
+        return unless self.field.subrecords;
 
-        if $!subrecord-ix.defined {
-            $!subrecord-ix++;
-        } else {
-            $!subrecord-ix = 0;
-        }
+        self.remove-subrecord-fields;
 
-        $!subrecord-ix = $!subrecord-ix % @!subrecords;
-
-        @!fields.=grep({ !.parent-prop });
-
-        self.field.subrecord-open = True;
-
-        @!fields.splice($!selected-field-ix + 1, 0, @!subrecords[$!subrecord-ix]);
+        @!fields.splice($!selected-field-ix + 1, 0, self.field.next-subrecord);
 
         self.draw-form;
     }
@@ -330,12 +385,7 @@ class Editor {
     }
 
     method set-value($value) {
-        self.field.value = $value;
-        self.field.set-label;
-        self.field.error = Nil;
-        if $!subrecord-ix.defined && self.field.parent-prop {
-            self.field-with-open-subrecord.value[$!subrecord-ix]{self.field.prop} = $value;
-        }
+        self.field.set-value($value);
     }
 
     method message($s) {
@@ -347,9 +397,6 @@ class Editor {
     }
 
     method move-cursor(Int $d) {
-        self.field.open-for-update = False;
-        self.field.value-ix = Nil;
-
         my $old-ix = $!selected-field-ix;
         my $new-ix = $!selected-field-ix + $d;
         my $open-subrecord-ix = self.ix-of-field-with-open-subrecord;
@@ -358,9 +405,12 @@ class Editor {
                        || $new-ix >= @!fields.elems
                        || $new-ix > $!number-of-display-lines + $!top-field-ix
                        || ($open-subrecord-ix.defined && $new-ix < $open-subrecord-ix)
-                       || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + @!subrecords.first.elems) {
+                       || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + self.field-with-open-subrecord.current-subrecord) {
             print BEL;
         } else {
+            self.field.open-for-update = False;
+            self.field.value-ix = Nil;
+
             $!selected-field-ix = $new-ix;
             self.draw-field($old-ix);
             self.draw-field;
@@ -395,17 +445,6 @@ class Editor {
                 when /\n/ {
                     self.set-value(%search<results>[$ix]<uri>);
                     self.field.label = %search<results>[$ix]<title>;
-                    # this is a bit yuk - poke this label into <_resolved><display_string>
-                    # so it can be used if the subrecord is cloded and reopened before saving
-                    my $parent = self.field-with-open-subrecord;
-
-                    my $res = $!subrecord-ix.defined
-                                  ?? $parent.value[$!subrecord-ix]<_resolved>
-                                  !! $parent.value<_resolved>;
-
-                    if $res {
-                        $res<display_string> = self.field.label;
-                    }
 
                     self.draw-field;
                     self.message('Linked ' ~ self.field.value);
@@ -442,6 +481,10 @@ class Editor {
         $!first-display-line + $ix - $!top-field-ix;
     }
 
+    method ix-for-field(FormField $field --> Int) {
+        @!fields.first(* === $field) :k;
+    }
+
     method draw-field($ix = $!selected-field-ix) {
         my $line = self.field-display-line($ix);
 
@@ -450,11 +493,10 @@ class Editor {
         }
 
         if (my $field = @!fields[$ix]) {
-            print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix),
-                                             :$!subrecord-ix), :fill);
+            print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix)), :fill);
 
-            if $field.parent-prop {
-                self.draw-field(self.ix-of-field-with-open-subrecord);
+            if $field.parent {
+                self.draw-field(self.ix-for-field($field.parent));
             }
         } else {
             print-at($line, 2, ' ', :fill);
@@ -577,9 +619,8 @@ class Editor {
                     } else {
                         self.message(%resp<status>);
 
-                        if (my $open-subrecord-ix = self.ix-of-field-with-open-subrecord).defined {
+                        if (my $open-subrecord-ix = self.ix-of-first-field-with-open-subrecord).defined {
                             $!selected-field-ix = $open-subrecord-ix;
-                            $!subrecord-ix = Nil;
                         }
 
                         # reload json after the update
@@ -606,15 +647,16 @@ class Editor {
                 }
                 when 'd' {
                     if self.field.value ~~ Iterable {
-                        if $!subrecord-ix.defined {
-                            self.field.delete-subrecord($!subrecord-ix);
-                            self.set-value(self.field.value);
-                            self.message("Item deleted from {self.field.prop}");
-                        } else {
-                            self.set-value([]);
-                            self.message("All {self.field.prop} deleted");
-                        }
-                        self.load-subrecord-fields;
+                        # if $!subrecord-ix.defined {
+                        #     self.field.delete-subrecord($!subrecord-ix);
+                        #     self.set-value(self.field.value);
+                        #     self.message("Item deleted from {self.field.prop}");
+                        # } else {
+                        #     self.set-value([]);
+                        #     self.message("All {self.field.prop} deleted");
+                        # }
+                        # self.load-subrecord-fields;
+                        self.message('Sorry, not yet reimplemented after the refactor');
                     } else {
                         self.set-value('');
                     }
@@ -655,7 +697,7 @@ class Editor {
                                 }
                                 run <tput civis>;
                             } else {
-                                my $coo = self.field.parent-prop ?? 5 !! 2;
+                                my $coo = self.field.depth * 2 + 2;;
                                 cursor($!cursor-offset + $coo, $!first-display-line + $!selected-field-ix - $!top-field-ix);
                                 run <tput cvvis>;
                                 my $cli = Terminal::LineEditor::CLIInput.new;
@@ -685,11 +727,12 @@ class Editor {
                                 if $resp<error> {
                                     self.message($resp<error>);
                                 } else {
+                                    # FIXME: need to set labels on subrecord fields
                                     self.set-value($resp{self.field.prop});
                                 }
                             }
 
-                            if $!subrecord-ix {
+                            if self.field.subrecord-ix.defined {
                                 self.draw-next-subrecord;
                             } else {
                                 self.load-subrecord-fields;
@@ -732,6 +775,9 @@ class Editor {
                 }
                 when 'J' {
                     page(pretty to-json %!json);
+                }
+                when 'u' {
+                    page(pretty to-json self.field.subrecords.raku);
                 }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
