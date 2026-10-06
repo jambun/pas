@@ -735,7 +735,7 @@ class Editor {
                             self.draw-ref-search;
                         } elsif $prop<type> eq <array> | <object> {
                             if !self.field.label {
-                                if <ref> ~~ $prop<subtype> | $prop<items><subtype> {
+                                if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
                                     my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                     if $resp<error> {
                                         self.message($resp<error>);
