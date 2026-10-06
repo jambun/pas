@@ -296,8 +296,12 @@ class Editor {
         self.init;
     }
 
-    method init(%json = %!json) {
-        $!schema = schemas(:name(%json<jsonmodel_type>));
+    method init(%json?) {
+        if %json {
+            %!json = %json;
+        }
+
+        $!schema = schemas(:name(%!json<jsonmodel_type>));
 
         return unless $!schema;
 
@@ -306,6 +310,12 @@ class Editor {
         my $max_val_length = term_cols() - $longest - 20;
         $!cursor-offset = $longest + 3;
         FormField.prop-width = $longest;
+
+        $!selected-field-ix = 0;
+        $!top-field-ix = 0;
+
+        self.draw-header;
+        self.draw-footer;
 
         self.load-fields;
     }
@@ -547,7 +557,7 @@ class Editor {
     }
 
     method draw-header {
-        print-at(1, 3, ansi(%!json<uri>, 'bold'));
+        print-at(1, 3, ansi(%!json<uri>, 'bold'), :clear);
     }
 
     method draw-footer {
@@ -588,7 +598,7 @@ class Editor {
 
         my $k = '';
 
-        self.draw-form();
+        self.draw-form;
 
         while $k ne 'q' {
 
@@ -790,6 +800,7 @@ class Editor {
                             self.message($resp<error>);
                         } else {
                             self.init($resp);
+                            self.draw-form;
                         }
                     }
                 }
