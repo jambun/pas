@@ -105,24 +105,53 @@ class FormField {
                 @prop-names = %props.keys;
             }
 
-            for @prop-names -> $prop {
-                next if $prop ~~ /^ '_' /;
-                my $schema-prop = %props{$prop};
-                next if $schema-prop<readonly>;
-                next if EDIT_SKIP_PROPS.grep($prop);
+            @!subrecords.push(self.build-subrecord-with(%props, @prop-names, $rec));
+        }
+    }
 
-                my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
-                my $val = $prop eq <item> ?? $rec !! $rec{$prop};
+    method build-subrecord-with(%props, @prop-names = %props.keys, $rec = {}) {
+        my @subrecord;
 
-                @subrecord.push(FormField.new(:$prop,
-                                              :parent(self),
-                                              :depth(self.depth + 1),
-                                              :schema($schema-prop),
-                                              :$label,
-                                              :value($val)));
-            }
+        for @prop-names -> $prop {
+            next if $prop ~~ /^ '_' /;
+            my $schema-prop = %props{$prop};
+            next if $schema-prop<readonly>;
+            next if EDIT_SKIP_PROPS.grep($prop);
 
+            my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
+            my $val = $prop eq <item> ?? $rec !! $rec{$prop};
+
+            @subrecord.push(FormField.new(:$prop,
+                                          :parent(self),
+                                          :depth(self.depth + 1),
+                                          :schema($schema-prop),
+                                          :$label,
+                                          :value($val)));
+        }
+
+        @subrecord;
+    }
+
+    method new-subrecord {
+        unless $!schema<type> eq 'array' | 'object' {
+            return;
+        }
+
+        my %props = $!schema<type> eq 'object'
+                        ?? $!schema<properties>
+                        !! ($!schema<items><properties> || {item => $!schema<items>});
+
+        my @subrecord = self.build-subrecord-with(%props);
+
+        my %rec = @subrecord.map({ .prop => .value });
+
+        if $!subrecord-ix.defined {
+            @!subrecords.splice($!subrecord-ix, 0, @subrecord);
+            $!value.splice($!subrecord-ix, 0, %rec);
+        } else {
+            $!subrecord-ix = @!subrecords.elems;
             @!subrecords.push(@subrecord);
+            $!value.push(%rec);
         }
     }
 
@@ -427,6 +456,16 @@ class Editor {
         self.draw-form;
     }
 
+    method draw-current-subrecord {
+        return unless self.field.subrecords;
+
+        self.remove-subrecord-fields;
+
+        @!fields.splice($!selected-field-ix + 1, 0, self.field.current-subrecord);
+
+        self.draw-form;
+    }
+
     method revert-value {
         self.set-value(self.field.original-value);
         self.field.set-original-subrecord-map;
@@ -671,7 +710,9 @@ class Editor {
                                     }
                                 }
                             } else {
-                                self.field-for-prop(|$k.split('/')).error = $v.join(', ');
+                                if (my $err-field = self.field-for-prop(|$k.split('/'))) {
+                                    $err-field.error = $v.join(', ');
+                                }
                             }
                         }
 
@@ -717,7 +758,10 @@ class Editor {
                     self.draw-field;
                 }
                 when 'a' {
-
+                    if self.field.value ~~ Iterable {
+                        self.field.new-subrecord;
+                        self.draw-current-subrecord;
+                    }
                 }
                 when ' ' {
                     my $prop = self.field.schema;
