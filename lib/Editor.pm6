@@ -664,9 +664,9 @@ class Editor {
                             } else {
                                 self.field-for-prop(|$k.split('/')).error = $v.join(', ');
                             }
-                            self.draw-form;
                         }
 
+                        self.draw-form;
                         self.message('Error - record not saved: ' ~ @err-msg.join(' | '));
                     } else {
                         self.message(%resp<status>);
@@ -690,7 +690,7 @@ class Editor {
                             self.load-fields;
                         }
 
-                        self.draw-form;
+                        self.draw-page;
                     }
                }
                 when "\t" {
