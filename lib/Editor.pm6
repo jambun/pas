@@ -669,8 +669,6 @@ class Editor {
                         self.draw-form;
                         self.message('Error - record not saved: ' ~ @err-msg.join(' | '));
                     } else {
-                        self.message(%resp<status>);
-
                         if (my $open-subrecord-ix = self.ix-of-first-field-with-open-subrecord).defined {
                             $!selected-field-ix = $open-subrecord-ix;
                         }
@@ -679,18 +677,13 @@ class Editor {
                         %resp = from-json client.get(%!json<uri>);
 
                         if %resp<error> {
-                            my $msg = '';
-                            for %resp<error>.kv -> $k, $v {
-                                $msg ~= $k ~ ': ' ~ $v.join(',') ~ '  ';
-                            }
-
-                            self.message($msg);
+                            self.message('Error reloading after successful save: ' ~ %resp<error>.raku);
                         } else {
                             %!json = %resp;
                             self.load-fields;
+                            self.draw-page;
+                            self.message('Saved');
                         }
-
-                        self.draw-page;
                     }
                }
                 when "\t" {
