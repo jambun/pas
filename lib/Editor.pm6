@@ -375,15 +375,17 @@ class Editor {
     }
 
     method field-for-prop($prop, $ix?, $subprop?) {
+        my $field = @!fields.first: *.prop eq $prop;
+
         if $ix {
             if $subprop {
-                self.field.subrecords[$ix].first: *.prop eq $subprop;
+                $field = $field.subrecords[$ix].first: *.prop eq $subprop;
             } else {
                 self.message("Yikes - called field-for-prop with an ix but no subprop");
             }
-        } else {
-            @!fields.first: *.prop eq $prop;
         }
+
+        $field;
     }
 
     method field-with-open-subrecord {
