@@ -262,6 +262,9 @@ class Editor {
     has $.selected-field-ix = 0; # the array index of the currently selected field
     has $.cursor-offset;
     has $.top-field-ix = 0;
+
+    has @.record-stack; # previously loaded records stacked so they can be returned to
+
     has $.number-of-display-lines = term_lines() - 6;
     has $.first-display-line = 3;
     has @.skip_props = <uri created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
@@ -296,9 +299,17 @@ class Editor {
         self.init;
     }
 
-    method init(%json?) {
+    method init(%json?, :$previous) {
         if %json {
+            @!record-stack.push(%!json.clone);
             %!json = %json;
+        } elsif $previous {
+            if @!record-stack {
+                %!json = @!record-stack.pop;
+            } else {
+                self.message('No previous record to load');
+                return;
+            }
         }
 
         $!schema = schemas(:name(%!json<jsonmodel_type>));
@@ -314,10 +325,23 @@ class Editor {
         $!selected-field-ix = 0;
         $!top-field-ix = 0;
 
-        self.draw-header;
-        self.draw-footer;
-
         self.load-fields;
+
+        True;
+    }
+
+    method load-record($uri) {
+        my $resp = from-json client.get($uri);
+        if $resp<error> {
+            self.message($resp<error>);
+        } else {
+            self.init($resp);
+            self.draw-page;
+        }
+    }
+
+    method load-previous-record {
+        self.init(:previous) && self.draw-page;
     }
 
     method max-top-field-ix {
@@ -536,11 +560,11 @@ class Editor {
         if $leading-count <= 0 {
             print-at($!first-display-line - 1,
                      $!cursor-offset,
-                     ' ', :fill);
+                     ' ', :clear);
         } elsif $leading-count > 0 {
             print-at($!first-display-line - 1,
                      $!cursor-offset,
-                     ansi('.', 'green') x $leading-count, :fill);
+                     ansi('.', 'green') x $leading-count, :clear);
         }
 
         my $trailing-count = @!fields.elems - $!number-of-display-lines - $!top-field-ix - 1;
@@ -548,16 +572,25 @@ class Editor {
         if $trailing-count <= 0 {
             print-at($!number-of-display-lines + $!first-display-line + 1,
                      $!cursor-offset,
-                     ' ', :fill);
+                     ' ', :clear);
         } elsif $trailing-count > 0 {
             print-at($!number-of-display-lines + $!first-display-line + 1,
                      $!cursor-offset,
-                     ansi('.', 'green') x $trailing-count, :fill);
+                     ansi('.', 'green') x $trailing-count, :clear);
         }
     }
 
+    method draw-page {
+        clear-screen();
+        self.draw-header;
+        self.draw-footer;
+        self.draw-form;
+    }
+
     method draw-header {
-        print-at(1, 3, ansi(%!json<uri>, 'bold'), :clear);
+        my $label = (%!json<uri>, label-for-json(%!json)).grep(*.so).join(' | ');
+        $label = ('.' x @!record-stack) ~ ' ' ~ $label;
+        print-at(1, 2, ansi($label, 'bold'), :clear);
     }
 
     method draw-footer {
@@ -591,14 +624,9 @@ class Editor {
             run <tput cvvis> unless $embedded;
         }
 
-        clear-screen();
-
-        self.draw-header;
-        self.draw-footer;
+        self.draw-page;
 
         my $k = '';
-
-        self.draw-form;
 
         while $k ne 'q' {
 
@@ -795,14 +823,13 @@ class Editor {
                 }
                 when 'g' {
                     if self.field.prop eq <ref> {
-                        my $resp = from-json client.get(self.field.value);
-                        if $resp<error> {
-                            self.message($resp<error>);
-                        } else {
-                            self.init($resp);
-                            self.draw-form;
-                        }
+                        self.load-record(self.field.value);
+                    } else {
+                        print BEL;
                     }
+                }
+                when 'b' {
+                    self.load-previous-record;
                 }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
