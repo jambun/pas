@@ -478,7 +478,7 @@ class Editor {
             $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
         }
 
-        my %c = col => $!cursor-offset + 6, line => self.field-display-line;
+        my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
 
         print-at(%c<line>, %c<col>, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
 
