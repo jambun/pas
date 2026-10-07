@@ -449,12 +449,16 @@ class Editor {
         my $new-ix = $!selected-field-ix + $d;
         my $open-subrecord-ix = self.ix-of-field-with-open-subrecord;
 
-        if $new-ix < 0 || $new-ix < $!top-field-ix
-                       || $new-ix >= @!fields.elems
-                       || $new-ix > $!number-of-display-lines + $!top-field-ix
+        if $new-ix < 0 || $new-ix >= @!fields.elems
                        || ($open-subrecord-ix.defined && $new-ix < $open-subrecord-ix)
                        || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + self.field-with-open-subrecord.current-subrecord) {
             print BEL;
+        } elsif $new-ix < $!top-field-ix {
+            $!selected-field-ix = $new-ix;
+            self.scroll-form(-1);
+        } elsif $new-ix > $!number-of-display-lines + $!top-field-ix {
+            $!selected-field-ix = $new-ix;
+            self.scroll-form(1);
         } else {
             self.field.open-for-update = False;
             self.field.value-ix = Nil;
@@ -464,6 +468,11 @@ class Editor {
             self.draw-field;
             self.draw-help;
         }
+    }
+
+    method scroll-form(Int $d) {
+        $!top-field-ix += $d;
+        self.draw-form;
     }
 
     method draw-ref-search {
@@ -850,8 +859,7 @@ class Editor {
                     } elsif $!top-field-ix + 1 > $!selected-field-ix {
                         print BEL;
                     } else {
-                        $!top-field-ix++;
-                        self.draw-form();
+                        self.scroll-form(1);
                     }
 		            }
 		            when LEFT_ARROW {
@@ -860,8 +868,7 @@ class Editor {
                     } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
                         print BEL;
                     } else {
-                        $!top-field-ix--;
-                        self.draw-form();
+                        self.scroll-form(-1);
                     }
 		            }
 	          }
