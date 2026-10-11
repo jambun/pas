@@ -421,6 +421,19 @@ sub check_endpoint($ep, $msg) is export {
     True;
 }
 
+sub is-subrecord($type-def --> Bool) is export {
+    if $type-def ~~ Iterable {
+        so all $type-def.map({ $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
+    } else {
+        ($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+    }
+}
+
+sub subrecord-type($type-def) is export {
+    $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+    $0.Str;
+}
+
 sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {
      if $reload || !$SCHEMAS_PARSED {
 	       my $schemas = client.get(SCHEMAS_URI);

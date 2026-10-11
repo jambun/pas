@@ -4,6 +4,8 @@ use Terminal::LineEditor;
 use Terminal::LineEditor::RawTerminalInput;
 use JSON::Tiny;
 
+class Subrecord {...}
+
 class FormField {
     has $.prop;
     has FormField $.parent;
@@ -14,7 +16,7 @@ class FormField {
     has $.original-value;
     has Bool $.open-for-update is rw = False;
 
-    has @.subrecords; # a FormField array for each sub-record in this field
+    has Subrecord @.subrecords; # a FormField array for each sub-record in this field
     has $.subrecord-ix is rw; # the array index of the currently selected subrecord
 
     # probably not required in the new regime
@@ -75,7 +77,7 @@ class FormField {
             $!label = label-for-json(%ref-map{$!value});
         }
 
-        for @!subrecords -> $sr { for |$sr { .set-labels-for(%ref-map); } }
+        for @!subrecords -> $sr { for $sr.fields { .set-labels-for(%ref-map); } }
     }
 
     method load-subrecords {
@@ -109,8 +111,10 @@ class FormField {
         }
     }
 
-    method build-subrecord-with(%props, @prop-names = %props.keys, $rec = {}) {
+    method build-subrecord-with(%props, @prop-names is copy, $rec = {}) {
         my @subrecord;
+
+        @prop-names ||= %props.keys;
 
         for @prop-names -> $prop {
             next if $prop ~~ /^ '_' /;
@@ -120,6 +124,18 @@ class FormField {
 
             my $label = ($prop eq <ref> && $rec<_resolved>) ?? label-for-json($rec<_resolved>) !! '';
             my $val = $prop eq <item> ?? $rec !! $rec{$prop};
+            unless $val.defined {
+                if $schema-prop<type> eq <array> {
+                    $val = [];
+                } elsif $schema-prop<type> eq <object> {
+                    $val = {};
+                    if $schema-prop<subtype> eq <ref> {
+                        $val<ref> = '';
+                    }
+                } elsif $schema-prop<type> eq <string> {
+                    $val = '';
+                }
+            }
 
             @subrecord.push(FormField.new(:$prop,
                                           :parent(self),
@@ -129,29 +145,54 @@ class FormField {
                                           :value($val)));
         }
 
-        @subrecord;
+        Subrecord.new(:fields(@subrecord));
     }
 
     method new-subrecord {
-        unless $!schema<type> eq 'array' | 'object' {
+        my %props;
+        my @prop-names;
+        my $jsonmodel;
+        my $rec = {};
+
+        if $!schema<type> eq <array> {
+            if $!schema<items><type> && $!schema<items><type> ~~ <string> {
+                %props = item => $!schema<items>;
+                $rec = '';
+            } elsif $!schema<items><type> && is-subrecord($!schema<items><type>) {
+                $jsonmodel = subrecord-type($!schema<items><type>);
+                my $schema = schemas(:name($jsonmodel));
+                %props = $schema<properties>;
+                @prop-names = |$schema<property_list>;
+            } else {
+                %props = ($!schema<items><properties> || {item => $!schema<items>});
+            }
+        } elsif $!schema<type> eq <object> {
+            %props = $!schema<properties>;
+        } elsif is-subrecord($!schema<type>) {
+            $jsonmodel = subrecord-type($!schema<type>);
+            my $schema = schemas(:name($jsonmodel));
+            %props = $schema<properties>;
+            @prop-names = |$schema<property_list>;
+        } else {
             return;
         }
 
-        my %props = $!schema<type> eq 'object'
-                        ?? $!schema<properties>
-                        !! ($!schema<items><properties> || {item => $!schema<items>});
+        my $subrecord = self.build-subrecord-with(%props, @prop-names, $rec);
 
-        my @subrecord = self.build-subrecord-with(%props);
-
-        my %rec = @subrecord.map({ .prop => .value });
+        $rec = $subrecord.fields.map({ .prop => .value }).Hash; #jjj
+        if all $rec.map(*.key) eq <item> {
+            $rec = $rec.map(*.value);
+        } elsif $jsonmodel {
+            $rec<jsonmodel_type> = $jsonmodel;
+        }
 
         if $!subrecord-ix.defined {
-            @!subrecords.splice($!subrecord-ix, 0, @subrecord);
-            $!value.splice($!subrecord-ix, 0, %rec);
+            @!subrecords.splice($!subrecord-ix, 0, $subrecord);
+            $!value.splice($!subrecord-ix, 0, $rec);
         } else {
             $!subrecord-ix = @!subrecords.elems;
-            @!subrecords.push(@subrecord);
-            $!value.push(%rec);
+            @!subrecords.push($subrecord);
+            $!value.push($rec);
         }
     }
 
@@ -284,6 +325,10 @@ class FormField {
     }
 }
 
+class Subrecord {
+    has FormField @.fields;
+}
+
 class Editor {
     has %.json; # the parsed json of the record
     has $.schema; # the JSONModel schema for the record's type
@@ -408,7 +453,7 @@ class Editor {
 
         if $ix {
             if $subprop {
-                $field = $field.subrecords[$ix].first: *.prop eq $subprop;
+                $field = $field.subrecords[$ix].fields.first: *.prop eq $subprop;
             } else {
                 self.message("Yikes - called field-for-prop with an ix but no subprop");
             }
@@ -451,7 +496,7 @@ class Editor {
 
         self.remove-subrecord-fields;
 
-        @!fields.splice($!selected-field-ix + 1, 0, self.field.next-subrecord);
+        @!fields.splice($!selected-field-ix + 1, 0, self.field.next-subrecord.fields);
 
         self.draw-form;
     }
@@ -461,7 +506,7 @@ class Editor {
 
         self.remove-subrecord-fields;
 
-        @!fields.splice($!selected-field-ix + 1, 0, self.field.current-subrecord);
+        @!fields.splice($!selected-field-ix + 1, 0, self.field.current-subrecord.fields);
 
         self.draw-form;
     }
@@ -490,7 +535,7 @@ class Editor {
 
         if $new-ix < 0 || $new-ix >= @!fields.elems
                        || ($open-subrecord-ix.defined && $new-ix < $open-subrecord-ix)
-                       || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + self.field-with-open-subrecord.current-subrecord) {
+                       || ($open-subrecord-ix.defined && $new-ix > $open-subrecord-ix + self.field-with-open-subrecord.current-subrecord.fields) {
             print BEL;
         } elsif $new-ix < $!top-field-ix {
             $!selected-field-ix = $new-ix;
@@ -684,7 +729,7 @@ class Editor {
 
 	          given $k {
                 when 's' {
-                    for @!fields.grep(*.updated) -> $field {
+                    for @!fields.grep(*.updated && !*.parent) -> $field {
                         %!json{$field.prop} = $field.value;
                     }
 
@@ -778,7 +823,8 @@ class Editor {
                         } elsif $prop<dynamic_enum> {
                             my $enum = enum-by-name($prop<dynamic_enum>);
                             my @values = |$enum<values>;
-                            my $next-ix = @values.first(self.field.value, :k) + 1;
+                            my $current-value-ix = @values.first(self.field.value, :k);
+                            my $next-ix = $current-value-ix.defined ?? $current-value-ix + 1 !! 0;
                             $next-ix %= @values.elems;
                             self.set-value(@values[$next-ix]);
                             self.field.set-label;
@@ -939,17 +985,4 @@ class Editor {
 
         %resp;
     }
-
-   method is-subrecord($type-def --> Bool) {
-       if $type-def ~~ Iterable {
-           so all $type-def.map({ $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
-       } else {
-           ($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
-       }
-    }
-
-   method subrecord-type($type-def) {
-       $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
-       $0.Str;
-   }
 }
