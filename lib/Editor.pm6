@@ -179,7 +179,7 @@ class FormField {
 
         my $subrecord = self.build-subrecord-with(%props, @prop-names, $rec);
 
-        $rec = $subrecord.fields.map({ .prop => .value }).Hash; #jjj
+        $rec = $subrecord.fields.map({ .prop => .value }).Hash;
         if all $rec.map(*.key) eq <item> {
             $rec = $rec.map(*.value);
         } elsif $jsonmodel {
@@ -390,12 +390,6 @@ class Editor {
 
         return unless $!schema;
 
-        my @props = |$!schema<property_list>;
-        my $longest = @props>>.chars.max;
-        my $max_val_length = term_cols() - $longest - 20;
-        $!cursor-offset = $longest + 3;
-        FormField.prop-width = $longest;
-
         $!selected-field-ix = 0;
         $!top-field-ix = 0;
 
@@ -436,6 +430,13 @@ class Editor {
 
             @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(%!json{$prop})));
         }
+
+        self.set-prop-width;
+    }
+
+    method set-prop-width {
+        FormField.prop-width = @!fields.map(*.prop.chars).max;
+        $!cursor-offset = FormField.prop-width + 3;
     }
 
     method load-subrecord-fields {
@@ -476,6 +477,8 @@ class Editor {
 
     method remove-subrecord-fields {
         @!fields.=grep({ !(.parent && .parent === self.field) });
+
+        self.set-prop-width;
     }
 
     method draw-remove-subrecord {
@@ -498,6 +501,8 @@ class Editor {
 
         @!fields.splice($!selected-field-ix + 1, 0, self.field.next-subrecord.fields);
 
+        self.set-prop-width;
+
         self.draw-form;
     }
 
@@ -507,6 +512,8 @@ class Editor {
         self.remove-subrecord-fields;
 
         @!fields.splice($!selected-field-ix + 1, 0, self.field.current-subrecord.fields);
+
+        self.set-prop-width;
 
         self.draw-form;
     }
