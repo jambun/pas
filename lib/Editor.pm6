@@ -934,6 +934,26 @@ class Editor {
                 when 'b' {
                     self.load-previous-record;
                 }
+                when 'i' {
+                    if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
+                        if inline_image_supported() {
+                            self.message("Showing: {self.field.value} <ANY KEY> to dismiss");
+                            my $width = term_cols() - 40;
+                            my $height = term_lines() - 10;
+                            if (my $img = image-for-url(self.field.value, :$width, :$height)) {
+                                print-at(5, 20, $img, :raw);
+                                get-key-in;
+                                self.draw-form;
+                            } else {
+                                self.message("Sorry, that image didn't dowmload");
+                            }
+                        } else {
+                            self.message('Sorry, image viewing only available with iTerm2');
+                        }
+                    } else {
+                        self.message('The current field is not an image link');
+                    }
+                }
                 when /\d/ {
                     my $ix = $!number-of-display-lines * ($k - 1);
                     if $ix > +@!fields || self.field-with-open-subrecord {

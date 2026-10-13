@@ -141,6 +141,18 @@ sub inline_image($data, :$height, :$width) is export {
     "\e]1337;File=inline=1;{$args}size={$datab64.chars}:{$datab64}\cG";
 }
 
+sub image-for-url($url, :$size, :$height is copy, :$width is copy) is export {
+    my $resp = client.nonas_get($url, :bin);
+
+    if $resp.is-success {
+        $height ||= $size || '30%';
+        $width ||= $size || '30%';
+        inline_image($resp.content, :$height, :$width);
+    } else {
+        '';
+    }
+}
+
 sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is export {
     if inline_image_supported() {
         unless (my $image_url = $json<image_url>) {
@@ -629,21 +641,25 @@ sub clear-screen is export {
     print state $ = qx[clear];
 }
 
-sub print-at($row, $col, $s, Bool :$fill, Bool :$clear) is export {
+sub print-at($row, $col, $s, Bool :$fill, Bool :$clear, :$raw) is export {
     if $row <= term_lines() {
-        if $clear {
-            cursor(1, $row);
-            run('tput', 'el');
-        }
-
-        my $out = visible_trim($s, term_cols() - $col);
-
-        if $fill {
-            $out ~= ' ' x (term_cols() - $col - visible_length($out));
-        }
-
         cursor($col, $row);
-        print $out;
+        if $raw {
+            print $s;
+        } else {
+            if $clear {
+                cursor(1, $row);
+                run('tput', 'el');
+            }
+
+            my $out = visible_trim($s, term_cols() - $col);
+
+            if $fill {
+                $out ~= ' ' x (term_cols() - $col - visible_length($out));
+            }
+
+            print $out;
+        }
     }
 }
 
