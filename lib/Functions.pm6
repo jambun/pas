@@ -643,15 +643,15 @@ sub clear-screen is export {
 
 sub print-at($row, $col, $s, Bool :$fill, Bool :$clear, :$raw) is export {
     if $row <= term_lines() {
+        if $clear {
+            cursor(1, $row);
+            run('tput', 'el');
+        }
+
         cursor($col, $row);
         if $raw {
             print $s;
         } else {
-            if $clear {
-                cursor(1, $row);
-                run('tput', 'el');
-            }
-
             my $out = visible_trim($s, term_cols() - $col);
 
             if $fill {
