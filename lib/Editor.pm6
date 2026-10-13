@@ -603,14 +603,13 @@ class Editor {
                 when ' ' {
                     if %search<results> {
                         $ix = ($ix + 1) % +%search<results>;
-                        my $msg = %search<results>[$ix]<uri>;
-                        if %search<results>[$ix]<title> {
-                            $msg ~= ' | ' ~ %search<results>[$ix]<title>;
-                        }
-                        self.message($msg);
+                        message-for-search(%search);
+                    } else {
+                        self.message('No hits');
                     }
                 }
                 default {
+                    $ix = 0;
                     if $ak ~~ /\w/ {
                         $q ~= $ak;
                     } elsif $ak.ord == 127 {
@@ -618,11 +617,24 @@ class Editor {
                     }
                     if $q {
                         %search = self.search-type($type, $q);
+                        message-for-search(%search);
                         print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
                     } else {
                         print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold'), :fill);
                     }
                 }
+            }
+        }
+
+        sub message-for-search(%search) {
+            if %search<results> {
+                my $msg = %search<results>[$ix]<uri>;
+                if %search<results>[$ix]<title> {
+                    $msg ~= ' | ' ~ %search<results>[$ix]<title>;
+                }
+                self.message($msg);
+            } else {
+                self.message('No hits');
             }
         }
     }
@@ -874,6 +886,7 @@ class Editor {
 
                         if self.field.prop eq <ref> {
                             self.draw-ref-search;
+                            self.field.open-for-update = False;
                         } elsif $prop<type> eq <array> | <object> {
                             if !self.field.label {
                                 if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
