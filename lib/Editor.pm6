@@ -73,7 +73,9 @@ class FormField {
     }
 
     method set-labels-for(%ref-map) {
-        if ($!prop eq <ref> && %ref-map{$!value}) {
+        return unless %ref-map;
+
+        if ($!prop eq <ref> && $!value ~~ Str:D && %ref-map{$!value}) {
             $!label = label-for-json(%ref-map{$!value});
         }
 
