@@ -628,7 +628,7 @@ class Editor {
 
         sub message-for-search(%search) {
             if %search<results> {
-                my $msg = %search<results>[$ix]<uri>;
+                my $msg = "{$ix + 1} of {%search<total_hits>}: {%search<results>[$ix]<uri>}";
                 if %search<results>[$ix]<title> {
                     $msg ~= ' | ' ~ %search<results>[$ix]<title>;
                 }
