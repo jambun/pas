@@ -865,7 +865,7 @@ class Editor {
                             self.set-value(@values[$next-ix]);
                             self.field.set-label;
                             self.draw-field;
-                        } elsif $prop<type> eq 'string' {
+                        } elsif $prop<type> eq 'string' | 'integer' | 'date' {
                             my $val = self.field.value // '';
                             if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
                                 save_tmp(self.field.value);
