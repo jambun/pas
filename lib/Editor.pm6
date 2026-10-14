@@ -288,8 +288,11 @@ class FormField {
                 if $val<ref> && self.label {
                     $val = ansi($val<ref> ~ ' | ' ~ self.label, "bold $value-style");
                 } else {
-                    my $k = $val.keys.first({ $_ !~~ /^ '_'/ });
-                    $val = ansi($k ~ ': ' ~ $val{$k}, "bold $value-style");
+                    if (my $k = $val.keys.first({ $_ !~~ /^ '_'/ })) {
+                        $val = ansi($k ~ ': ' ~ $val{$k}, "bold $value-style");
+                    } else {
+                        $val = '--';
+                    }
                 }
             }
         } elsif $val ~~ Iterable {
