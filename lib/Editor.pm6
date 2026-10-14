@@ -611,12 +611,16 @@ class Editor {
                     last;
                 }
                 when /\n/ {
-                    self.set-value(%search<results>[$ix]<uri>);
-                    self.field.label = %search<results>[$ix]<title>;
+                    if %search<results> {
+                        self.set-value(%search<results>[$ix]<uri>);
+                        self.field.label = %search<results>[$ix]<title>;
 
-                    self.draw-field;
-                    self.message('Linked ' ~ self.field.value);
-                    last;
+                        self.draw-field;
+                        self.message('Linked ' ~ self.field.value);
+                        last;
+                    } else {
+                        self.message('No result to link');
+                    }
                 }
                 when ' ' {
                     if %search<results> {
