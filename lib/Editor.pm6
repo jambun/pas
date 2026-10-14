@@ -54,10 +54,10 @@ class FormField {
     method set-child-value($child, $ix = $!subrecord-ix) {
         if is-subrecord($!schema) {
             $!value{$child.prop} = $child.value;
-        } elsif $!value[$ix] !~~ Iterable {
-            $!value[$ix] = $child.value;
-        } else {
+        } elsif $!value[$ix] ~~ Associative {
             $!value[$ix]{$child.prop} = $child.value;
+        } else {
+            $!value[$ix] = $child.value;
         }
         self.set-label;
         $!error = Nil;
