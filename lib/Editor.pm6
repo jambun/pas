@@ -52,7 +52,9 @@ class FormField {
     }
 
     method set-child-value($child, $ix = $!subrecord-ix) {
-        if $!value[$ix] !~~ Iterable {
+        if is-subrecord($!schema) {
+            $!value{$child.prop} = $child.value;
+        } elsif $!value[$ix] !~~ Iterable {
             $!value[$ix] = $child.value;
         } else {
             $!value[$ix]{$child.prop} = $child.value;
@@ -83,15 +85,16 @@ class FormField {
     }
 
     method load-subrecords {
-        unless $!schema<type> eq 'array' | 'object' {
+        # FIXME: also things like: "type": "JSONModel(:language_and_script) object"
+        unless $!schema<type> eq 'array' | 'object' || is-subrecord($!schema<type>) {
             return;
         }
 
         @!subrecords = Empty;
 
-        my @subrecs = $!schema<type> eq 'object'
-                          ?? [$!value]
-                          !! |$!value;
+        my @subrecs = $!schema<type> eq 'array'
+                          ?? |$!value
+                          !! [$!value];
 
         for @subrecs -> $rec {
             my @subrecord;
@@ -100,6 +103,10 @@ class FormField {
 
             if $rec<jsonmodel_type> {
                 my $item-schema = schemas(:name($rec<jsonmodel_type>));
+                @prop-names = |$item-schema<property_list>;
+                %props = $item-schema<properties>;
+            } elsif is-subrecord($!schema<type>) {
+                my $item-schema = schemas(:name(subrecord-type($!schema<type>)));
                 @prop-names = |$item-schema<property_list>;
                 %props = $item-schema<properties>;
             } else {
@@ -129,9 +136,9 @@ class FormField {
             unless $val.defined {
                 if $schema-prop<type> eq <array> {
                     $val = [];
-                } elsif $schema-prop<type> eq <object> {
+                } elsif $schema-prop<type> eq <object> || is-subrecord($schema-prop<type>) {
                     $val = {};
-                    if $schema-prop<subtype> eq <ref> {
+                    if $schema-prop<subtype> && $schema-prop<subtype> eq <ref> {
                         $val<ref> = '';
                     }
                 } elsif $schema-prop<type> eq <string> {
@@ -451,15 +458,23 @@ class Editor {
         self.draw-help(@subrecord-help, :add);
     }
 
-    method field-for-prop($prop, $ix?, $subprop?) {
-        my $field = @!fields.first: *.prop eq $prop;
+    method field-for-error-ref($error-ref) {
+        # valid refs:
+        # prop
+        # prop/subprop
+        # prop/ix/subprop
+        my @ref = $error-ref.split('/');
 
-        if $ix {
-            if $subprop {
-                $field = $field.subrecords[$ix].fields.first: *.prop eq $subprop;
-            } else {
-                self.message("Yikes - called field-for-prop with an ix but no subprop");
-            }
+        my $field = @!fields.first: *.prop eq @ref[0];
+
+        if @ref.elems == 1 {
+            # all good
+        } elsif @ref.elems == 2 {
+            $field = $field.subrecords[0].fields.first: *.prop eq @ref[1];
+        } elsif @ref.elems == 3 {
+            $field = $field.subrecords[@ref[1]].fields.first: *.prop eq @ref[2];
+        } else {
+            self.message("Yikes - called field-for-error-ref with a bad ref: $error-ref");
         }
 
         $field;
@@ -766,9 +781,9 @@ class Editor {
                                 %!json{$field.prop} = $field.original-value;
                             }
 
-                            if $k eq <identifier> && self.field-for-prop(<id_0>) {
+                            if $k eq <identifier> && self.field-for-error-ref(<id_0>) {
                                 for <id_0 id_1 id_2 id_3> -> $id {
-                                    my $field = self.field-for-prop($id);
+                                    my $field = self.field-for-error-ref($id);
                                     if $field.value {
                                         last;
                                     } else {
@@ -776,7 +791,7 @@ class Editor {
                                     }
                                 }
                             } else {
-                                if (my $err-field = self.field-for-prop(|$k.split('/'))) {
+                                if (my $err-field = self.field-for-error-ref($k)) {
                                     $err-field.error = $v.join(', ');
                                 }
                             }
@@ -887,7 +902,7 @@ class Editor {
                         if self.field.prop eq <ref> {
                             self.draw-ref-search;
                             self.field.open-for-update = False;
-                        } elsif $prop<type> eq <array> | <object> {
+                        } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
                             if !self.field.label {
                                 if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
                                     my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));

@@ -434,10 +434,12 @@ sub check_endpoint($ep, $msg) is export {
 }
 
 sub is-subrecord($type-def --> Bool) is export {
-    if $type-def ~~ Iterable {
-        so all $type-def.map({ $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
+    if $type-def ~~ Associative {
+        ($type-def<type> ~~ Str && $type-def<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+    } elsif $type-def ~~ Iterable {
+        so all $type-def.map({ $_<type> ~~ Str && $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
     } else {
-        ($type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+        ($type-def ~~ Str && $type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
     }
 }
 
