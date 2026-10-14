@@ -913,13 +913,21 @@ class Editor {
                                         self.message($resp<error>);
                                     } else {
                                         my %ref-map;
-                                        if $resp{self.field.prop} ~~ Associative {
-                                            %ref-map = $resp{self.field.prop}<ref> => $resp{self.field.prop}<_resolved>;
-                                            self.field.label = label-for-json(%ref-map.values.head);
-                                        } else {
-                                            %ref-map = $resp{self.field.prop}.map({ .<ref> => .<_resolved> });
-                                            self.field.label = 'Resolved';
+
+                                        sub walk($node) {
+                                            if $node ~~ Associative {
+                                                if $node<ref> && $node<_resolved> {
+                                                    %ref-map{$node<ref>} = $node<_resolved>;
+                                                } else {
+                                                    walk($_) for $node.values;
+                                                }
+                                            } elsif $node ~~ Positional {
+                                                walk($_) for @$node;
+                                            }
                                         }
+
+                                        walk($resp);
+
                                         for @!fields { .set-labels-for(%ref-map); }
                                     }
                                 }
