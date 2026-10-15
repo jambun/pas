@@ -902,6 +902,7 @@ class Editor {
                                 if edit(tmp_file('edit.txt')) {
                                     self.set-value(slurp(tmp_file('edit.txt')).chomp);
                                     self.message('Edits applied');
+                                    self.draw-field;
                                 } else {
                                     self.message('No edits');
                                 }
