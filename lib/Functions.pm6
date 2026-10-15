@@ -150,8 +150,10 @@ sub image-for-url($url, :$size, :$height is copy, :$width is copy) is export {
         $width ||= $size || '30%';
         inline_image($resp.content, :$height, :$width);
     } else {
-        '';
+        return '';
     }
+
+    CATCH { default { return ''; } }
 }
 
 sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is export {
@@ -164,12 +166,11 @@ sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is
             }
         }
         if $image_url {
-            my $resp = client.nonas_get($image_url, :bin);
-            if $resp.is-success {
+            if (my $image = image-for-url($image_url)) {
                 my $rendered_label = $label ?? "\n\n" ~ ansi($label, 'bold') !! '';
                 $height ||= $size || '30%';
                 $width ||= $size || '30%';
-                inline_image($resp.content, :$height, :$width) ~ $rendered_label;
+                inline_image($image, :$height, :$width) ~ $rendered_label;
             } else {
                 "Failed to retrieve image: $image_url";
             }
