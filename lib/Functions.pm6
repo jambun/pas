@@ -30,6 +30,7 @@ our constant DOWN_ARROW  =  "\x[1b][B";
 our constant RIGHT_ARROW =  "\x[1b][C";
 our constant LEFT_ARROW  =  "\x[1b][D";
 our constant BEL         =  "\x[07]";
+our constant DELETE      =  "\x[7F]";
 
 
 my $SCHEMAS;

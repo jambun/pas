@@ -630,11 +630,11 @@ class Editor {
                         self.message('No hits');
                     }
                 }
-                when /^ \w $/ | "\x[7F]" { # word character or delete
+                when /^ \w $/ | DELETE {
                     $ix = 0;
                     if $ak ~~ /^ \w $/ {
                         $q ~= $ak;
-                    } elsif $ak.ord == 127 { # another way to say delete
+                    } elsif $ak eq DELETE {
                         $q.=substr(0, *-1) if $q;
                     }
                     if $q {
