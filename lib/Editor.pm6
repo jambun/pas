@@ -469,25 +469,28 @@ class Editor {
     }
 
     method field-for-error-ref($error-ref) {
+        return unless $error-ref;
         # valid refs:
         # prop
         # prop/subprop
         # prop/ix/subprop
         # prop/ix/subrec/subprop
+        # prop/ix/subrec/ix/subprop
         my @ref = $error-ref.split('/');
 
         my $field = @!fields.first: *.prop eq @ref[0];
+        @ref.shift;
 
-        if @ref.elems == 1 {
-            # all good
-        } elsif @ref.elems == 2 {
-            $field = $field.subrecords[0].fields.first: *.prop eq @ref[1];
-        } elsif @ref.elems == 3 {
-            $field = $field.subrecords[@ref[1]].fields.first: *.prop eq @ref[2];
-        } elsif @ref.elems == 4 {
-            $field = $field.subrecords[@ref[1]].fields.first(*.prop eq @ref[2]).subrecords[0].fields.first: *.prop eq @ref[3];
-        } else {
-            self.message("Yikes - called field-for-error-ref with a bad ref: $error-ref");
+        for @ref -> $ref {
+            if $ref ~~ /^ \d $/ {
+                $field = $field.subrecords[$ref];
+            } else {
+                if $field ~~ Subrecord {
+                    $field = $field.fields.first: *.prop eq $ref;
+                } else {
+                    $field = $field.subrecords[0].fields.first: *.prop eq $ref;
+                }
+            }
         }
 
         $field;
