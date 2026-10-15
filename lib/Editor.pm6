@@ -824,10 +824,9 @@ class Editor {
                             }
 
                             if $k eq <identifier> && self.field-for-error-ref(<id_0>) {
-                                for <id_0 id_1 id_2 id_3> -> $id {
+                                for <id_0 id_1 id_2> -> $id {
                                     my $field = self.field-for-error-ref($id);
                                     if $field.value {
-                                        last;
                                     } else {
                                         $field.error = $v.join(', ');
                                     }
