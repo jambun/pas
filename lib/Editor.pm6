@@ -355,7 +355,7 @@ class Editor {
     has $.selected-field-ix = 0; # the array index of the currently selected field
     has $.cursor-offset;
     has $.top-field-ix = 0;
-
+    has Promise $.message-timer-cancel = Promise.new;
     has @.record-stack; # previously loaded records stacked so they can be returned to
 
     has $.number-of-display-lines = term_lines() - 6;
@@ -554,8 +554,30 @@ class Editor {
         self.field.set-value($value);
     }
 
-    method message($s) {
+    method with-cursor-lock(&block) {
+        ENTER $!message-timer-cancel.keep(True);
+        LEAVE {
+            $!message-timer-cancel = Promise.new;
+            self.set-message-cancel-timer;
+        }
+
+        &block();
+    }
+
+    method set-message-cancel-timer {
+        start react {
+            whenever $!message-timer-cancel { done; }
+            whenever Promise.in(3) { print-at(term_lines() - 1, 3, '', :clear); done; }
+        }
+    }
+
+    method message($s, :$sticky) {
+        $!message-timer-cancel.keep(True);
+        $!message-timer-cancel = Promise.new;
+
         print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :fill);
+
+        self.set-message-cancel-timer unless $sticky;
     }
 
     method field {
@@ -661,9 +683,9 @@ class Editor {
                 if %search<results>[$ix]<title> {
                     $msg ~= ' | ' ~ %search<results>[$ix]<title>;
                 }
-                self.message($msg);
+                self.message($msg, :sticky);
             } else {
-                self.message('No hits');
+                self.message('No hits', :sticky);
             }
         }
     }
@@ -908,7 +930,7 @@ class Editor {
                                 }
                                 run <tput civis>;
                             } else {
-                                my $coo = self.field.depth * 2 + 2;;
+                                my $coo = self.field.depth * 2 + 2;
                                 cursor($!cursor-offset + $coo, $!first-display-line + $!selected-field-ix - $!top-field-ix);
                                 run <tput cvvis>;
                                 my $cli = Terminal::LineEditor::CLIInput.new;
@@ -920,7 +942,10 @@ class Editor {
                                 # so use history instead - sigh
                                 $cli.add-history(self.field.value);
 
-                                self.set-value($cli.prompt);
+                                self.with-cursor-lock: {
+                                    self.set-value($cli.prompt);
+                                }
+
                                 run <tput civis>;
                                 self.draw-field;
                             }
