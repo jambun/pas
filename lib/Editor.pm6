@@ -1029,12 +1029,13 @@ class Editor {
                 when 'i' {
                     if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
                         if inline_image_supported() {
-                            self.message("Showing: {self.field.value} <ANY KEY> to dismiss");
+                            self.message("Showing: {self.field.value} <ANY KEY> to dismiss", :sticky);
                             my $width = term_cols() - 40;
                             my $height = term_lines() - 10;
                             if (my $img = image-for-url(self.field.value, :$width, :$height)) {
                                 print-at(5, 20, $img, :raw);
                                 get-key-in;
+                                self.message('');
                                 self.draw-form;
                             } else {
                                 self.message("Sorry, that image didn't dowmload");
