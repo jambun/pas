@@ -855,7 +855,7 @@ class Editor {
                 when 'a' {
                     if self.field.value ~~ Iterable {
                         my $types = jsonmodel-object-types-for-schema(self.field.schema);
-                        if $types ~~ Iterable {
+                        if $types && $types ~~ Iterable {
                             # the subrecord can have more than one type - get the user to choose one
                             my $ix = 0;
                             my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
