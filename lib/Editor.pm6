@@ -898,9 +898,9 @@ class Editor {
                         } elsif $prop<type> eq 'string' | 'integer' | 'date' {
                             my $val = self.field.value // '';
                             if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
-                                save_tmp(self.field.value);
-                                if edit(tmp_file) {
-                                    self.set-value(slurp(tmp_file).chomp);
+                                save_tmp(self.field.value, :file-name('edit.txt'));
+                                if edit(tmp_file('edit.txt')) {
+                                    self.set-value(slurp(tmp_file('edit.txt')).chomp);
                                     self.message('Edits applied');
                                 } else {
                                     self.message('No edits');

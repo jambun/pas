@@ -529,13 +529,13 @@ sub clear_session_state() is export {
 }
 
 
-sub tmp_file is export {
-    store.path(TMP_FILE);
+sub tmp_file($file-name = TMP_FILE) is export {
+    store.path($file-name);
 }
 
 
-sub save_tmp($data) is export {
-    store.save(TMP_FILE, $data);
+sub save_tmp($data, :$file-name = TMP_FILE) is export {
+    store.save($file-name, $data);
 }
 
 
