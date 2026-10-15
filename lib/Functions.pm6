@@ -437,7 +437,7 @@ sub check_endpoint($ep, $msg) is export {
 sub is-subrecord($type-def --> Bool) is export {
     if $type-def ~~ Associative {
         ($type-def<type> ~~ Str && $type-def<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
-    } elsif $type-def ~~ Iterable {
+    } elsif $type-def ~~ Positional {
         so all $type-def.map({ $_<type> ~~ Str && $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
     } else {
         ($type-def ~~ Str && $type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
@@ -445,8 +445,23 @@ sub is-subrecord($type-def --> Bool) is export {
 }
 
 sub subrecord-type($type-def) is export {
-    $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
-    $0.Str;
+    if $type-def ~~ Associative {
+        $type-def<type> ~~ Str && $type-def<type> ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+        $0.Str;
+    } elsif $type-def ~~ Positional {
+        $type-def.map({ $_<type> ~~ Str && $_<type> ~~ /^ 'JSONModel(:' (\w+) ') object' $/; $0.Str });
+    } else {
+        $type-def ~~ Str && $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+        $0.Str;
+    }
+}
+
+sub jsonmodel-object-types-for-schema($schema) is export {
+    if $schema<type> eq <array> && $schema<items><type> && is-subrecord($schema<items><type>) {
+        subrecord-type($schema<items><type>);
+    } elsif is-subrecord($schema<type>) {
+        subrecord-type($schema<type>);
+    }
 }
 
 sub schemas(Bool :$reload, Str :$name, Bool :$prop) is export {

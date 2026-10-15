@@ -157,7 +157,7 @@ class FormField {
         Subrecord.new(:fields(@subrecord));
     }
 
-    method new-subrecord {
+    method new-subrecord($schema-name?) {
         my %props;
         my @prop-names;
         my $jsonmodel;
@@ -169,6 +169,13 @@ class FormField {
                 $rec = '';
             } elsif $!schema<items><type> && is-subrecord($!schema<items><type>) {
                 $jsonmodel = subrecord-type($!schema<items><type>);
+                if $jsonmodel ~~ Iterable {
+                    if $schema-name && $schema-name ~~ any |$jsonmodel {
+                    $jsonmodel = $schema-name;
+                    } else {
+                        return;
+                    }
+                }
                 my $schema = schemas(:name($jsonmodel));
                 %props = $schema<properties>;
                 @prop-names = |$schema<property_list>;
@@ -847,7 +854,23 @@ class Editor {
                 }
                 when 'a' {
                     if self.field.value ~~ Iterable {
-                        self.field.new-subrecord;
+                        my $types = jsonmodel-object-types-for-schema(self.field.schema);
+                        if $types ~~ Iterable {
+                            # the subrecord can have more than one type - get the user to choose one
+                            my $ix = 0;
+                            my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
+                            while True {
+                                print-at(%c<line>, %c<col>, ansi('Select a subrecord type: ', 'green') ~ ansi($types[$ix], 'bold'), :fill);
+                                my $ak = get-key-in;
+                                given $ak {
+                                    when "\t" { last; }
+                                    when /\n/ { self.field.new-subrecord($types[$ix]); last; }
+                                    when ' '  { $ix = ($ix + 1) % $types.elems; }
+                                }
+                            }
+                        } else {
+                            self.field.new-subrecord;
+                        }
                         self.draw-current-subrecord;
                     }
                 }
