@@ -673,7 +673,7 @@ sub print-at($row, $col, $s, Bool :$fill, Bool :$clear, :$raw) is export {
             my $out = visible_trim($s, term_cols() - $col);
 
             if $fill {
-                $out ~= ' ' x (term_cols() - $col - visible_length($out));
+                $out ~= ' ' x (term_cols() - $col - visible_length($out) + 1);
             }
 
             print $out;
