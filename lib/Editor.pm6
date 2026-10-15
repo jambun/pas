@@ -473,6 +473,7 @@ class Editor {
         # prop
         # prop/subprop
         # prop/ix/subprop
+        # prop/ix/subrec/subprop
         my @ref = $error-ref.split('/');
 
         my $field = @!fields.first: *.prop eq @ref[0];
@@ -483,6 +484,8 @@ class Editor {
             $field = $field.subrecords[0].fields.first: *.prop eq @ref[1];
         } elsif @ref.elems == 3 {
             $field = $field.subrecords[@ref[1]].fields.first: *.prop eq @ref[2];
+        } elsif @ref.elems == 4 {
+            $field = $field.subrecords[@ref[1]].fields.first(*.prop eq @ref[2]).subrecords[0].fields.first: *.prop eq @ref[3];
         } else {
             self.message("Yikes - called field-for-error-ref with a bad ref: $error-ref");
         }
