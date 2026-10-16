@@ -148,7 +148,7 @@ sub image-for-url($url, :$size, :$height is copy, :$width is copy) is export {
     if $resp.is-success {
         $height ||= $size || '30%';
         $width ||= $size || '30%';
-        inline_image($resp.content, :$height, :$width);
+        return inline_image($resp.content, :$height, :$width);
     } else {
         return '';
     }
@@ -166,11 +166,11 @@ sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is
             }
         }
         if $image_url {
-            if (my $image = image-for-url($image_url)) {
-                my $rendered_label = $label ?? "\n\n" ~ ansi($label, 'bold') !! '';
-                $height ||= $size || '30%';
-                $width ||= $size || '30%';
-                inline_image($image, :$height, :$width) ~ $rendered_label;
+            my $rendered_label = $label ?? "\n\n" ~ ansi($label, 'bold') !! '';
+            $height ||= $size || '30%';
+            $width ||= $size || '30%';
+            if (my $image = image-for-url($image_url, :$height, :$width)) {
+                print $image;
             } else {
                 "Failed to retrieve image: $image_url";
             }
