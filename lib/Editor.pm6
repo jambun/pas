@@ -561,7 +561,7 @@ class Editor {
     }
 
     method with-cursor-lock(&block) {
-        ENTER $!message-timer-cancel.keep(True);
+        ENTER $!message-timer-cancel.keep;
         LEAVE {
             $!message-timer-cancel = Promise.new;
             self.set-message-cancel-timer;
@@ -578,7 +578,7 @@ class Editor {
     }
 
     method message($s, :$sticky) {
-        $!message-timer-cancel.keep(True);
+        $!message-timer-cancel.keep;
         $!message-timer-cancel = Promise.new;
 
         print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :fill);
