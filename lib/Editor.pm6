@@ -339,8 +339,10 @@ class FormField {
         }
 
         my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
+        my $prop = self.open-for-update ?? ansi($!prop, 'bold') !! $!prop;
+        my $width = self.open-for-update  ?? self.prop-width + 8 !! self.prop-width;
 
-        sprintf("%{self.prop-width}s{'  ' x $!depth} $cursor %s", $!prop, $val);
+        sprintf("%{$width}s{'  ' x $!depth} $cursor %s", $prop, $val);
     }
 }
 
