@@ -85,7 +85,6 @@ class FormField {
     }
 
     method load-subrecords {
-        # FIXME: also things like: "type": "JSONModel(:language_and_script) object"
         unless $!schema<type> eq 'array' | 'object' || is-subrecord($!schema<type>) {
             return;
         }
@@ -244,16 +243,6 @@ class FormField {
         @!original-subrecord-map = ^$!value.elems;
     }
 
-    # not used - delete?
-    method next-value {
-        if $!value-ix.defined {
-            $!value-ix = ($!value-ix + 1) % $!value.elems;
-            if $!value-ix == 0 { $!value-ix = Nil; }
-        } else {
-            $!value-ix = 0;
-        }
-    }
-
     method delete-subrecord($ix) {
         $!value.splice($ix, 1);
         @!original-subrecord-map.splice($ix, 1);
@@ -362,7 +351,6 @@ class Editor {
 
     has $.number-of-display-lines = term_lines() - 6;
     has $.first-display-line = 3;
-    has @.skip_props = <uri created_by last_modified_by jsonmodel_type user_mtime system_mtime create_time lock_version>;
 
     my @default-help =
         'Q' => 'Quit',
@@ -447,7 +435,7 @@ class Editor {
         for |$!schema<property_list> -> $prop {
             my $schema_prop = $!schema<properties>{$prop};
             next if $schema_prop<readonly>;
-            next if @!skip_props.grep($prop);
+            next if EDIT_SKIP_PROPS.grep($prop);
 
             @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(%!json{$prop})));
         }
@@ -460,24 +448,9 @@ class Editor {
         $!cursor-offset = FormField.prop-width + 3;
     }
 
-    method load-subrecord-fields {
-        unless self.field.schema<type> eq 'array' | 'object' {
-            self.message(self.field.prop ~ ' does not contain subrecords');
-            return;
-        }
-
-        self.draw-next-subrecord;
-        self.draw-help(@subrecord-help, :add);
-    }
-
     method field-for-error-ref($error-ref) {
         return unless $error-ref;
-        # valid refs:
-        # prop
-        # prop/subprop
-        # prop/ix/subprop
-        # prop/ix/subrec/subprop
-        # prop/ix/subrec/ix/subprop
+
         my @ref = $error-ref.split('/');
 
         my $field = @!fields.first: *.prop eq @ref[0];
