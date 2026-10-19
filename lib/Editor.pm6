@@ -950,7 +950,7 @@ class Editor {
 
                                 self.with-cursor-lock: {
                                     self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
-                                                               $!cursor-offset + $coo));
+                                                               $!cursor-offset + $coo, :value(self.field.value)));
                                 }
 
                                 self.draw-field;
