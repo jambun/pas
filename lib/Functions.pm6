@@ -10,6 +10,8 @@ use Digest::MD5;
 use Crypt::Random;
 use Terminal::ANSIColor;
 use Base64::Native;
+use Terminal::LineEditor;
+use Terminal::LineEditor::RawTerminalInput;
 
 my constant   LAST_DIR           = 'last';
 my constant   TMP_FILE           = 'last.json';
@@ -32,6 +34,12 @@ our constant LEFT_ARROW  =  "\x[1b][D";
 our constant BEL         =  "\x[07]";
 our constant DELETE      =  "\x[7F]";
 
+our constant JSONMODEL_URI_REF           = /^ 'JSONModel(:' (\w+) ') uri' $/;
+
+# I think this 'uri_or_object' business is bogus - treating as 'object'
+#our constant JSONMODEL_OBJECT_REF        = /^ 'JSONModel(:' (\w+) ') object' $/;
+#our constant JSONMODEL_URI_OR_OBJECT_REF = /^ 'JSONModel(:' (\w+) ') uri_or_object' $/;
+our constant JSONMODEL_OBJECT_REF = /^ 'JSONModel(:' (\w+) ')' \s+ ('object' | 'uri_or_object') $/;
 
 my $SCHEMAS;
 my $SCHEMAS_PARSED;
@@ -180,6 +188,23 @@ sub image_for_json($json, :$size, :$height is copy, :$width is copy, :$label) is
     } else {
         "Sorry, only supported on iTerm2.";
     }
+}
+
+sub jsonmodel-type-for-uri($uri is copy) is export {
+    $uri ~~ s/\/repositories\/(\d+)/\/repositories\/:repo_id/;
+    my $repo_id = $0.Str if $0;
+    $uri ~~ s:g/\d+/:id/;
+    my $endpoint = from-json client.get(ENDPOINTS_URI, ['uri=' ~ $uri, 'method=post']);
+
+    return if @($endpoint).elems == 0;
+
+    my $jsonmodel;
+    for |$endpoint.first<params> {
+        $jsonmodel = $_[1];
+        last if $jsonmodel ~~ s/'JSONModel(:' (\w+) ')'/$0/;
+    }
+
+    $jsonmodel;
 }
 
 sub modify_json($json, @pairs) is export {
@@ -437,22 +462,44 @@ sub check_endpoint($ep, $msg) is export {
 
 sub is-subrecord($type-def --> Bool) is export {
     if $type-def ~~ Associative {
-        ($type-def<type> ~~ Str && $type-def<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+        ($type-def<type> ~~ Str && $type-def<type> ~~ JSONMODEL_OBJECT_REF).so;
     } elsif $type-def ~~ Positional {
-        so all $type-def.map({ $_<type> ~~ Str && $_<type> ~~ /^ 'JSONModel(:' \w+ ') object' $/ });
+        so all $type-def.map({ $_<type> ~~ Str && $_<type> ~~ JSONMODEL_OBJECT_REF });
     } else {
-        ($type-def ~~ Str && $type-def ~~ /^ 'JSONModel(:' \w+ ') object' $/).so;
+        ($type-def ~~ Str && $type-def ~~ JSONMODEL_OBJECT_REF).so;
     }
 }
 
 sub subrecord-type($type-def) is export {
     if $type-def ~~ Associative {
-        $type-def<type> ~~ Str && $type-def<type> ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+        $type-def<type> ~~ Str && $type-def<type> ~~ JSONMODEL_OBJECT_REF;
         $0.Str;
     } elsif $type-def ~~ Positional {
-        $type-def.map({ $_<type> ~~ Str && $_<type> ~~ /^ 'JSONModel(:' (\w+) ') object' $/; $0.Str });
+        $type-def.map({ $_<type> ~~ Str && $_<type> ~~ JSONMODEL_OBJECT_REF; $0.Str });
     } else {
-        $type-def ~~ Str && $type-def ~~ /^ 'JSONModel(:' (\w+) ') object' $/;
+        $type-def ~~ Str && $type-def ~~ JSONMODEL_OBJECT_REF;
+        $0.Str;
+    }
+}
+
+sub is-record-ref($type-def --> Bool) is export {
+    if $type-def ~~ Associative {
+        ($type-def<type> ~~ Str && $type-def<type> ~~ JSONMODEL_URI_REF).so;
+    } elsif $type-def ~~ Positional {
+        so all $type-def.map({ $_<type> ~~ Str && $_<type> ~~ JSONMODEL_URI_REF });
+    } else {
+        ($type-def ~~ Str && $type-def ~~ JSONMODEL_URI_REF).so;
+    }
+}
+
+sub ref-record-type($type-def) is export {
+    if $type-def ~~ Associative {
+        $type-def<type> ~~ Str && $type-def<type> ~~ JSONMODEL_URI_REF;
+        $0.Str;
+    } elsif $type-def ~~ Positional {
+        $type-def.map({ $_<type> ~~ Str && $_<type> ~~ JSONMODEL_URI_REF; $0.Str });
+    } else {
+        $type-def ~~ Str && $type-def ~~ JSONMODEL_URI_REF;
         $0.Str;
     }
 }
@@ -696,4 +743,29 @@ sub get-key-in is export {
     }
 
     $k;
+}
+
+sub line-editor($line, $col, &block?, :$value) is export {
+    ENTER {
+        cursor($col, $line);
+        run <tput cvvis>;
+    }
+    LEAVE run <tput civis>;
+
+    my $cli = Terminal::LineEditor::CLIInput.new;
+
+    # these don't work :( i see the value appear but gets blatted immediately
+    # $cli.replace-input-field(:50display-width, :0field-start, :content($field.value));
+    # $cli.do-edit('insert-string', $field.value);
+
+    # so use history instead - sigh
+    if $value {
+        $cli.add-history($value);
+    }
+
+    if &block {
+        &block();
+    } else {
+        $cli.prompt;
+    }
 }

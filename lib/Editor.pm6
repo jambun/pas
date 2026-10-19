@@ -1,7 +1,5 @@
 use Functions;
 
-use Terminal::LineEditor;
-use Terminal::LineEditor::RawTerminalInput;
 use JSON::Tiny;
 
 class Subrecord {...}
@@ -407,6 +405,29 @@ class Editor {
         True;
     }
 
+    method create-record($jsonmodel-type) {
+        my $schema = schemas(:name($jsonmodel-type));
+        self.message($schema);
+
+        my %rec = jsonmodel_type => $jsonmodel-type, uri => $schema<uri>;
+
+        for $schema<properties>.kv -> $prop, %def {
+            next if %def<readonly>;
+            next if EDIT_SKIP_PROPS.grep($prop);
+
+            given %def<type> {
+                when <string>  { %rec{$prop} = %def<default> // ''; }
+                when <array>   { %rec{$prop} = []; }
+                when <boolean> { %rec{$prop} = %def<default>; }
+                when <integer> { %rec{$prop} = %def<default>; }
+#                when <object>  { %rec{$prop} = %def<default>; }
+            }
+        }
+
+        self.init(%rec);
+        self.draw-page;
+    }
+
     method load-record($uri) {
         my $resp = from-json client.get($uri);
         if $resp<error> {
@@ -457,6 +478,8 @@ class Editor {
         @ref.shift;
 
         for @ref -> $ref {
+            last unless $field;
+
             if $ref ~~ /^ \d $/ {
                 $field = $field.subrecords[$ref];
             } else {
@@ -610,12 +633,20 @@ class Editor {
             $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
         }
 
-        my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
+        my %c = col => $!cursor-offset + self.field.depth * 2 + 2, line => self.field-display-line;
 
         print-at(%c<line>, %c<col>, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
 
         while (my $ak = get-key-in) {
             given $ak {
+                when '`' {
+                    self.with-cursor-lock: {
+                        self.set-value(line-editor(%c<line>, %c<col> - 1));
+                        self.field.label = '';
+                    }
+                    self.message("Link entered manually");
+                    last;
+                }
                 when "\t" {
                     self.message("Exited linker");
                     last;
@@ -736,7 +767,7 @@ class Editor {
     }
 
     method draw-header {
-        my $label = (%!json<uri>, label-for-json(%!json)).grep(*.so).join(' | ');
+        my $label = (%!json<uri>, %!json<uri> ~~ / \d $/ ?? Nil !! 'NEW', label-for-json(%!json)).grep(*.so).join(' | ');
         $label = ('.' x @!record-stack) ~ ' ' ~ $label;
         print-at(1, 2, ansi($label, 'bold'), :clear);
     }
@@ -818,6 +849,11 @@ class Editor {
                     } else {
                         if (my $open-subrecord-ix = self.ix-of-first-field-with-open-subrecord).defined {
                             $!selected-field-ix = $open-subrecord-ix;
+                        }
+
+                        # if it was a create then let's grab the new uri
+                        if %resp<status> eq 'Created' {
+                            %!json<uri> = %resp<uri>;
                         }
 
                         # reload json after the update
@@ -911,22 +947,12 @@ class Editor {
                                 run <tput civis>;
                             } else {
                                 my $coo = self.field.depth * 2 + 1;
-                                cursor($!cursor-offset + $coo, $!first-display-line + $!selected-field-ix - $!top-field-ix);
-                                run <tput cvvis>;
-                                my $cli = Terminal::LineEditor::CLIInput.new;
-
-                                # these don't work :( i see the value appear but gets blatted immediately
-                                # $cli.replace-input-field(:50display-width, :0field-start, :content($field.value));
-                                # $cli.do-edit('insert-string', $field.value);
-
-                                # so use history instead - sigh
-                                $cli.add-history(self.field.value);
 
                                 self.with-cursor-lock: {
-                                    self.set-value($cli.prompt);
+                                    self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
+                                                               $!cursor-offset + $coo));
                                 }
 
-                                run <tput civis>;
                                 self.draw-field;
                             }
                         } elsif $prop<type> eq 'array' {
@@ -935,7 +961,7 @@ class Editor {
                     } else {
                         self.field.open-for-update = True;
 
-                        if self.field.prop eq <ref> {
+                        if self.field.prop eq <ref> || is-record-ref($prop<type>) {
                             self.draw-ref-search;
                             self.field.open-for-update = False;
                         } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
@@ -1000,7 +1026,14 @@ class Editor {
                     if self.field.prop eq <ref> {
                         self.load-record(self.field.value);
                     } else {
-                        print BEL;
+                        self.message("Can only go to uris in ref fields");
+                    }
+                }
+                when 'n' {
+                    if self.field.prop eq <ref> {
+                        self.create-record(ref-record-type(self.field.schema<type>));
+                    } else {
+                        self.message("Can only go to uris in ref fields");
                     }
                 }
                 when 'b' {
