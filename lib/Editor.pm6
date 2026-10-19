@@ -687,13 +687,13 @@ class Editor {
         }
 
         if (my $field = @!fields[$ix]) {
-            print-at($line, 2, $field.render(:selected($ix == $!selected-field-ix)), :fill);
+            print-at($line, 1, $field.render(:selected($ix == $!selected-field-ix)), :fill);
 
             if $field.parent {
                 self.draw-field(self.ix-for-field($field.parent));
             }
         } else {
-            print-at($line, 2, ' ', :fill);
+            print-at($line, 1, '', :clear);
         }
     }
 
