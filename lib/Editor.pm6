@@ -910,7 +910,7 @@ class Editor {
                                 }
                                 run <tput civis>;
                             } else {
-                                my $coo = self.field.depth * 2 + 2;
+                                my $coo = self.field.depth * 2 + 1;
                                 cursor($!cursor-offset + $coo, $!first-display-line + $!selected-field-ix - $!top-field-ix);
                                 run <tput cvvis>;
                                 my $cli = Terminal::LineEditor::CLIInput.new;
