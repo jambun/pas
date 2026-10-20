@@ -769,7 +769,8 @@ class Editor {
     method draw-header {
         my $label = (%!json<uri>, %!json<uri> ~~ / \d $/ ?? Nil !! 'NEW', label-for-json(%!json)).grep(*.so).join(' | ');
         $label = ('.' x @!record-stack) ~ ' ' ~ $label;
-        print-at(1, 2, ansi($label, 'bold'), :clear);
+        my $last-update = '  ' ~ ansi(%!json<last_modified_by> ~ ' @ ' ~ DateTime.new(%!json<user_mtime>).local, 'cyan');
+        print-at(1, 2, ansi($label, 'bold') ~ $last-update, :clear);
     }
 
     method draw-footer {
