@@ -764,7 +764,7 @@ sub line-editor($line, $col, &block?, :$value) is export {
     }
 
     if &block {
-        &block();
+        &block($cli.prompt);
     } else {
         $cli.prompt;
     }
