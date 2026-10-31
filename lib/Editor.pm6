@@ -898,7 +898,11 @@ class Editor {
                }
                 when "\t" {
                     self.revert-value;
-                    self.draw-field;
+                    if self.field.subrecord-open {
+                        self.draw-remove-subrecord
+                    } else {
+                        self.draw-field;
+                    }
                 }
                 when 'd' {
                     if self.field.has-subrecords {
