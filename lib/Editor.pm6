@@ -15,10 +15,8 @@ class FormField {
     has Bool $.open-for-update is rw = False;
 
     has Subrecord @.subrecords; # a FormField array for each sub-record in this field
+    has Subrecord @.original-subrecords; # a copy of @!subrecords at build time to support revert
     has $.subrecord-ix is rw; # the array index of the currently selected subrecord
-
-    # probably not required in the new regime
-    has @.original-subrecord-map; # keeps track of original subrecord indexes for comparing with original-value
 
     has Int $.value-ix is rw; # the array index of the current value in the list of possible values - enum, bool
     has Str $.label is rw; # added to value when rendered - display string or enum translation
@@ -26,22 +24,34 @@ class FormField {
     submethod TWEAK {
         # storing it as json - annoying but deep structures are passed by ref
         # so get mutated when they change in $!value - tried deepmap, no go
-        $!original-value = to-json $!original-value || $!value;
+        $!original-value = to-json($!original-value || $!value);
 
         self.load-subrecords;
 
-        self.set-original-subrecord-map;
         self.set-label;
     }
 
     my $.prop-width;
+
+    method clone {
+        FormField.new(:$!prop,
+                      :$!parent,
+                      :$!depth,
+                      :$!schema,
+                      :$!label,
+                      :value(self.original-value));
+    }
+
+    method revert-subrecords {
+        @!subrecords = @!original-subrecords.map(*.clone);
+    }
 
     method original-value {
         from-json $!original-value;
     }
 
     method set-value($value) {
-        $!value = $value;
+        $!value = from-json to-json $value;
         self.set-label;
         $!error = Nil;
         if $!parent {
@@ -115,6 +125,8 @@ class FormField {
 
             @!subrecords.push(self.build-subrecord-with(%props, @prop-names, $rec));
         }
+
+        @!original-subrecords = @!subrecords.map(*.clone);
     }
 
     method build-subrecord-with(%props, @prop-names is copy, $rec = {}) {
@@ -209,6 +221,10 @@ class FormField {
         }
     }
 
+    method has-subrecords {
+        so @!subrecords;
+    }
+
     method subrecord-open {
         $!subrecord-ix.defined;
     }
@@ -237,17 +253,20 @@ class FormField {
         @!subrecords[$!subrecord-ix];
     }
 
-    method set-original-subrecord-map {
-        @!original-subrecord-map = ^$!value.elems;
+    method delete-current-subrecord-or-all {
+        if $!subrecord-ix {
+            self.delete-subrecord($!subrecord-ix);
+            'current';
+        } else {
+            @!subrecords = [];
+            $!value = [];
+            'all';
+        }
     }
 
     method delete-subrecord($ix) {
+        @!subrecords.splice($ix, 1);
         $!value.splice($ix, 1);
-        @!original-subrecord-map.splice($ix, 1);
-    }
-
-    method original-value-ix($ix) {
-        @!original-subrecord-map[$ix];
     }
 
     method updated {
@@ -335,6 +354,10 @@ class FormField {
 
 class Subrecord {
     has FormField @.fields;
+
+    method clone {
+        Subrecord.new(:fields(@!fields.map(*.clone)));
+    }
 }
 
 class Editor {
@@ -458,7 +481,7 @@ class Editor {
             next if $schema_prop<readonly>;
             next if EDIT_SKIP_PROPS.grep($prop);
 
-            @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(%!json{$prop})));
+            @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(from-json to-json %!json{$prop})));
         }
 
         self.set-prop-width;
@@ -551,7 +574,10 @@ class Editor {
 
     method revert-value {
         self.set-value(self.field.original-value);
-        self.field.set-original-subrecord-map;
+
+        if self.field.original-subrecords {
+            self.field.revert-subrecords;
+        }
     }
 
     method set-value($value) {
@@ -875,17 +901,13 @@ class Editor {
                     self.draw-field;
                 }
                 when 'd' {
-                    if self.field.value ~~ Iterable {
-                        # if $!subrecord-ix.defined {
-                        #     self.field.delete-subrecord($!subrecord-ix);
-                        #     self.set-value(self.field.value);
-                        #     self.message("Item deleted from {self.field.prop}");
-                        # } else {
-                        #     self.set-value([]);
-                        #     self.message("All {self.field.prop} deleted");
-                        # }
-                        # self.load-subrecord-fields;
-                        self.message('Sorry, not yet reimplemented after the refactor');
+                    if self.field.has-subrecords {
+                        if self.field.delete-current-subrecord-or-all eq 'all' {
+                            self.message("Deleted all {self.field.prop}");
+                        } else {
+                            self.message("Deleted item from {self.field.prop}");
+                            self.draw-next-subrecord;
+                        }
                     } else {
                         self.set-value('');
                     }
