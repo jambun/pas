@@ -648,6 +648,8 @@ class Editor {
     method draw-ref-search {
         my %search;
         my $ix = 0;
+        my $page = 1;
+        my $page-size = 10;
         my $q = '';
         my $type = self.field.schema<type>;
         if $type ~~ Array {
@@ -691,7 +693,16 @@ class Editor {
                 }
                 when ' ' {
                     if %search<results> {
-                        $ix = ($ix + 1) % +%search<results>;
+                        $ix++;
+                        if absolute-ix() >= %search<total_hits> {
+                            $ix = 0;
+                            $page = 1;
+                            %search = self.search-type($type, $q, :$page, :$page-size);
+                        } elsif $ix >= $page-size {
+                            $ix = 0;
+                            $page++;
+                            %search = self.search-type($type, $q, :$page, :$page-size);
+                        }
                         message-for-search(%search);
                     } else {
                         self.message('No hits');
@@ -699,13 +710,14 @@ class Editor {
                 }
                 when /^ \w $/ | DELETE {
                     $ix = 0;
+                    $page = 1;
                     if $ak ~~ /^ \w $/ {
                         $q ~= $ak;
                     } elsif $ak eq DELETE {
                         $q.=substr(0, *-1) if $q;
                     }
                     if $q {
-                        %search = self.search-type($type, $q);
+                        %search = self.search-type($type, $q, :$page, :$page-size);
                         message-for-search(%search);
                         print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
                     } else {
@@ -715,9 +727,13 @@ class Editor {
             }
         }
 
+        sub absolute-ix {
+            ($page - 1) * $page-size + $ix;
+        }
+
         sub message-for-search(%search) {
             if %search<results> {
-                my $msg = "{$ix + 1} of {%search<total_hits>}: {%search<results>[$ix]<uri>}";
+                my $msg = "{absolute-ix() + 1} of {%search<total_hits>}: {%search<results>[$ix]<uri>}";
                 if %search<results>[$ix]<title> {
                     $msg ~= ' | ' ~ %search<results>[$ix]<title>;
                 }
@@ -1132,8 +1148,8 @@ class Editor {
         "Closed form for {%!json<uri>}";
     }
 
-    method search-type($type, $q) {
-        my @args = 'page=1', "q=$q";
+    method search-type($type, $q, :$page = 1, :$page-size = 10) {
+        my @args = "page=$page", "q=$q", "page_size=$page-size";
 
         for |$type -> $t {
             @args.push("type[]=$t");
