@@ -3,6 +3,8 @@ use Functions;
 use JSON::Tiny;
 
 class Subrecord {...}
+class CommandMode {...}
+class CommandKey {...}
 
 class FormField {
     has $.prop;
@@ -646,11 +648,6 @@ class Editor {
     }
 
     method draw-ref-search {
-        my %search;
-        my $ix = 0;
-        my $page = 1;
-        my $page-size = 10;
-        my $q = '';
         my $type = self.field.schema<type>;
         if $type ~~ Array {
             for |$type -> $t {
@@ -661,71 +658,19 @@ class Editor {
             $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
         }
 
-        my %c = col => $!cursor-offset + self.field.depth * 2 + 2, line => self.field-display-line;
+        self.linker-mode($type,
+                         self.field-display-line,
+                         $!cursor-offset + self.field.depth * 2 + 2).run;
+    }
 
-        print-at(%c<line>, %c<col>, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
+    method linker-mode($type, $line, $col) {
+        my %search;
+        my $ix = 0;
+        my $page = 1;
+        my $page-size = 10;
+        my $q = '';
 
-        while (my $ak = get-key-in) {
-            given $ak {
-                when '`' {
-                    self.with-cursor-lock: {
-                        self.set-value(line-editor(%c<line>, %c<col> - 1));
-                        self.field.label = '';
-                    }
-                    self.message("Link entered manually");
-                    last;
-                }
-                when "\t" {
-                    self.message("Exited linker");
-                    last;
-                }
-                when /\n/ {
-                    if %search<results> {
-                        self.set-value(%search<results>[$ix]<uri>);
-                        self.field.label = %search<results>[$ix]<title>;
-
-                        self.draw-field;
-                        self.message('Linked ' ~ self.field.value);
-                        last;
-                    } else {
-                        self.message('No result to link');
-                    }
-                }
-                when ' ' {
-                    if %search<results> {
-                        $ix++;
-                        if absolute-ix() >= %search<total_hits> {
-                            $ix = 0;
-                            $page = 1;
-                            %search = self.search-type($type, $q, :$page, :$page-size);
-                        } elsif $ix >= $page-size {
-                            $ix = 0;
-                            $page++;
-                            %search = self.search-type($type, $q, :$page, :$page-size);
-                        }
-                        message-for-search(%search);
-                    } else {
-                        self.message('No hits');
-                    }
-                }
-                when /^ \w $/ | DELETE {
-                    $ix = 0;
-                    $page = 1;
-                    if $ak ~~ /^ \w $/ {
-                        $q ~= $ak;
-                    } elsif $ak eq DELETE {
-                        $q.=substr(0, *-1) if $q;
-                    }
-                    if $q {
-                        %search = self.search-type($type, $q, :$page, :$page-size);
-                        message-for-search(%search);
-                        print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
-                    } else {
-                        print-at(%c<line>, %c<col> + 8, ansi($q ~ '_', 'bold'), :fill);
-                    }
-                }
-            }
-        }
+        print-at($line, $col, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
 
         sub absolute-ix {
             ($page - 1) * $page-size + $ix;
@@ -742,6 +687,77 @@ class Editor {
                 self.message('No hits', :sticky);
             }
         }
+
+        my $mode = CommandMode.new(:name('Ref linker'), :editor(self));
+
+        $mode.add-command(/^ (\w | $(DELETE)) $/, 'Type', 'to search',
+                          -> $k {
+                              $ix = 0;
+                              $page = 1;
+                              if $k ~~ /^ \w $/ {
+                                  $q ~= $k;
+                              } elsif $k eq DELETE {
+                                  $q.=substr(0, *-1) if $q;
+                              }
+                              if $q {
+                                  %search = self.search-type($type, $q, :$page, :$page-size);
+                                  message-for-search(%search);
+                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
+                              } else {
+                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold'), :fill);
+                              }
+                          });
+
+        $mode.add-command("\t", 'TAB', 'Exit',
+                          -> $k {
+                                 self.message("Exited linker");
+                                 last;
+                             });
+
+        $mode.add-command(' ', 'SPACE', 'Next result',
+                          -> $k {
+                                 if %search<results> {
+                                     $ix++;
+                                     if absolute-ix() >= %search<total_hits> {
+                                         $ix = 0;
+                                         $page = 1;
+                                         %search = self.search-type($type, $q, :$page, :$page-size);
+                                     } elsif $ix >= $page-size {
+                                         $ix = 0;
+                                         $page++;
+                                         %search = self.search-type($type, $q, :$page, :$page-size);
+                                     }
+                                     message-for-search(%search);
+                                 } else {
+                                     self.message('No hits');
+                                 }
+                             });
+
+        $mode.add-command(/\n/, 'ENTER', 'Link current result',
+                          -> $k {
+                                 if %search<results> {
+                                     self.set-value(%search<results>[$ix]<uri>);
+                                     self.field.label = %search<results>[$ix]<title>;
+
+                                     self.draw-field;
+                                     self.message('Linked ' ~ self.field.value);
+                                     last;
+                                 } else {
+                                     self.message('No result to link');
+                                 }
+                             });
+
+        $mode.add-command('`', 'BACKTICK', 'Enter link manually',
+                          -> $k {
+                                 self.with-cursor-lock: {
+                                     self.set-value(line-editor($line, $col - 1));
+                                     self.field.label = '';
+                                 }
+                                 self.message("Link entered manually");
+                                 last;
+                             });
+
+        $mode;
     }
 
     method field-display-line($ix = $!selected-field-ix) {
@@ -1163,4 +1179,49 @@ class Editor {
 
         %resp;
     }
+}
+
+class CommandMode {
+    has $.name;
+    has CommandKey @.command-keys;
+    has $.editor;
+
+
+    # $mode.add-command(' ', 'SPACE', 'Next thing', -> $k { self.message("Spacebar"); });
+    multi method add-command($key-match, $label, $description, &block) {
+        @!command-keys.push(CommandKey.new(:$key-match, :$label, :$description, :&block));
+    }
+
+    # $mode.add-command('6', '6ish', -> $k { self.message("is it a six? $k"); });
+    multi method add-command($key-match, $description, &block) {
+        @!command-keys.push(CommandKey.new(:$key-match, :$description, :&block));
+    }
+
+    # $mode.add-command(CommandKey.new(:key-match('4'), :label('Four'), :description('Four was typed'), :block(-> $k { self.message('4444444') })));
+    multi method add-command(CommandKey $cmd) {
+        @!command-keys.push($cmd);
+    }
+
+    method run {
+        $!editor.message("$!name");
+        self.help();
+
+        loop {
+            my $k = get-key-in;
+            if (my $cmd = @!command-keys.first(-> $ck {$k ~~ $ck.key-match})) {
+                $cmd.block.($k);
+            }
+        }
+    }
+
+    method help {
+        $!editor.draw-help(@!command-keys.map({ (.label // .key-match) => .description}));
+    }
+}
+
+class CommandKey {
+    has $.key-match;
+    has $.label;
+    has $.description;
+    has &.block;
 }
