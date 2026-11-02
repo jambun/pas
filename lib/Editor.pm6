@@ -371,35 +371,10 @@ class Editor {
     has $.top-field-ix = 0;
     has Promise $.message-timer-cancel = Promise.new;
     has @.record-stack; # previously loaded records stacked so they can be returned to
+    has @.mode-stack; # command modes stacked
 
     has $.number-of-display-lines = term_lines() - 6;
     has $.first-display-line = 3;
-
-    my @default-help =
-        'Q' => 'Quit',
-        'S' => 'Save',
-        "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]" => 'Cursor',
-        "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]" => 'Scroll',
-        '1 2 +' => 'Page',
-        'M' => 'Model',
-        'J' => 'JSON',
-        'V' => 'Value',
-        'SPACE' => 'Edit',
-        'TAB' => 'Revert',
-        'D' => 'Delete';
-
-    my @array-help =
-        'A' => 'Add';
-
-    my @add-value-help =
-        'Query' => 'Type search query',
-        'SPACE' => 'Next result',
-        'RETURN' => 'Add selected result',
-        'TAB' => 'Exit';
-
-    my @subrecord-help =
-         'A' => 'Add subrecord',
-         'C' => 'Close subrecords';
 
     submethod TWEAK {
         self.init;
@@ -547,7 +522,6 @@ class Editor {
         self.remove-subrecord-fields;
 
         self.draw-form;
-        self.draw-help;
     }
 
     method draw-next-subrecord {
@@ -638,7 +612,6 @@ class Editor {
             $!selected-field-ix = $new-ix;
             self.draw-field($old-ix);
             self.draw-field;
-            self.draw-help;
         }
     }
 
@@ -658,9 +631,9 @@ class Editor {
             $type ~~ s/^ 'JSONModel(:' (\w+) ') uri' $/$0/;
         }
 
-        self.linker-mode($type,
-                         self.field-display-line,
-                         $!cursor-offset + self.field.depth * 2 + 2).run;
+        self.push-mode(self.linker-mode($type,
+                                        self.field-display-line,
+                                        $!cursor-offset + self.field.depth * 2 + 2));
     }
 
     method linker-mode($type, $line, $col) {
@@ -820,7 +793,6 @@ class Editor {
     method draw-page {
         clear-screen();
         self.draw-header;
-        self.draw-footer;
         self.draw-form;
     }
 
@@ -831,26 +803,17 @@ class Editor {
         print-at(1, 2, ansi($label, 'bold') ~ $last-update, :clear);
     }
 
-    method draw-footer {
-        self.draw-help;
-    }
-
-    method draw-help(@items? is copy, :$add) {
-        if $add && @items {
-            @items = |@default-help, |@items;
-        } else {
-            @items ||= @default-help;
-        }
+    method draw-help($name, @items is copy) {
         my $help-txt;
         for @items -> $i {
             $help-txt ~= ' | ' if $help-txt;
-            if $i.key eq $i.value.substr(0,1) {
-                $help-txt ~= ansi($i.key, 'bold green') ~ $i.value.substr(1);
+            if $i.key.fc eq $i.value.substr(0,1).fc {
+                $help-txt ~= ansi($i.key.uc, 'bold green') ~ $i.value.substr(1);
             } else {
                 $help-txt ~= ansi($i.key, 'bold green') ~ ' ' ~ $i.value;
             }
         }
-        print-at(term_lines(), 3, $help-txt, :fill);
+        print-at(term_lines(), 2, ansi("$name: ", 'bold') ~ ' ' ~ $help-txt, :clear);
     }
 
     method edit-screen(:$embedded) {
@@ -864,304 +827,375 @@ class Editor {
 
         self.draw-page;
 
-        my $k = '';
+        self.push-mode(self.main-mode);
 
-        while $k ne 'q' {
-
-	          $k = get-key-in;
-
-	          given $k {
-                when 's' {
-                    for @!fields.grep(*.updated && !*.parent) -> $field {
-                        %!json{$field.prop} = $field.value;
-                    }
-
-                    my %resp = from-json client.post(%!json<uri>, Empty, to-json %!json);
-
-                    if %resp<error> {
-                        my @err-msg;
-                        for @!fields -> $f { $f.error = Nil }
-                        for %resp<error>.kv -> $k, $v {
-                            @err-msg.push($k ~ ' :: ' ~ $v.join(','));
-
-                            for @!fields.grep(*.updated) -> $field {
-                                %!json{$field.prop} = $field.original-value;
-                            }
-
-                            if $k eq <identifier> && self.field-for-error-ref(<id_0>) {
-                                for <id_0 id_1 id_2> -> $id {
-                                    my $field = self.field-for-error-ref($id);
-                                    if $field.value {
-                                    } else {
-                                        $field.error = $v.join(', ');
-                                    }
-                                }
-                            } else {
-                                if (my $err-field = self.field-for-error-ref($k)) {
-                                    $err-field.error = $v.join(', ');
-                                }
-                            }
-                        }
-
-                        self.draw-form;
-                        self.message('Error - record not saved: ' ~ @err-msg.join(' | '));
-                    } else {
-                        if (my $open-subrecord-ix = self.ix-of-first-field-with-open-subrecord).defined {
-                            $!selected-field-ix = $open-subrecord-ix;
-                        }
-
-                        # if it was a create then let's grab the new uri
-                        if %resp<status> eq 'Created' {
-                            %!json<uri> = %resp<uri>;
-                        }
-
-                        # reload json after the update
-                        %resp = from-json client.get(%!json<uri>);
-
-                        if %resp<error> {
-                            self.message('Error reloading after successful save: ' ~ %resp<error>.raku);
-                        } else {
-                            %!json = %resp;
-                            self.load-fields;
-                            self.draw-page;
-                            self.message('Saved');
-                        }
-                    }
-               }
-                when "\t" {
-                    self.revert-value;
-                    if self.field.subrecord-open {
-                        self.draw-remove-subrecord
-                    } else {
-                        self.draw-field;
-                    }
-                }
-                when 'd' {
-                    if self.field.has-subrecords {
-                        if self.field.delete-current-subrecord-or-all eq 'all' {
-                            self.message("Deleted all {self.field.prop}");
-                        } else {
-                            self.message("Deleted item from {self.field.prop}");
-                            self.draw-next-subrecord;
-                        }
-                    } else {
-                        self.set-value('');
-                    }
-                    self.draw-field;
-                }
-                when 'a' {
-                    if self.field.value ~~ Iterable {
-                        my $types = jsonmodel-object-types-for-schema(self.field.schema);
-                        if $types && $types ~~ Iterable {
-                            # the subrecord can have more than one type - get the user to choose one
-                            my $ix = 0;
-                            my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
-                            while True {
-                                print-at(%c<line>, %c<col>, ansi('Select a subrecord type: ', 'green') ~ ansi($types[$ix], 'bold'), :fill);
-                                my $ak = get-key-in;
-                                given $ak {
-                                    when "\t" { last; }
-                                    when /\n/ { self.field.new-subrecord($types[$ix]); last; }
-                                    when ' '  { $ix = ($ix + 1) % $types.elems; }
-                                }
-                            }
-                        } else {
-                            self.field.new-subrecord;
-                        }
-                        self.draw-current-subrecord;
-                    }
-                }
-                when ' ' {
-                    my $prop = self.field.schema;
-
-                    if self.field.open-for-update {
-                        if $prop<type> eq 'boolean' {
-                            self.set-value(!self.field.value);
-                            self.draw-field;
-                        } elsif $prop<enum> {
-                            my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
-                            $next-ix %= $prop<enum>.elems;
-                            self.set-value($prop<enum>[$next-ix]);
-                            self.draw-field;
-                        } elsif $prop<dynamic_enum> {
-                            my $enum = enum-by-name($prop<dynamic_enum>);
-                            my @values = |$enum<values>;
-                            my $current-value-ix = @values.first(self.field.value, :k);
-                            my $next-ix = $current-value-ix.defined ?? $current-value-ix + 1 !! 0;
-                            $next-ix %= @values.elems;
-                            self.set-value(@values[$next-ix]);
-                            self.field.set-label;
-                            self.draw-field;
-                        } elsif $prop<type> eq 'string' | 'integer' | 'date' {
-                            my $val = self.field.value // '';
-                            if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
-                                save_tmp(self.field.value, :file-name('edit.txt'));
-                                if edit(tmp_file('edit.txt')) {
-                                    self.set-value(slurp(tmp_file('edit.txt')).chomp);
-                                    self.message('Edits applied');
-                                    self.draw-field;
-                                } else {
-                                    self.message('No edits');
-                                }
-                                run <tput civis>;
-                            } else {
-                                my $coo = self.field.depth * 2 + 1;
-
-                                self.with-cursor-lock: {
-                                    self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
-                                                               $!cursor-offset + $coo, :value(self.field.value)));
-                                }
-
-                                self.draw-field;
-                            }
-                        } elsif $prop<type> eq 'array' {
-                            self.draw-next-subrecord;
-                        }
-                    } else {
-                        self.field.open-for-update = True;
-
-                        if self.field.prop eq <ref> || is-record-ref($prop<type>) {
-                            self.draw-ref-search;
-                            self.field.open-for-update = False;
-                        } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
-                            if !self.field.label {
-                                if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
-                                    my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
-                                    if $resp<error> {
-                                        self.message($resp<error>);
-                                    } else {
-                                        my %ref-map;
-
-                                        sub walk($node) {
-                                            if $node ~~ Associative {
-                                                if $node<ref> && $node<_resolved> {
-                                                    %ref-map{$node<ref>} = $node<_resolved>;
-                                                } else {
-                                                    walk($_) for $node.values;
-                                                }
-                                            } elsif $node ~~ Positional {
-                                                walk($_) for @$node;
-                                            }
-                                        }
-
-                                        walk($resp);
-
-                                        for @!fields { .set-labels-for(%ref-map); }
-                                    }
-                                }
-                            }
-                            self.draw-next-subrecord;
-                            self.draw-help(@array-help, :add);
-                        }
-
-                        self.draw-field;
-                    }
-                }
-                when 'c' {
-                    self.draw-remove-subrecord;
-                }
-                when 'm' {
-                    page(pretty to-json self.field.schema);
-                }
-                when 'M' {
-                    page(pretty to-json self.schema);
-                }
-                when 'v' {
-                    page(pretty to-json self.field.value);
-                }
-                when 'V' {
-                    page(pretty to-json self.field.original-value);
-                }
-                when 'j' {
-                    page(pretty to-json %!json{self.field.prop});
-                }
-                when 'J' {
-                    page(pretty to-json %!json);
-                }
-                when 'u' {
-                    page(pretty to-json self.field.subrecords.raku);
-                }
-                when 'g' {
-                    if self.field.prop eq <ref> {
-                        self.load-record(self.field.value);
-                    } else {
-                        self.message("Can only go to uris in ref fields");
-                    }
-                }
-                when 'n' {
-                    if self.field.prop eq <ref> {
-                        self.create-record(ref-record-type(self.field.schema<type>));
-                    } else {
-                        self.message("Can only go to uris in ref fields");
-                    }
-                }
-                when 'b' {
-                    self.load-previous-record;
-                }
-                when 'i' {
-                    if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
-                        if inline_image_supported() {
-                            self.message("Showing: {self.field.value} <ANY KEY> to dismiss", :sticky);
-                            my $width = term_cols() - $!cursor-offset - 40;
-                            my $height = term_lines() - 10;
-                            if (my $img = image-for-url(self.field.value, :$width, :$height)) {
-                                print-at(5, $!cursor-offset + 20, $img, :raw);
-                                get-key-in;
-                                self.message('');
-                                self.draw-form;
-                            } else {
-                                self.message("Sorry, that image didn't dowmload");
-                            }
-                        } else {
-                            self.message('Sorry, image viewing only available with iTerm2');
-                        }
-                    } else {
-                        self.message('The current field is not an image link');
-                    }
-                }
-                when /\d/ {
-                    my $ix = $!number-of-display-lines * ($k - 1);
-                    if $ix > +@!fields || self.field-with-open-subrecord {
-                        print BEL;
-                    } else {
-                        $!top-field-ix = $ix;
-                        $!selected-field-ix = $ix;
-                        self.draw-form;
-                    }
-                }
-		            when UP_ARROW {
-                    self.move-cursor(-1);
-
-                }
-		            when DOWN_ARROW {
-                    self.move-cursor(1);
-
-		            }
-		            when RIGHT_ARROW {
-                    if $!top-field-ix + 1 >= self.max-top-field-ix {
-                        print BEL;
-                    } elsif $!top-field-ix + 1 > $!selected-field-ix {
-                        print BEL;
-                    } else {
-                        self.scroll-form(1);
-                    }
-		            }
-		            when LEFT_ARROW {
-                    if $!top-field-ix < 1 {
-                        print BEL;
-                    } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
-                        print BEL;
-                    } else {
-                        self.scroll-form(-1);
-                    }
-		            }
-	          }
-
-        }
-
-        print-at(term_lines(), 1, ' ', :fill);
+        print-at(term_lines(), 1, '', :clear);
 
         "Closed form for {%!json<uri>}";
+    }
+
+    method current-mode {
+        @!mode-stack.tail;
+    }
+
+    method push-mode(CommandMode $mode) {
+        @!mode-stack.push($mode);
+        $mode.run;
+        @!mode-stack.pop;
+        if self.current-mode {
+            self.current-mode.help;
+        }
+    }
+
+    method main-mode {
+        my $mode = CommandMode.new(:name('Main'), :editor(self));
+
+        $mode.add-command('q', 'Quit', -> $k { last; });
+
+        $mode.add-command('s', 'Save',
+                          -> $k {
+                                 for @!fields.grep(*.updated && !*.parent) -> $field {
+                                     %!json{$field.prop} = $field.value;
+                                 }
+
+                                 my %resp = from-json client.post(%!json<uri>, Empty, to-json %!json);
+
+                                 if %resp<error> {
+                                     my @err-msg;
+                                     for @!fields -> $f { $f.error = Nil }
+                                     for %resp<error>.kv -> $k, $v {
+                                         @err-msg.push($k ~ ' :: ' ~ $v.join(','));
+
+                                         for @!fields.grep(*.updated) -> $field {
+                                             %!json{$field.prop} = $field.original-value;
+                                         }
+
+                                         if $k eq <identifier> && self.field-for-error-ref(<id_0>) {
+                                             for <id_0 id_1 id_2> -> $id {
+                                                 my $field = self.field-for-error-ref($id);
+                                                 if $field.value {
+                                                 } else {
+                                                     $field.error = $v.join(', ');
+                                                 }
+                                             }
+                                         } else {
+                                             if (my $err-field = self.field-for-error-ref($k)) {
+                                                 $err-field.error = $v.join(', ');
+                                             }
+                                         }
+                                     }
+
+                                     self.draw-form;
+                                     self.message('Error - record not saved: ' ~ @err-msg.join(' | '));
+                                 } else {
+                                     if (my $open-subrecord-ix = self.ix-of-first-field-with-open-subrecord).defined {
+                                         $!selected-field-ix = $open-subrecord-ix;
+                                     }
+
+                                     # if it was a create then let's grab the new uri
+                                     if %resp<status> eq 'Created' {
+                                         %!json<uri> = %resp<uri>;
+                                     }
+
+                                     # reload json after the update
+                                     %resp = from-json client.get(%!json<uri>);
+
+                                     if %resp<error> {
+                                         self.message('Error reloading after successful save: ' ~ %resp<error>.raku);
+                                     } else {
+                                         %!json = %resp;
+                                         self.load-fields;
+                                         self.draw-form;
+                                         self.message('Saved');
+                                     }
+                                 }
+                             });
+
+        $mode.add-command("\t", 'TAB', 'Revert',
+                          -> $k {
+                                 self.revert-value;
+                                 if self.field.subrecord-open {
+                                     self.draw-remove-subrecord
+                                 } else {
+                                     self.draw-field;
+                                 }
+                             });
+
+        $mode.add-command('d', 'Delete',
+                          -> $k {
+                                 if self.field.has-subrecords {
+                                     if self.field.delete-current-subrecord-or-all eq 'all' {
+                                         self.message("Deleted all {self.field.prop}");
+                                     } else {
+                                         self.message("Deleted item from {self.field.prop}");
+                                         self.draw-next-subrecord;
+                                     }
+                                 } else {
+                                     self.set-value('');
+                                 }
+                                 self.draw-field;
+                             });
+
+        $mode.add-command('a', 'Add',
+                          -> $k {
+                                 if self.field.value ~~ Iterable {
+                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
+                                     if $types && $types ~~ Iterable {
+                                         # the subrecord can have more than one type - get the user to choose one
+                                         my $ix = 0;
+                                         my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
+                                         while True {
+                                             print-at(%c<line>, %c<col>, ansi('Select a subrecord type: ', 'green') ~ ansi($types[$ix], 'bold'), :fill);
+                                             my $ak = get-key-in;
+                                             given $ak {
+                                                 when "\t" { last; }
+                                                 when /\n/ { self.field.new-subrecord($types[$ix]); last; }
+                                                 when ' '  { $ix = ($ix + 1) % $types.elems; }
+                                             }
+                                         }
+                                     } else {
+                                         self.field.new-subrecord;
+                                     }
+                                     self.draw-current-subrecord;
+                                 }
+                             });
+
+        $mode.add-command(' ', 'SPACE', 'Edit',
+                          -> $k {
+                                 my $prop = self.field.schema;
+
+                                 if self.field.open-for-update {
+                                     if $prop<type> eq 'boolean' {
+                                         self.set-value(!self.field.value);
+                                         self.draw-field;
+                                     } elsif $prop<enum> {
+                                         my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
+                                         $next-ix %= $prop<enum>.elems;
+                                         self.set-value($prop<enum>[$next-ix]);
+                                         self.draw-field;
+                                     } elsif $prop<dynamic_enum> {
+                                         my $enum = enum-by-name($prop<dynamic_enum>);
+                                         my @values = |$enum<values>;
+                                         my $current-value-ix = @values.first(self.field.value, :k);
+                                         my $next-ix = $current-value-ix.defined ?? $current-value-ix + 1 !! 0;
+                                         $next-ix %= @values.elems;
+                                         self.set-value(@values[$next-ix]);
+                                         self.field.set-label;
+                                         self.draw-field;
+                                     } elsif $prop<type> eq 'string' | 'integer' | 'date' {
+                                         my $val = self.field.value // '';
+                                         if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
+                                             save_tmp(self.field.value, :file-name('edit.txt'));
+                                             if edit(tmp_file('edit.txt')) {
+                                                 self.set-value(slurp(tmp_file('edit.txt')).chomp);
+                                                 self.message('Edits applied');
+                                                 self.draw-field;
+                                             } else {
+                                                 self.message('No edits');
+                                             }
+                                             run <tput civis>;
+                                         } else {
+                                             my $coo = self.field.depth * 2 + 1;
+
+                                             self.with-cursor-lock: {
+                                                 self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
+                                                                            $!cursor-offset + $coo, :value(self.field.value)));
+                                             }
+
+                                             self.draw-field;
+                                         }
+                                     } elsif $prop<type> eq 'array' {
+                                         self.draw-next-subrecord;
+                                     }
+                                 } else {
+                                     self.field.open-for-update = True;
+
+                                     if self.field.prop eq <ref> || is-record-ref($prop<type>) {
+                                         self.draw-ref-search;
+                                         self.field.open-for-update = False;
+                                     } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
+                                         if !self.field.label {
+                                             if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
+                                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
+                                                 if $resp<error> {
+                                                     self.message($resp<error>);
+                                                 } else {
+                                                     my %ref-map;
+
+                                                     sub walk($node) {
+                                                         if $node ~~ Associative {
+                                                             if $node<ref> && $node<_resolved> {
+                                                                 %ref-map{$node<ref>} = $node<_resolved>;
+                                                             } else {
+                                                                 walk($_) for $node.values;
+                                                             }
+                                                         } elsif $node ~~ Positional {
+                                                             walk($_) for @$node;
+                                                         }
+                                                     }
+
+                                                     walk($resp);
+
+                                                     for @!fields { .set-labels-for(%ref-map); }
+                                                 }
+                                             }
+                                         }
+                                         self.draw-next-subrecord;
+#                                         self.draw-help(@array-help, :add);
+                                     }
+
+                                     self.draw-field;
+                                 }
+                             });
+
+        $mode.add-command('c', 'Close',
+                          -> $k {
+                                 self.draw-remove-subrecord;
+                             });
+
+        $mode.add-command('@',
+                          -> $k {
+                                 self.push-mode(self.diagnostic-mode);
+                             });
+
+        $mode.add-command('g', 'Goto link',
+                          -> $k {
+                                 if self.field.prop eq <ref> {
+                                     self.load-record(self.field.value);
+                                 } else {
+                                     self.message("Can only go to uris in ref fields");
+                                 }
+                             });
+
+        $mode.add-command('n', 'New record',
+                          -> $k {
+                                 if self.field.prop eq <ref> {
+                                     self.create-record(ref-record-type(self.field.schema<type>));
+                                 } else {
+                                     self.message("Can only go to uris in ref fields");
+                                 }
+                             });
+
+        $mode.add-command('b', 'Back to previous record',
+                          -> $k {
+                                 self.load-previous-record;
+                             });
+
+        $mode.add-command('i', 'Image',
+                          -> $k {
+                                 if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
+                                     if inline_image_supported() {
+                                         self.message("Showing: {self.field.value} <ANY KEY> to dismiss", :sticky);
+                                         my $width = term_cols() - $!cursor-offset - 40;
+                                         my $height = term_lines() - 10;
+                                         if (my $img = image-for-url(self.field.value, :$width, :$height)) {
+                                             print-at(5, $!cursor-offset + 20, $img, :raw);
+                                             get-key-in;
+                                             self.message('');
+                                             self.draw-form;
+                                         } else {
+                                             self.message("Sorry, that image didn't dowmload");
+                                         }
+                                     } else {
+                                         self.message('Sorry, image viewing only available with iTerm2');
+                                     }
+                                 } else {
+                                     self.message('The current field is not an image link');
+                                 }
+                             });
+
+        $mode.add-command(/\d/, '1 2 +', 'Page',
+                          -> $k {
+                                 my $ix = $!number-of-display-lines * ($k - 1);
+                                 if $ix > +@!fields || self.field-with-open-subrecord {
+                                     print BEL;
+                                 } else {
+                                     $!top-field-ix = $ix;
+                                     $!selected-field-ix = $ix;
+                                     self.draw-form;
+                                 }
+                             });
+
+
+        $mode.add-command(UP_ARROW, "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]", 'Cursor',
+                          -> $k {
+                                 self.move-cursor(-1);
+                             });
+
+        $mode.add-command(DOWN_ARROW,
+                          -> $k {
+                                 self.move-cursor(1);
+		                         });
+
+        $mode.add-command(RIGHT_ARROW, "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]", 'Scroll',
+                          -> $k {
+                                 if $!top-field-ix + 1 >= self.max-top-field-ix {
+                                     print BEL;
+                                 } elsif $!top-field-ix + 1 > $!selected-field-ix {
+                                     print BEL;
+                                 } else {
+                                     self.scroll-form(1);
+                                 }
+		                         });
+
+        $mode.add-command(LEFT_ARROW,
+                          -> $k {
+                                 if $!top-field-ix < 1 {
+                                     print BEL;
+                                 } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
+                                     print BEL;
+                                 } else {
+                                     self.scroll-form(-1);
+                                 }
+		                         });
+
+        $mode;
+	  }
+
+    method diagnostic-mode {
+        my $mode = CommandMode.new(:name('Diagnostics'), :editor(self));
+
+        $mode.add-command('q', 'Quit',
+                          -> $k {
+                                 last;
+                             });
+
+        $mode.add-command('m', 'Field schema',
+                          -> $k {
+                                 page(pretty to-json self.field.schema);
+                             });
+
+        $mode.add-command('M', 'Record schema',
+                          -> $k {
+                                 page(pretty to-json self.schema);
+                             });
+
+        $mode.add-command('v', 'Value',
+                          -> $k {
+                                 page(pretty to-json self.field.value);
+                             });
+
+        $mode.add-command('V', 'Original value',
+                          -> $k {
+                                 page(pretty to-json self.field.original-value);
+                             });
+
+        $mode.add-command('j', 'Field JSON',
+                          -> $k {
+                                 page(pretty to-json %!json{self.field.prop});
+                             });
+
+        $mode.add-command('J', 'Record JSON',
+                          -> $k {
+                                 page(pretty to-json %!json);
+                             });
+
+        $mode.add-command('u', 'Subrecords',
+                          -> $k {
+                                 page(pretty to-json self.field.subrecords.raku);
+                             });
+
+        $mode;
     }
 
     method search-type($type, $q, :$page = 1, :$page-size = 10) {
@@ -1187,23 +1221,23 @@ class CommandMode {
     has $.editor;
 
 
-    # $mode.add-command(' ', 'SPACE', 'Next thing', -> $k { self.message("Spacebar"); });
     multi method add-command($key-match, $label, $description, &block) {
         @!command-keys.push(CommandKey.new(:$key-match, :$label, :$description, :&block));
     }
 
-    # $mode.add-command('6', '6ish', -> $k { self.message("is it a six? $k"); });
     multi method add-command($key-match, $description, &block) {
         @!command-keys.push(CommandKey.new(:$key-match, :$description, :&block));
     }
 
-    # $mode.add-command(CommandKey.new(:key-match('4'), :label('Four'), :description('Four was typed'), :block(-> $k { self.message('4444444') })));
+    multi method add-command($key-match, &block) {
+        @!command-keys.push(CommandKey.new(:$key-match, :&block));
+    }
+
     multi method add-command(CommandKey $cmd) {
         @!command-keys.push($cmd);
     }
 
     method run {
-        $!editor.message("$!name");
         self.help();
 
         loop {
@@ -1215,7 +1249,7 @@ class CommandMode {
     }
 
     method help {
-        $!editor.draw-help(@!command-keys.map({ (.label // .key-match) => .description}));
+        $!editor.draw-help($!name, @!command-keys.grep(*.description).map({ (.label // .key-match) => .description}));
     }
 }
 
