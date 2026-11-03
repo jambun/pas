@@ -574,7 +574,7 @@ class Editor {
     method set-message-cancel-timer {
         start react {
             whenever $!message-timer-cancel { done; }
-            whenever Promise.in(8) { print-at(term_lines() - 1, 3, '', :clear); done; }
+            whenever Promise.in(8) { print-at(term_lines() - 1, 2, '', :clear); done; }
         }
     }
 
@@ -586,7 +586,7 @@ class Editor {
         $!message-timer-cancel.keep;
         $!message-timer-cancel = Promise.new;
 
-        print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :clear);
+        print-at(term_lines() - 1, 2, ansi($s.gist, 'yellow'), :clear);
 
         self.set-message-cancel-timer unless $sticky;
     }
