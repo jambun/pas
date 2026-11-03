@@ -759,6 +759,7 @@ class Editor {
         my $mode = CommandMode.new(:name('Main'), :editor(self));
 
         $mode.add-sub-mode-trigger(<add>, :set(-> { self.field.value ~~ Iterable }));
+        $mode.add-sub-mode-trigger(<edited>, :set(-> { self.field.updated }));
         $mode.add-sub-mode-trigger(<subrecord>, :set(-> { self.field-with-open-subrecord }));
         $mode.add-sub-mode-trigger(<ref>, :set(-> { self.field.prop eq <ref> }));
         $mode.add-sub-mode-trigger(<stack>, :set(-> { @!record-stack }));
@@ -957,7 +958,7 @@ class Editor {
                                  }
                              });
 
-        $mode.add-command("\t", 'TAB', 'Revert',
+        $mode.add-sub-command('edited', "\t", 'TAB', 'Revert',
                           -> $k {
                                  self.revert-value;
                                  if self.field.subrecord-open {
