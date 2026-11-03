@@ -820,6 +820,7 @@ class Editor {
                                      } else {
                                          %!json = %resp;
                                          self.load-fields;
+                                         self.draw-header;
                                          self.draw-form;
                                          self.message('Saved');
                                      }
