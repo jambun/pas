@@ -640,132 +640,6 @@ class Editor {
                                         $!cursor-offset + self.field.depth * 2 + 2));
     }
 
-    method linker-mode($type, $line, $col) {
-        my %search;
-        my $ix = 0;
-        my $page = 1;
-        my $page-size = 10;
-        my $q = '';
-
-        print-at($line, $col, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
-
-        sub absolute-ix {
-            ($page - 1) * $page-size + $ix;
-        }
-
-        sub message-for-search(%search) {
-            if %search<results> {
-                my $msg = "{absolute-ix() + 1} of {%search<total_hits>}: {%search<results>[$ix]<uri>}";
-                if %search<results>[$ix]<title> {
-                    $msg ~= ' | ' ~ %search<results>[$ix]<title>;
-                }
-                self.message($msg, :sticky);
-            } else {
-                self.message('No hits', :sticky);
-            }
-        }
-
-        my $mode = CommandMode.new(:name('Ref linker'), :editor(self));
-
-        $mode.add-command(/^ (\w | $(DELETE)) $/, 'Type', 'to search',
-                          -> $k {
-                              $ix = 0;
-                              $page = 1;
-                              if $k ~~ /^ \w $/ {
-                                  $q ~= $k;
-                              } elsif $k eq DELETE {
-                                  $q.=substr(0, *-1) if $q;
-                              }
-                              if $q {
-                                  %search = self.search-type($type, $q, :$page, :$page-size);
-                                  message-for-search(%search);
-                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
-                              } else {
-                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold'), :fill);
-                              }
-                          });
-
-        $mode.add-command("\t", 'TAB', 'Exit',
-                          -> $k {
-                                 self.message("Exited linker");
-                                 last;
-                             });
-
-        $mode.add-command(' ', 'SPACE', 'Next result',
-                          -> $k {
-                                 if %search<results> {
-                                     $ix++;
-                                     if absolute-ix() >= %search<total_hits> {
-                                         $ix = 0;
-                                         $page = 1;
-                                         %search = self.search-type($type, $q, :$page, :$page-size);
-                                     } elsif $ix >= $page-size {
-                                         $ix = 0;
-                                         $page++;
-                                         %search = self.search-type($type, $q, :$page, :$page-size);
-                                     }
-                                     message-for-search(%search);
-                                 } else {
-                                     self.message('No hits');
-                                 }
-                             });
-
-        $mode.add-command(/\n/, 'ENTER', 'Link current result',
-                          -> $k {
-                                 if %search<results> {
-                                     self.set-value(%search<results>[$ix]<uri>);
-                                     self.field.label = %search<results>[$ix]<title>;
-
-                                     self.draw-field;
-                                     self.message('Linked ' ~ self.field.value);
-                                     last;
-                                 } else {
-                                     self.message('No result to link');
-                                 }
-                             });
-
-        $mode.add-command('`', 'BACKTICK', 'Enter link manually',
-                          -> $k {
-                                 self.with-cursor-lock: {
-                                     self.set-value(line-editor($line, $col - 1));
-                                     self.field.label = '';
-                                 }
-                                 self.message("Link entered manually");
-                                 last;
-                             });
-
-        $mode;
-    }
-
-    method new-subrecord-for-types-mode(@types, $line, $col) {
-        my $ix = 0;
-        print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
-
-        my $mode = CommandMode.new(:name('Select subrecord type'), :editor(self));
-
-        $mode.add-command('q', 'Quit',
-                          -> $k {
-                                 self.draw-field;
-                                 last;
-                                });
-
-        $mode.add-command(' ', 'SPACE', 'Next type',
-                          -> $k {
-                                 $ix = ($ix + 1) % @types;
-                                 print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
-                             });
-
-        $mode.add-command(/\n/, 'ENTER', 'Select type',
-                          -> $k {
-                                 self.field.new-subrecord(@types[$ix]);
-                                 self.draw-current-subrecord;
-                                 last;
-                             });
-
-        $mode;
-    }
-
-
     method field-display-line($ix = $!selected-field-ix) {
         $!first-display-line + $ix - $!top-field-ix;
     }
@@ -1232,6 +1106,131 @@ class Editor {
         $mode.add-command('u', 'Subrecords',
                           -> $k {
                                  page(pretty to-json self.field.subrecords.raku);
+                             });
+
+        $mode;
+    }
+
+    method linker-mode($type, $line, $col) {
+        my %search;
+        my $ix = 0;
+        my $page = 1;
+        my $page-size = 10;
+        my $q = '';
+
+        print-at($line, $col, ansi('Search: ', 'green') ~ ansi('_', 'bold'), :fill);
+
+        sub absolute-ix {
+            ($page - 1) * $page-size + $ix;
+        }
+
+        sub message-for-search(%search) {
+            if %search<results> {
+                my $msg = "{absolute-ix() + 1} of {%search<total_hits>}: {%search<results>[$ix]<uri>}";
+                if %search<results>[$ix]<title> {
+                    $msg ~= ' | ' ~ %search<results>[$ix]<title>;
+                }
+                self.message($msg, :sticky);
+            } else {
+                self.message('No hits', :sticky);
+            }
+        }
+
+        my $mode = CommandMode.new(:name('Ref linker'), :editor(self));
+
+        $mode.add-command(/^ (\w | $(DELETE)) $/, 'Type', 'to search',
+                          -> $k {
+                              $ix = 0;
+                              $page = 1;
+                              if $k ~~ /^ \w $/ {
+                                  $q ~= $k;
+                              } elsif $k eq DELETE {
+                                  $q.=substr(0, *-1) if $q;
+                              }
+                              if $q {
+                                  %search = self.search-type($type, $q, :$page, :$page-size);
+                                  message-for-search(%search);
+                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
+                              } else {
+                                  print-at($line, $col + 8, ansi($q ~ '_', 'bold'), :fill);
+                              }
+                          });
+
+        $mode.add-command("\t", 'TAB', 'Exit',
+                          -> $k {
+                                 self.message("Exited linker");
+                                 last;
+                             });
+
+        $mode.add-command(' ', 'SPACE', 'Next result',
+                          -> $k {
+                                 if %search<results> {
+                                     $ix++;
+                                     if absolute-ix() >= %search<total_hits> {
+                                         $ix = 0;
+                                         $page = 1;
+                                         %search = self.search-type($type, $q, :$page, :$page-size);
+                                     } elsif $ix >= $page-size {
+                                         $ix = 0;
+                                         $page++;
+                                         %search = self.search-type($type, $q, :$page, :$page-size);
+                                     }
+                                     message-for-search(%search);
+                                 } else {
+                                     self.message('No hits');
+                                 }
+                             });
+
+        $mode.add-command(/\n/, 'ENTER', 'Link current result',
+                          -> $k {
+                                 if %search<results> {
+                                     self.set-value(%search<results>[$ix]<uri>);
+                                     self.field.label = %search<results>[$ix]<title>;
+
+                                     self.draw-field;
+                                     self.message('Linked ' ~ self.field.value);
+                                     last;
+                                 } else {
+                                     self.message('No result to link');
+                                 }
+                             });
+
+        $mode.add-command('`', 'BACKTICK', 'Enter link manually',
+                          -> $k {
+                                 self.with-cursor-lock: {
+                                     self.set-value(line-editor($line, $col - 1));
+                                     self.field.label = '';
+                                 }
+                                 self.message("Link entered manually");
+                                 last;
+                             });
+
+        $mode;
+    }
+
+    method new-subrecord-for-types-mode(@types, $line, $col) {
+        my $ix = 0;
+        print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
+
+        my $mode = CommandMode.new(:name('Select subrecord type'), :editor(self));
+
+        $mode.add-command('q', 'Quit',
+                          -> $k {
+                                 self.draw-field;
+                                 last;
+                                });
+
+        $mode.add-command(' ', 'SPACE', 'Next type',
+                          -> $k {
+                                 $ix = ($ix + 1) % @types;
+                                 print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
+                             });
+
+        $mode.add-command(/\n/, 'ENTER', 'Select type',
+                          -> $k {
+                                 self.field.new-subrecord(@types[$ix]);
+                                 self.draw-current-subrecord;
+                                 last;
                              });
 
         $mode;
