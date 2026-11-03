@@ -458,6 +458,7 @@ class Editor {
             next if $schema_prop<readonly>;
             next if EDIT_SKIP_PROPS.grep($prop);
 
+            # this json cycling bizzo is trying to break refs (like a deep clone) - probably not necessary
             @!fields.push(FormField.new(:$prop, :schema($schema_prop), :value(from-json to-json %!json{$prop})));
         }
 
