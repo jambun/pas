@@ -577,11 +577,15 @@ class Editor {
         }
     }
 
+    method clear-message {
+        self.message('');
+    }
+
     method message($s, :$sticky) {
         $!message-timer-cancel.keep;
         $!message-timer-cancel = Promise.new;
 
-        print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :fill);
+        print-at(term_lines() - 1, 3, ansi($s.gist, 'yellow'), :clear);
 
         self.set-message-cancel-timer unless $sticky;
     }
@@ -1154,14 +1158,12 @@ class Editor {
                           -> $k {
                                  if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
                                      if inline_image_supported() {
-                                         self.message("Showing: {self.field.value} <ANY KEY> to dismiss", :sticky);
+                                         self.message("Showing: {self.field.value}", :sticky);
                                          my $width = term_cols() - $!cursor-offset - 40;
                                          my $height = term_lines() - 10;
                                          if (my $img = image-for-url(self.field.value, :$width, :$height)) {
                                              print-at(5, $!cursor-offset + 20, $img, :raw);
-                                             get-key-in;
-                                             self.message('');
-                                             self.draw-form;
+                                             self.push-mode(self.image-viewer-mode);
                                          } else {
                                              self.message("Sorry, that image didn't dowmload");
                                          }
@@ -1175,6 +1177,19 @@ class Editor {
 
         $mode;
 	  }
+
+    method image-viewer-mode {
+        my $mode = CommandMode.new(:name('Image viewer'), :editor(self));
+
+        $mode.add-command(Any, 'ANY KEY', 'Exit viewer',
+                          -> $k {
+                                 self.clear-message;
+                                 self.draw-form;
+                                 last;
+                             });
+
+        $mode;
+    }
 
     method diagnostic-mode {
         my $mode = CommandMode.new(:name('Diagnostics'), :editor(self));
