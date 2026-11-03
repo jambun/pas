@@ -1315,17 +1315,27 @@ class CommandMode {
     }
 
     method set-sub-mode($sub-mode) {
+        my $orig = $!sub-modes.Set;
+
         $!sub-modes.set($sub-mode);
-        self.help;
+
+        unless $orig eqv $!sub-modes {
+            self.help;
+        }
     }
 
     method unset-sub-mode($sub-mode?) {
+        my $orig = $!sub-modes.Set;
+
         if $sub-mode {
             $!sub-modes.unset($sub-mode);
         } else {
             $!sub-modes = Empty;
         }
-        self.help;
+
+        unless $orig eqv $!sub-modes {
+            self.help;
+        }
     }
 
     method label {
