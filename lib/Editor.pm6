@@ -733,6 +733,35 @@ class Editor {
         $mode;
     }
 
+    method new-subrecord-for-types-mode(@types, $line, $col) {
+        my $ix = 0;
+        print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
+
+        my $mode = CommandMode.new(:name('Select subrecord type'), :editor(self));
+
+        $mode.add-command('q', 'Quit',
+                          -> $k {
+                                 self.draw-field;
+                                 last;
+                                });
+
+        $mode.add-command(' ', 'SPACE', 'Next type',
+                          -> $k {
+                                 $ix = ($ix + 1) % @types;
+                                 print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
+                             });
+
+        $mode.add-command(/\n/, 'ENTER', 'Select type',
+                          -> $k {
+                                 self.field.new-subrecord(@types[$ix]);
+                                 self.draw-current-subrecord;
+                                 last;
+                             });
+
+        $mode;
+    }
+
+
     method field-display-line($ix = $!selected-field-ix) {
         $!first-display-line + $ix - $!top-field-ix;
     }
@@ -850,6 +879,12 @@ class Editor {
     method main-mode {
         my $mode = CommandMode.new(:name('Main'), :editor(self));
 
+        $mode.add-sub-mode-trigger(<add>, :set(-> { self.field.value ~~ Iterable }));
+        $mode.add-sub-mode-trigger(<subrecord>, :set(-> { self.field-with-open-subrecord }));
+        $mode.add-sub-mode-trigger(<ref>, :set(-> { self.field.prop eq <ref> }));
+        $mode.add-sub-mode-trigger(<stack>, :set(-> { @!record-stack }));
+        $mode.add-sub-mode-trigger(<image>, :set(-> { self.field.value ~~ Str && self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ }));
+
         $mode.add-command('q', 'Quit', -> $k { last; });
 
         $mode.add-command('s', 'Save',
@@ -911,54 +946,50 @@ class Editor {
                                  }
                              });
 
-        $mode.add-command("\t", 'TAB', 'Revert',
+        $mode.add-command(UP_ARROW, "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]", 'Cursor',
                           -> $k {
-                                 self.revert-value;
-                                 if self.field.subrecord-open {
-                                     self.draw-remove-subrecord
+                                 self.move-cursor(-1);
+                             });
+
+        $mode.add-command(DOWN_ARROW,
+                          -> $k {
+                                 self.move-cursor(1);
+		                         });
+
+        $mode.add-command(RIGHT_ARROW, "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]", 'Scroll',
+                          -> $k {
+                                 if $!top-field-ix + 1 >= self.max-top-field-ix {
+                                     print BEL;
+                                 } elsif $!top-field-ix + 1 > $!selected-field-ix {
+                                     print BEL;
                                  } else {
-                                     self.draw-field;
+                                     self.scroll-form(1);
+                                 }
+		                         });
+
+        $mode.add-command(LEFT_ARROW,
+                          -> $k {
+                                 if $!top-field-ix < 1 {
+                                     print BEL;
+                                 } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
+                                     print BEL;
+                                 } else {
+                                     self.scroll-form(-1);
+                                 }
+		                         });
+
+        $mode.add-command(/\d/, '1 2 +', 'Page',
+                          -> $k {
+                                 my $ix = $!number-of-display-lines * ($k - 1);
+                                 if $ix > +@!fields || self.field-with-open-subrecord {
+                                     print BEL;
+                                 } else {
+                                     $!top-field-ix = $ix;
+                                     $!selected-field-ix = $ix;
+                                     self.draw-form;
                                  }
                              });
 
-        $mode.add-command('d', 'Delete',
-                          -> $k {
-                                 if self.field.has-subrecords {
-                                     if self.field.delete-current-subrecord-or-all eq 'all' {
-                                         self.message("Deleted all {self.field.prop}");
-                                     } else {
-                                         self.message("Deleted item from {self.field.prop}");
-                                         self.draw-next-subrecord;
-                                     }
-                                 } else {
-                                     self.set-value('');
-                                 }
-                                 self.draw-field;
-                             });
-
-        $mode.add-command('a', 'Add',
-                          -> $k {
-                                 if self.field.value ~~ Iterable {
-                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
-                                     if $types && $types ~~ Iterable {
-                                         # the subrecord can have more than one type - get the user to choose one
-                                         my $ix = 0;
-                                         my %c = col => $!cursor-offset + self.field.depth * 2 + 3, line => self.field-display-line;
-                                         while True {
-                                             print-at(%c<line>, %c<col>, ansi('Select a subrecord type: ', 'green') ~ ansi($types[$ix], 'bold'), :fill);
-                                             my $ak = get-key-in;
-                                             given $ak {
-                                                 when "\t" { last; }
-                                                 when /\n/ { self.field.new-subrecord($types[$ix]); last; }
-                                                 when ' '  { $ix = ($ix + 1) % $types.elems; }
-                                             }
-                                         }
-                                     } else {
-                                         self.field.new-subrecord;
-                                     }
-                                     self.draw-current-subrecord;
-                                 }
-                             });
 
         $mode.add-command(' ', 'SPACE', 'Edit',
                           -> $k {
@@ -1041,14 +1072,52 @@ class Editor {
                                              }
                                          }
                                          self.draw-next-subrecord;
-#                                         self.draw-help(@array-help, :add);
                                      }
 
                                      self.draw-field;
                                  }
                              });
 
-        $mode.add-command('c', 'Close',
+        $mode.add-command("\t", 'TAB', 'Revert',
+                          -> $k {
+                                 self.revert-value;
+                                 if self.field.subrecord-open {
+                                     self.draw-remove-subrecord
+                                 } else {
+                                     self.draw-field;
+                                 }
+                             });
+
+        $mode.add-command('d', 'Delete',
+                          -> $k {
+                                 if self.field.has-subrecords {
+                                     if self.field.delete-current-subrecord-or-all eq 'all' {
+                                         self.message("Deleted all {self.field.prop}");
+                                     } else {
+                                         self.message("Deleted item from {self.field.prop}");
+                                         self.draw-next-subrecord;
+                                     }
+                                 } else {
+                                     self.set-value('');
+                                 }
+                                 self.draw-field;
+                             });
+
+        $mode.add-sub-command('add', 'a', 'Add a subrecord',
+                          -> $k {
+                                 if self.field.value ~~ Iterable {
+                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
+                                     if $types && $types ~~ Iterable {
+                                         # the subrecord can have more than one type - get the user to choose one
+                                         self.push-mode(self.new-subrecord-for-types-mode($types, self.field-display-line, $!cursor-offset + self.field.depth * 2 + 2));
+                                     } else {
+                                         self.field.new-subrecord;
+                                         self.draw-current-subrecord;
+                                     }
+                                 }
+                             });
+
+        $mode.add-sub-command('subrecord', 'c', 'Close',
                           -> $k {
                                  self.draw-remove-subrecord;
                              });
@@ -1058,7 +1127,7 @@ class Editor {
                                  self.push-mode(self.diagnostic-mode);
                              });
 
-        $mode.add-command('g', 'Goto link',
+        $mode.add-sub-command('ref', 'g', 'Goto link',
                           -> $k {
                                  if self.field.prop eq <ref> {
                                      self.load-record(self.field.value);
@@ -1067,7 +1136,7 @@ class Editor {
                                  }
                              });
 
-        $mode.add-command('n', 'New record',
+        $mode.add-sub-command('ref', 'n', 'New record',
                           -> $k {
                                  if self.field.prop eq <ref> {
                                      self.create-record(ref-record-type(self.field.schema<type>));
@@ -1076,12 +1145,12 @@ class Editor {
                                  }
                              });
 
-        $mode.add-command('b', 'Back to previous record',
+        $mode.add-sub-command('stack', 'b', 'Back to previous record',
                           -> $k {
                                  self.load-previous-record;
                              });
 
-        $mode.add-command('i', 'Image',
+        $mode.add-sub-command('image', 'i', 'Image',
                           -> $k {
                                  if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
                                      if inline_image_supported() {
@@ -1103,51 +1172,6 @@ class Editor {
                                      self.message('The current field is not an image link');
                                  }
                              });
-
-        $mode.add-command(/\d/, '1 2 +', 'Page',
-                          -> $k {
-                                 my $ix = $!number-of-display-lines * ($k - 1);
-                                 if $ix > +@!fields || self.field-with-open-subrecord {
-                                     print BEL;
-                                 } else {
-                                     $!top-field-ix = $ix;
-                                     $!selected-field-ix = $ix;
-                                     self.draw-form;
-                                 }
-                             });
-
-
-        $mode.add-command(UP_ARROW, "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]", 'Cursor',
-                          -> $k {
-                                 self.move-cursor(-1);
-                             });
-
-        $mode.add-command(DOWN_ARROW,
-                          -> $k {
-                                 self.move-cursor(1);
-		                         });
-
-        $mode.add-command(RIGHT_ARROW, "\c[LEFTWARDS ARROW] \c[RIGHTWARDS ARROW]", 'Scroll',
-                          -> $k {
-                                 if $!top-field-ix + 1 >= self.max-top-field-ix {
-                                     print BEL;
-                                 } elsif $!top-field-ix + 1 > $!selected-field-ix {
-                                     print BEL;
-                                 } else {
-                                     self.scroll-form(1);
-                                 }
-		                         });
-
-        $mode.add-command(LEFT_ARROW,
-                          -> $k {
-                                 if $!top-field-ix < 1 {
-                                     print BEL;
-                                 } elsif $!top-field-ix + 1 < $!selected-field-ix - $!number-of-display-lines + 2 {
-                                     print BEL;
-                                 } else {
-                                     self.scroll-form(-1);
-                                 }
-		                         });
 
         $mode;
 	  }
@@ -1219,7 +1243,14 @@ class CommandMode {
     has $.name;
     has CommandKey @.command-keys;
     has $.editor;
+    has SetHash $.sub-modes = SetHash.new;
+    has %.sub-mode-triggers;
 
+    method add-sub-mode-trigger($sub-mode, :&set, :&unset) {
+        my %t = set => &set, unset => &unset;
+
+        %!sub-mode-triggers{$sub-mode} = %t;
+    }
 
     multi method add-command($key-match, $label, $description, &block) {
         @!command-keys.push(CommandKey.new(:$key-match, :$label, :$description, :&block));
@@ -1237,10 +1268,28 @@ class CommandMode {
         @!command-keys.push($cmd);
     }
 
+    multi method add-sub-command($sub-mode, $key-match, $label, $description, &block) {
+        @!command-keys.push(CommandKey.new(:$sub-mode, :$key-match, :$label, :$description, :&block));
+    }
+
+    multi method add-sub-command($sub-mode, $key-match, $description, &block) {
+        @!command-keys.push(CommandKey.new(:$sub-mode, :$key-match, :$description, :&block));
+    }
+
     method run {
         self.help();
 
         loop {
+            for %!sub-mode-triggers.kv -> $sub-mode, %triggers {
+                if %triggers<unset> && %triggers<unset>.() {
+                    self.unset-sub-mode($sub-mode);
+                } elsif %triggers<set>.() {
+                    self.set-sub-mode($sub-mode);
+                } else {
+                    self.unset-sub-mode($sub-mode);
+                }
+            }
+
             my $k = get-key-in;
             if (my $cmd = @!command-keys.first(-> $ck {$k ~~ $ck.key-match})) {
                 $cmd.block.($k);
@@ -1248,8 +1297,33 @@ class CommandMode {
         }
     }
 
+    method set-sub-mode($sub-mode) {
+        $!sub-modes.set($sub-mode);
+        self.help;
+    }
+
+    method unset-sub-mode($sub-mode?) {
+        if $sub-mode {
+            $!sub-modes.unset($sub-mode);
+        } else {
+            $!sub-modes = Empty;
+        }
+        self.help;
+    }
+
+    method label {
+        if $!sub-modes {
+            "$!name ($!sub-modes)";
+        } else {
+            $!name;
+        }
+    }
+
     method help {
-        $!editor.draw-help($!name, @!command-keys.grep(*.description).map({ (.label // .key-match) => .description}));
+        $!editor.draw-help(self.label, @!command-keys
+                                         .grep(*.description)
+                                         .grep(-> $ck { !$ck.sub-mode || $!sub-modes && $ck.sub-mode eq any($!sub-modes.keys) })
+                                         .map({ (.label // .key-match) => .description}));
     }
 }
 
@@ -1257,5 +1331,6 @@ class CommandKey {
     has $.key-match;
     has $.label;
     has $.description;
+    has Str $.sub-mode;
     has &.block;
 }
