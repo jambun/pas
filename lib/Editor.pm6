@@ -711,19 +711,6 @@ class Editor {
         print-at(1, 2, ansi($label, 'bold') ~ $last-update, :clear);
     }
 
-    method draw-help($name, @items is copy) {
-        my $help-txt;
-        for @items -> $i {
-            $help-txt ~= ' | ' if $help-txt;
-            if $i.key.fc eq $i.value.substr(0,1).fc {
-                $help-txt ~= ansi($i.key.uc, 'bold green') ~ $i.value.substr(1);
-            } else {
-                $help-txt ~= ansi($i.key, 'bold green') ~ ' ' ~ $i.value;
-            }
-        }
-        print-at(term_lines(), 2, ansi("$name: ", 'bold') ~ ' ' ~ $help-txt, :clear);
-    }
-
     method edit-screen(:$embedded) {
         ENTER {
             run <tput civis> unless $embedded;
@@ -756,14 +743,14 @@ class Editor {
     }
 
     method main-mode {
-        my $mode = CommandMode.new(:name('Main'), :editor(self));
+        my $mode = CommandMode.new(:name('Main'));
 
-        $mode.add-sub-mode-trigger(<add>, :set(-> { self.field.value ~~ Iterable }));
-        $mode.add-sub-mode-trigger(<edited>, :set(-> { self.field.updated }));
-        $mode.add-sub-mode-trigger(<subrecord>, :set(-> { self.field-with-open-subrecord }));
-        $mode.add-sub-mode-trigger(<ref>, :set(-> { self.field.prop eq <ref> }));
-        $mode.add-sub-mode-trigger(<stack>, :set(-> { @!record-stack }));
-        $mode.add-sub-mode-trigger(<image>, :set(-> { self.field.value ~~ Str && self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ }));
+        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.value ~~ Iterable }));
+        $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
+        $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
+        $mode.add-sub-mode(<ref>, <blue>, :set(-> { self.field.prop eq <ref> }));
+        $mode.add-sub-mode(<stack>, <magenta>, :set(-> { @!record-stack }));
+        $mode.add-sub-mode(<image>, <purple>, :set(-> { self.field.value ~~ Str && self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ }), :color(<yellow>));
 
         $mode.add-command('q', 'Quit', -> $k { last; });
 
@@ -1056,7 +1043,7 @@ class Editor {
 	  }
 
     method image-viewer-mode {
-        my $mode = CommandMode.new(:name('Image viewer'), :editor(self));
+        my $mode = CommandMode.new(:name('Image viewer'));
 
         $mode.add-command(Any, 'ANY KEY', 'Exit viewer',
                           -> $k {
@@ -1069,7 +1056,7 @@ class Editor {
     }
 
     method diagnostic-mode {
-        my $mode = CommandMode.new(:name('Diagnostics'), :editor(self));
+        my $mode = CommandMode.new(:name('Diagnostics'));
 
         $mode.add-command('q', 'Quit',
                           -> $k {
@@ -1139,7 +1126,7 @@ class Editor {
             }
         }
 
-        my $mode = CommandMode.new(:name('Ref linker'), :editor(self));
+        my $mode = CommandMode.new(:name('Ref linker'));
 
         $mode.add-command(/^ (\w | $(DELETE)) $/, 'Type', 'to search',
                           -> $k {
@@ -1215,7 +1202,7 @@ class Editor {
         my $ix = 0;
         print-at($line, $col, ansi('Select a subrecord type: ', 'green') ~ ansi(@types[$ix], 'bold'), :fill);
 
-        my $mode = CommandMode.new(:name('Select subrecord type'), :editor(self));
+        my $mode = CommandMode.new(:name('Select subrecord type'));
 
         $mode.add-command('q', 'Quit',
                           -> $k {
@@ -1256,17 +1243,16 @@ class Editor {
     }
 }
 
+class SubMode {...}
+
 class CommandMode {
     has $.name;
     has CommandKey @.command-keys;
-    has $.editor;
-    has SetHash $.sub-modes = SetHash.new;
-    has %.sub-mode-triggers;
+    has SetHash $.active-sub-modes = SetHash.new;
+    has SubMode @.sub-modes;
 
-    method add-sub-mode-trigger($sub-mode, :&set, :&unset) {
-        my %t = set => &set, unset => &unset;
-
-        %!sub-mode-triggers{$sub-mode} = %t;
+    method add-sub-mode($name, $color, :&set, :&unset) {
+        @!sub-modes.push(SubMode.new(:$name, :$color, :set-trigger(&set), :unset-trigger(&unset)));
     }
 
     multi method add-command($key-match, $label, $description, &block) {
@@ -1297,13 +1283,13 @@ class CommandMode {
         self.help();
 
         loop {
-            for %!sub-mode-triggers.kv -> $sub-mode, %triggers {
-                if %triggers<unset> && %triggers<unset>.() {
-                    self.unset-sub-mode($sub-mode);
-                } elsif %triggers<set>.() {
-                    self.set-sub-mode($sub-mode);
+            for @!sub-modes -> $sub-mode {
+                if $sub-mode.unset-trigger && $sub-mode.unset-trigger.() {
+                    self.unset-sub-mode($sub-mode.name);
+                } elsif $sub-mode.set-trigger.() {
+                    self.set-sub-mode($sub-mode.name);
                 } else {
-                    self.unset-sub-mode($sub-mode);
+                    self.unset-sub-mode($sub-mode.name);
                 }
             }
 
@@ -1315,43 +1301,65 @@ class CommandMode {
     }
 
     method set-sub-mode($sub-mode) {
-        my $orig = $!sub-modes.Set;
+        my $orig = $!active-sub-modes.Set;
 
-        $!sub-modes.set($sub-mode);
+        $!active-sub-modes.set($sub-mode);
 
-        unless $orig eqv $!sub-modes {
+        unless $orig eqv $!active-sub-modes {
             self.help;
         }
     }
 
     method unset-sub-mode($sub-mode?) {
-        my $orig = $!sub-modes.Set;
+        my $orig = $!active-sub-modes.Set;
 
         if $sub-mode {
-            $!sub-modes.unset($sub-mode);
+            $!active-sub-modes.unset($sub-mode);
         } else {
-            $!sub-modes = Empty;
+            $!active-sub-modes = Empty;
         }
 
-        unless $orig eqv $!sub-modes {
+        unless $orig eqv $!active-sub-modes {
             self.help;
         }
     }
 
-    method label {
-        if $!sub-modes {
-            "$!name ($!sub-modes)";
-        } else {
-            $!name;
-        }
-    }
-
     method help {
-        $!editor.draw-help(self.label, @!command-keys
-                                         .grep(*.description)
-                                         .grep(-> $ck { !$ck.sub-mode || $!sub-modes && $ck.sub-mode eq any($!sub-modes.keys) })
-                                         .map({ (.label // .key-match) => .description}));
+        my $sub-label = $!active-sub-modes.keys.map(-> $sm { ansi($sm, @!sub-modes.first({ .name eq $sm }).color ~ ' bold')  }).join(' ');
+
+        my $help-txt;
+
+        for @!command-keys.grep(*.description)
+                                 .grep(-> $ck { !$ck.sub-mode || $!active-sub-modes && $ck.sub-mode eq any($!active-sub-modes.keys) }) -> $k {
+
+            my $label = $k.label // $k.key-match;
+
+            $help-txt ~= ' | ' if $help-txt;
+
+            my $color = $k.sub-mode ?? @!sub-modes.first({ .name eq $k.sub-mode }).color ~ ' bold' !! 'green bold';
+
+            if $label.fc eq $k.description.substr(0,1).fc {
+                $help-txt ~= ansi($label.uc, $color) ~ $k.description.substr(1);
+            } else {
+                $help-txt ~= ansi($label, $color) ~ ' ' ~ $k.description;
+            }
+        }
+
+        my $mode-label = ansi($!name, 'bold green');
+        if $sub-label {
+            $mode-label ~= ' (' ~ $sub-label ~ ')';
+        }
+        $mode-label ~= ': ';
+
+        print-at(term_lines(), 2, $mode-label ~ $help-txt, :clear);
     }
+}
+
+class SubMode {
+    has $.name;
+    has $.color;
+    has &.set-trigger;
+    has &.unset-trigger;
 }
 
 class CommandKey {

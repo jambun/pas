@@ -121,7 +121,26 @@ sub page($text) is export {
 
 sub ansi(Str $s, Str $ansi_fmt) is export {
     if config.attr<properties><color> {
-        colored($s, $ansi_fmt);
+
+        my @fmts = $ansi_fmt.split(/\s+/);
+
+        my $fmt = @fmts.map(-> $fmt {
+                         given $fmt {
+                             when <orange>     { '255,165,0'   }
+                             when <purple>     { '160,32,240'  }
+                             when <teal>       { '0,165,165'   }
+                             when <light_blue> { '165,165,255' }
+                             when <gray>       { '165,165,165' }
+                             when <lilac>      { '200,162,200' }
+                             when <mauve>      { '224,176,255' }
+                             when <gold>       { '255,215,0'   }
+                             default {
+                                 $fmt;
+                             }
+                         }
+                     }).join(' ');
+
+        colored($s, $fmt);
     } else {
         $s;
     }
