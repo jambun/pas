@@ -326,7 +326,11 @@ class FormField {
             } elsif self.subrecord-open {
                 $val = ansi("{$!subrecord-ix + 1} of {$val.elems}", "bold $value-style") ~ ' ' ~ $!prop;
             } else {
-                $val = ansi($val.elems.Str, "bold $value-style") ~ ' ' ~ $!prop;
+                my $p = $!prop;
+                if $val.elems == 1 {
+                    $p ~~ s/'s' $//;
+                }
+                $val = ansi($val.elems.Str, "bold $value-style") ~ ' ' ~ $p;
             }
         } else {
             $val.=trans("\n" => ' ');
