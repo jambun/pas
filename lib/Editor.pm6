@@ -1283,6 +1283,10 @@ class CommandMode {
         @!command-keys.push(CommandKey.new(:$sub-mode, :$key-match, :$description, :&block));
     }
 
+    method active-keys {
+        @!command-keys.grep(-> $ck { !$ck.sub-mode || $!active-sub-modes && $ck.sub-mode eq any($!active-sub-modes.keys) });
+    }
+
     method run {
         self.help();
 
@@ -1298,8 +1302,10 @@ class CommandMode {
             }
 
             my $k = get-key-in;
-            if (my $cmd = @!command-keys.first(-> $ck {$k ~~ $ck.key-match})) {
+            if (my $cmd = self.active-keys.first(-> $ck {$k ~~ $ck.key-match})) {
                 $cmd.block.($k);
+            } else {
+                print BEL;
             }
         }
     }
@@ -1333,13 +1339,9 @@ class CommandMode {
 
         my $help-txt;
 
-        for @!command-keys.grep(*.description)
-                                 .grep(-> $ck { !$ck.sub-mode || $!active-sub-modes && $ck.sub-mode eq any($!active-sub-modes.keys) }) -> $k {
-
+        for self.active-keys.grep(*.description) -> $k {
             my $label = $k.label // $k.key-match;
-
             $help-txt ~= ' | ' if $help-txt;
-
             my $color = $k.sub-mode ?? @!sub-modes.first({ .name eq $k.sub-mode }).color ~ ' bold' !! 'green bold';
 
             if $label.fc eq $k.description.substr(0,1).fc {
