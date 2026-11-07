@@ -1018,7 +1018,7 @@ class Editor {
                                  self.load-previous-record;
                              });
 
-        $mode.add-sub-command('image', 'i', 'Image',
+        $mode.add-sub-command('image', 'v', 'View image',
                           -> $k {
                                  if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
                                      if inline_image_supported() {
