@@ -749,6 +749,8 @@ class Editor {
     method main-mode {
         my $mode = CommandMode.new(:name('Main'));
 
+        $mode.add-sub-mode(<selected>, <green>, :set(-> { !self.field.open-for-update }));
+        $mode.add-sub-mode(<open>, <lilac>, :set(-> { self.field.open-for-update }));
         $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.value ~~ Iterable }));
         $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
         $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
@@ -756,7 +758,185 @@ class Editor {
         $mode.add-sub-mode(<stack>, <magenta>, :set(-> { @!record-stack }));
         $mode.add-sub-mode(<image>, <purple>, :set(-> { self.field.value ~~ Str && self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ }), :color(<yellow>));
 
-        $mode.add-command('q', 'Quit', -> $k { last; });
+
+        $mode.add-sub-command('selected', ' ', 'SPACE', 'Open for update',
+                              -> $k {
+                                     my $prop = self.field.schema;
+
+                                     self.field.open-for-update = True;
+
+                                     if self.field.prop eq <ref> || is-record-ref($prop<type>) {
+                                         self.draw-ref-search;
+                                         self.field.open-for-update = False;
+                                     } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
+                                         if !self.field.label {
+                                             if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
+                                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
+                                                 if $resp<error> {
+                                                     self.message($resp<error>);
+                                                 } else {
+                                                     my %ref-map;
+
+                                                     sub walk($node) {
+                                                         if $node ~~ Associative {
+                                                             if $node<ref> && $node<_resolved> {
+                                                                 %ref-map{$node<ref>} = $node<_resolved>;
+                                                             } else {
+                                                                 walk($_) for $node.values;
+                                                             }
+                                                         } elsif $node ~~ Positional {
+                                                             walk($_) for @$node;
+                                                         }
+                                                     }
+
+                                                     walk($resp);
+
+                                                     for @!fields { .set-labels-for(%ref-map); }
+                                                 }
+                                             }
+                                         }
+                                         self.draw-next-subrecord;
+                                     }
+
+                                     self.draw-field;
+                                 });
+
+        $mode.add-sub-command('open', ' ', 'SPACE', 'New value',
+                              -> $k {
+                                     my $prop = self.field.schema;
+
+                                     if $prop<type> eq 'boolean' {
+                                         self.set-value(!self.field.value);
+                                         self.draw-field;
+                                     } elsif $prop<enum> {
+                                         my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
+                                         $next-ix %= $prop<enum>.elems;
+                                         self.set-value($prop<enum>[$next-ix]);
+                                         self.draw-field;
+                                     } elsif $prop<dynamic_enum> {
+                                         my $enum = enum-by-name($prop<dynamic_enum>);
+                                         my @values = |$enum<values>;
+                                         my $current-value-ix = @values.first(self.field.value, :k);
+                                         my $next-ix = $current-value-ix.defined ?? $current-value-ix + 1 !! 0;
+                                         $next-ix %= @values.elems;
+                                         self.set-value(@values[$next-ix]);
+                                         self.field.set-label;
+                                         self.draw-field;
+                                     } elsif $prop<type> eq 'string' | 'integer' | 'date' {
+                                         my $val = self.field.value // '';
+                                         if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
+                                             save_tmp(self.field.value, :file-name('edit.txt'));
+                                             if edit(tmp_file('edit.txt')) {
+                                                 self.set-value(slurp(tmp_file('edit.txt')).chomp);
+                                                 self.message('Edits applied');
+                                                 self.draw-field;
+                                             } else {
+                                                 self.message('No edits');
+                                             }
+                                             run <tput civis>;
+                                         } else {
+                                             my $coo = self.field.depth * 2 + 1;
+
+                                             self.with-cursor-lock: {
+                                                 self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
+                                                                            $!cursor-offset + $coo, :value(self.field.value)));
+                                             }
+
+                                             self.draw-field;
+                                         }
+                                     } elsif $prop<type> eq 'array' {
+                                         self.draw-next-subrecord;
+                                     }
+                                 });
+
+        $mode.add-sub-command('edited', "\t", 'TAB', 'Revert',
+                          -> $k {
+                                 self.revert-value;
+                                 if self.field.subrecord-open {
+                                     self.draw-remove-subrecord
+                                 } else {
+                                     self.draw-field;
+                                 }
+                             });
+
+        $mode.add-sub-command('add', 'a', 'Add subrecord',
+                          -> $k {
+                                 if self.field.value ~~ Iterable {
+                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
+                                     if $types && $types ~~ Iterable {
+                                         # the subrecord can have more than one type - get the user to choose one
+                                         self.push-mode(self.new-subrecord-for-types-mode($types, self.field-display-line, $!cursor-offset + self.field.depth * 2 + 2));
+                                     } else {
+                                         self.field.new-subrecord;
+                                         self.draw-current-subrecord;
+                                     }
+                                 }
+                             });
+
+        $mode.add-sub-command('subrecord', 'c', 'Close subrecord',
+                          -> $k {
+                                 self.draw-remove-subrecord;
+                             });
+
+        $mode.add-sub-command('ref', 'g', 'Goto link',
+                          -> $k {
+                                 if self.field.prop eq <ref> {
+                                     self.load-record(self.field.value);
+                                 } else {
+                                     self.message("Can only go to uris in ref fields");
+                                 }
+                             });
+
+        $mode.add-sub-command('ref', 'n', 'New record',
+                          -> $k {
+                                 if self.field.prop eq <ref> {
+                                     self.create-record(ref-record-type(self.field.schema<type>));
+                                 } else {
+                                     self.message("Can only go to uris in ref fields");
+                                 }
+                             });
+
+        $mode.add-sub-command('stack', 'b', 'Back to previous record',
+                          -> $k {
+                                 self.load-previous-record;
+                             });
+
+        $mode.add-sub-command('image', 'v', 'View image',
+                          -> $k {
+                                 if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
+                                     if inline_image_supported() {
+                                         self.message("Showing: {self.field.value}", :sticky);
+                                         my $width = term_cols() - $!cursor-offset - 40;
+                                         my $height = term_lines() - 10;
+                                         if (my $img = image-for-url(self.field.value, :$width, :$height)) {
+                                             print-at(5, $!cursor-offset + 20, $img, :raw);
+                                             self.push-mode(self.image-viewer-mode);
+                                         } else {
+                                             self.message("Sorry, that image didn't dowmload");
+                                         }
+                                     } else {
+                                         self.message('Sorry, image viewing only available with iTerm2');
+                                     }
+                                 } else {
+                                     self.message('The current field is not an image link');
+                                 }
+                             });
+
+
+        $mode.add-command('d', 'Delete',
+                          -> $k {
+                                 if self.field.has-subrecords {
+                                     if self.field.delete-current-subrecord-or-all eq 'all' {
+                                         self.message("Deleted all {self.field.prop}");
+                                     } else {
+                                         self.message("Deleted item from {self.field.prop}");
+                                         self.draw-next-subrecord;
+                                     }
+                                 } else {
+                                     self.set-value('');
+                                 }
+                                 self.draw-field;
+                             });
 
         $mode.add-command('s', 'Save',
                           -> $k {
@@ -862,185 +1042,12 @@ class Editor {
                                  }
                              });
 
+        $mode.add-command('q', 'Quit', -> $k { last; });
 
-        $mode.add-command(' ', 'SPACE', 'Edit',
-                          -> $k {
-                                 my $prop = self.field.schema;
-
-                                 if self.field.open-for-update {
-                                     if $prop<type> eq 'boolean' {
-                                         self.set-value(!self.field.value);
-                                         self.draw-field;
-                                     } elsif $prop<enum> {
-                                         my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
-                                         $next-ix %= $prop<enum>.elems;
-                                         self.set-value($prop<enum>[$next-ix]);
-                                         self.draw-field;
-                                     } elsif $prop<dynamic_enum> {
-                                         my $enum = enum-by-name($prop<dynamic_enum>);
-                                         my @values = |$enum<values>;
-                                         my $current-value-ix = @values.first(self.field.value, :k);
-                                         my $next-ix = $current-value-ix.defined ?? $current-value-ix + 1 !! 0;
-                                         $next-ix %= @values.elems;
-                                         self.set-value(@values[$next-ix]);
-                                         self.field.set-label;
-                                         self.draw-field;
-                                     } elsif $prop<type> eq 'string' | 'integer' | 'date' {
-                                         my $val = self.field.value // '';
-                                         if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
-                                             save_tmp(self.field.value, :file-name('edit.txt'));
-                                             if edit(tmp_file('edit.txt')) {
-                                                 self.set-value(slurp(tmp_file('edit.txt')).chomp);
-                                                 self.message('Edits applied');
-                                                 self.draw-field;
-                                             } else {
-                                                 self.message('No edits');
-                                             }
-                                             run <tput civis>;
-                                         } else {
-                                             my $coo = self.field.depth * 2 + 1;
-
-                                             self.with-cursor-lock: {
-                                                 self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
-                                                                            $!cursor-offset + $coo, :value(self.field.value)));
-                                             }
-
-                                             self.draw-field;
-                                         }
-                                     } elsif $prop<type> eq 'array' {
-                                         self.draw-next-subrecord;
-                                     }
-                                 } else {
-                                     self.field.open-for-update = True;
-
-                                     if self.field.prop eq <ref> || is-record-ref($prop<type>) {
-                                         self.draw-ref-search;
-                                         self.field.open-for-update = False;
-                                     } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
-                                         if !self.field.label {
-                                             if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
-                                                 my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
-                                                 if $resp<error> {
-                                                     self.message($resp<error>);
-                                                 } else {
-                                                     my %ref-map;
-
-                                                     sub walk($node) {
-                                                         if $node ~~ Associative {
-                                                             if $node<ref> && $node<_resolved> {
-                                                                 %ref-map{$node<ref>} = $node<_resolved>;
-                                                             } else {
-                                                                 walk($_) for $node.values;
-                                                             }
-                                                         } elsif $node ~~ Positional {
-                                                             walk($_) for @$node;
-                                                         }
-                                                     }
-
-                                                     walk($resp);
-
-                                                     for @!fields { .set-labels-for(%ref-map); }
-                                                 }
-                                             }
-                                         }
-                                         self.draw-next-subrecord;
-                                     }
-
-                                     self.draw-field;
-                                 }
-                             });
-
-        $mode.add-sub-command('edited', "\t", 'TAB', 'Revert',
-                          -> $k {
-                                 self.revert-value;
-                                 if self.field.subrecord-open {
-                                     self.draw-remove-subrecord
-                                 } else {
-                                     self.draw-field;
-                                 }
-                             });
-
-        $mode.add-command('d', 'Delete',
-                          -> $k {
-                                 if self.field.has-subrecords {
-                                     if self.field.delete-current-subrecord-or-all eq 'all' {
-                                         self.message("Deleted all {self.field.prop}");
-                                     } else {
-                                         self.message("Deleted item from {self.field.prop}");
-                                         self.draw-next-subrecord;
-                                     }
-                                 } else {
-                                     self.set-value('');
-                                 }
-                                 self.draw-field;
-                             });
-
-        $mode.add-sub-command('add', 'a', 'Add a subrecord',
-                          -> $k {
-                                 if self.field.value ~~ Iterable {
-                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
-                                     if $types && $types ~~ Iterable {
-                                         # the subrecord can have more than one type - get the user to choose one
-                                         self.push-mode(self.new-subrecord-for-types-mode($types, self.field-display-line, $!cursor-offset + self.field.depth * 2 + 2));
-                                     } else {
-                                         self.field.new-subrecord;
-                                         self.draw-current-subrecord;
-                                     }
-                                 }
-                             });
-
-        $mode.add-sub-command('subrecord', 'c', 'Close',
-                          -> $k {
-                                 self.draw-remove-subrecord;
-                             });
 
         $mode.add-command('@',
                           -> $k {
                                  self.push-mode(self.diagnostic-mode);
-                             });
-
-        $mode.add-sub-command('ref', 'g', 'Goto link',
-                          -> $k {
-                                 if self.field.prop eq <ref> {
-                                     self.load-record(self.field.value);
-                                 } else {
-                                     self.message("Can only go to uris in ref fields");
-                                 }
-                             });
-
-        $mode.add-sub-command('ref', 'n', 'New record',
-                          -> $k {
-                                 if self.field.prop eq <ref> {
-                                     self.create-record(ref-record-type(self.field.schema<type>));
-                                 } else {
-                                     self.message("Can only go to uris in ref fields");
-                                 }
-                             });
-
-        $mode.add-sub-command('stack', 'b', 'Back to previous record',
-                          -> $k {
-                                 self.load-previous-record;
-                             });
-
-        $mode.add-sub-command('image', 'v', 'View image',
-                          -> $k {
-                                 if self.field.value ~~ /^ 'http' .+? '.' ('jpg' | 'png') $/ {
-                                     if inline_image_supported() {
-                                         self.message("Showing: {self.field.value}", :sticky);
-                                         my $width = term_cols() - $!cursor-offset - 40;
-                                         my $height = term_lines() - 10;
-                                         if (my $img = image-for-url(self.field.value, :$width, :$height)) {
-                                             print-at(5, $!cursor-offset + 20, $img, :raw);
-                                             self.push-mode(self.image-viewer-mode);
-                                         } else {
-                                             self.message("Sorry, that image didn't dowmload");
-                                         }
-                                     } else {
-                                         self.message('Sorry, image viewing only available with iTerm2');
-                                     }
-                                 } else {
-                                     self.message('The current field is not an image link');
-                                 }
                              });
 
         $mode;
@@ -1342,7 +1349,7 @@ class CommandMode {
         for self.active-keys.grep(*.description) -> $k {
             my $label = $k.label // $k.key-match;
             $help-txt ~= ' | ' if $help-txt;
-            my $color = $k.sub-mode ?? @!sub-modes.first({ .name eq $k.sub-mode }).color ~ ' bold' !! 'green bold';
+            my $color = $k.sub-mode ?? @!sub-modes.first({ .name eq $k.sub-mode }).color ~ ' bold' !! 'bold';
 
             if $label.fc eq $k.description.substr(0,1).fc {
                 $help-txt ~= ansi($label.uc, $color) ~ $k.description.substr(1);
@@ -1351,7 +1358,7 @@ class CommandMode {
             }
         }
 
-        my $mode-label = ansi($!name, 'bold green');
+        my $mode-label = ansi($!name, 'bold');
         if $sub-label {
             $mode-label ~= ' (' ~ $sub-label ~ ')';
         }
