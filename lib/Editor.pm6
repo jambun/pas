@@ -1263,7 +1263,7 @@ class SubMode {...}
 class CommandMode {
     has $.name;
     has CommandKey @.command-keys;
-    has SetHash $.active-sub-modes = SetHash.new;
+    has Str @.active-sub-modes;
     has SubMode @.sub-modes;
 
     method add-sub-mode($name, $color, :&set, :&unset) {
@@ -1295,7 +1295,7 @@ class CommandMode {
     }
 
     method active-keys {
-        @!command-keys.grep(-> $ck { !$ck.sub-mode || $!active-sub-modes && $ck.sub-mode eq any($!active-sub-modes.keys) });
+        @!command-keys.grep(-> $ck { !$ck.sub-mode || @!active-sub-modes && $ck.sub-mode eq any(@!active-sub-modes) });
     }
 
     method run {
@@ -1322,31 +1322,32 @@ class CommandMode {
     }
 
     method set-sub-mode($sub-mode) {
-        my $orig = $!active-sub-modes.Set;
+        my @orig = @!active-sub-modes.clone;
 
-        $!active-sub-modes.set($sub-mode);
+        @!active-sub-modes.push($sub-mode);
+        @!active-sub-modes.=unique;
 
-        unless $orig eqv $!active-sub-modes {
+        unless @orig eqv @!active-sub-modes {
             self.help;
         }
     }
 
     method unset-sub-mode($sub-mode?) {
-        my $orig = $!active-sub-modes.Set;
+        my @orig = @!active-sub-modes.unique;
 
         if $sub-mode {
-            $!active-sub-modes.unset($sub-mode);
+            @!active-sub-modes.=grep(* ne $sub-mode);
         } else {
-            $!active-sub-modes = Empty;
+            @!active-sub-modes = Empty;
         }
 
-        unless $orig eqv $!active-sub-modes {
+        unless @orig eqv @!active-sub-modes {
             self.help;
         }
     }
 
     method help {
-        my $sub-label = $!active-sub-modes.keys.map(-> $sm { ansi($sm, @!sub-modes.first({ .name eq $sm }).color ~ ' bold')  }).join(' ');
+        my $sub-label = @!active-sub-modes.map(-> $sm { ansi($sm, @!sub-modes.first({ .name eq $sm }).color ~ ' bold')  }).join(' ');
 
         my $help-txt;
 
