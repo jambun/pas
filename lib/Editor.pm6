@@ -754,7 +754,13 @@ class Editor {
         my $mode = CommandMode.new(:name('Main'));
 
         $mode.add-sub-mode(<selected>, <green>, :set(-> { !self.field.open-for-update }));
-        $mode.add-sub-mode(<open>, <lilac>, :set(-> { self.field.open-for-update }));
+
+        $mode.add-sub-mode('open bool', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq 'boolean' }));
+        $mode.add-sub-mode('open enum', <lilac>, :set(-> { self.field.open-for-update && (self.field.schema<enum> || self.field.schema<dynamic_enum>) }));
+        $mode.add-sub-mode('open value', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq any(<string integer date>) &&
+                                                            !(self.field.schema<enum> || self.field.schema<dynamic_enum>)}));
+        $mode.add-sub-mode('open sub', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq 'array' && self.field.value.elems > 1 }));
+
         $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.value ~~ Iterable }));
         $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
         $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
@@ -805,14 +811,16 @@ class Editor {
                                      self.draw-field;
                                  });
 
-        $mode.add-sub-command('open', ' ', 'SPACE', 'New value',
+        $mode.add-sub-command('open bool', ' ', 'SPACE', 'Toggle',
+                              -> $k {
+                                     self.set-value(!self.field.value);
+                                     self.draw-field;
+                                 });
+
+        $mode.add-sub-command('open enum', ' ', 'SPACE', 'Next value',
                               -> $k {
                                      my $prop = self.field.schema;
-
-                                     if $prop<type> eq 'boolean' {
-                                         self.set-value(!self.field.value);
-                                         self.draw-field;
-                                     } elsif $prop<enum> {
+                                     if $prop<enum> {
                                          my $next-ix = $prop<enum>.first(self.field.value, :k) + 1;
                                          $next-ix %= $prop<enum>.elems;
                                          self.set-value($prop<enum>[$next-ix]);
@@ -826,31 +834,37 @@ class Editor {
                                          self.set-value(@values[$next-ix]);
                                          self.field.set-label;
                                          self.draw-field;
-                                     } elsif $prop<type> eq 'string' | 'integer' | 'date' {
-                                         my $val = self.field.value // '';
-                                         if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
-                                             save_tmp(self.field.value, :file-name('edit.txt'));
-                                             if edit(tmp_file('edit.txt')) {
-                                                 self.set-value(slurp(tmp_file('edit.txt')).chomp);
-                                                 self.message('Edits applied');
-                                                 self.draw-field;
-                                             } else {
-                                                 self.message('No edits');
-                                             }
-                                             run <tput civis>;
-                                         } else {
-                                             my $coo = self.field.depth * 2 + 1;
-
-                                             self.with-cursor-lock: {
-                                                 self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
-                                                                            $!cursor-offset + $coo, :value(self.field.value)));
-                                             }
-
-                                             self.draw-field;
-                                         }
-                                     } elsif $prop<type> eq 'array' {
-                                         self.draw-next-subrecord;
                                      }
+                                 });
+
+        $mode.add-sub-command('open value', ' ', 'SPACE', 'Edit',
+                              -> $k {
+                                     my $val = self.field.value // '';
+                                     if $val.chars > term_cols() - $!cursor-offset - 20 || $val ~~ /\n/ {
+                                         save_tmp(self.field.value, :file-name('edit.txt'));
+                                         if edit(tmp_file('edit.txt')) {
+                                             self.set-value(slurp(tmp_file('edit.txt')).chomp);
+                                             self.message('Edits applied');
+                                             self.draw-field;
+                                         } else {
+                                             self.message('No edits');
+                                         }
+                                         run <tput civis>;
+                                     } else {
+                                         my $coo = self.field.depth * 2 + 1;
+
+                                         self.with-cursor-lock: {
+                                             self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
+                                                                        $!cursor-offset + $coo, :value(self.field.value)));
+                                         }
+
+                                         self.draw-field;
+                                     }
+                                 });
+
+        $mode.add-sub-command('open sub', ' ', 'SPACE', 'Next subrecord',
+                              -> $k {
+                                     self.draw-next-subrecord;
                                  });
 
         $mode.add-sub-command('edited', "\t", 'TAB', 'Revert',
