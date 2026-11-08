@@ -853,11 +853,9 @@ class Editor {
                                      } else {
                                          my $coo = self.field.depth * 2 + 1;
 
-                                         self.with-cursor-lock: {
-                                             self.set-value(line-editor($!first-display-line + $!selected-field-ix - $!top-field-ix,
-                                                                        $!cursor-offset + $coo, :value(self.field.value)));
-                                         }
-
+                                         self.push-mode(self.line-editor-mode($!first-display-line + $!selected-field-ix - $!top-field-ix,
+                                                                              $!cursor-offset + $coo,
+                                                                              :value(self.field.value)));
                                          self.draw-field;
                                      }
                                  });
@@ -1071,6 +1069,25 @@ class Editor {
         $mode;
 	  }
 
+    method line-editor-mode($line, $col, :$value) {
+        my $mode = CommandMode.new(:name('Editor'), :no-key);
+
+        $mode.add-command(Any, 'Type', 'to edit',
+                          -> $k {
+                                 self.with-cursor-lock: {
+                                     self.set-value(line-editor($line, $col, :$value));
+                                 }
+                                 last;
+                             });
+
+        if $value {
+            $mode.add-command(Any, "\c[UPWARDS ARROW]", 'Current value', -> $k {});
+        }
+        $mode.add-command(Any, 'ENTER', 'Set edited value', -> $k {});
+
+        $mode;
+    }
+
     method image-viewer-mode {
         my $mode = CommandMode.new(:name('Image viewer'));
 
@@ -1216,10 +1233,8 @@ class Editor {
 
         $mode.add-command('`', 'BACKTICK', 'Enter link manually',
                           -> $k {
-                                 self.with-cursor-lock: {
-                                     self.set-value(line-editor($line, $col - 1));
-                                     self.field.label = '';
-                                 }
+                                 self.push-mode(self.line-editor-mode($line, $col - 1));
+                                 self.field.label = '';
                                  self.message("Link entered manually");
                                  last;
                              });
@@ -1279,6 +1294,7 @@ class CommandMode {
     has CommandKey @.command-keys;
     has Str @.active-sub-modes;
     has SubMode @.sub-modes;
+    has Bool $.no-key;
 
     method add-sub-mode($name, $color, :&set, :&unset) {
         @!sub-modes.push(SubMode.new(:$name, :$color, :set-trigger(&set), :unset-trigger(&unset)));
@@ -1326,7 +1342,8 @@ class CommandMode {
                 }
             }
 
-            my $k = get-key-in;
+            my $k = $!no-key ?? Any !! get-key-in;
+
             if (my $cmd = self.active-keys.first(-> $ck {$k ~~ $ck.key-match})) {
                 $cmd.block.($k);
             } else {
