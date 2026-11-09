@@ -799,7 +799,7 @@ class Editor {
                                          self.draw-ref-search;
                                          self.field.open-for-update = False;
                                      } elsif $prop<type> eq <array> | <object> || is-subrecord($prop<type>) {
-                                         if !self.field.label {
+                                         if self.field.value && !self.field.label && %!json<uri> ~~ / \d $/ {
                                              if $prop<subtype> ~~ <ref> || ($prop<items> && $prop<items><subtype> ~~ <ref>) {
                                                  my $resp = from-json client.get(%!json<uri>, ('resolve[]=' ~ self.field.prop,));
                                                  if $resp<error> {
