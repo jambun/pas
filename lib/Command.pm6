@@ -321,12 +321,20 @@ class Command {
 
 
     method form {
-        my $json = client.get($!uri);
-        if (from-json($json)<error>) {
-            pretty $json;
-        } else {
-            my %json = from-json($json);
-            Editor.new(:%json).edit-screen;
+        if $!uri ~~ / \d $/ {
+            my $json = client.get($!uri);
+            if (from-json($json)<error>) {
+                pretty $json;
+            } else {
+                my %json = from-json($json);
+                Editor.new(:%json).edit-screen;
+            }
+        } else { # new record
+            if (my $type = jsonmodel-type-for-uri($!uri)) {
+                Editor.new-for-type($type, $!uri).edit-screen;
+            } else {
+                "No JSONModel found for $!uri";
+            }
         }
     }
 

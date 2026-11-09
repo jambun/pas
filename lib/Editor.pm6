@@ -386,7 +386,9 @@ class Editor {
 
     method init(%json?, :$previous) {
         if %json {
-            @!record-stack.push(%!json.clone);
+            if %!json {
+                @!record-stack.push(%!json.clone);
+            }
             %!json = %json;
         } elsif $previous {
             if @!record-stack {
@@ -395,10 +397,11 @@ class Editor {
                 self.message('No previous record to load');
                 return;
             }
+        } elsif !%!json {
+            return;
         }
 
         $!schema = schemas(:name(%!json<jsonmodel_type>));
-
         return unless $!schema;
 
         $!selected-field-ix = 0;
@@ -409,11 +412,29 @@ class Editor {
         True;
     }
 
-    method create-record($jsonmodel-type) {
-        my $schema = schemas(:name($jsonmodel-type));
-        self.message($schema);
+    method new-for-type($jsonmodel-type, $uri) {
+        my $editor = Editor.new;
+        $editor.create-record($jsonmodel-type, :$uri);
+        $editor;
+    }
 
-        my %rec = jsonmodel_type => $jsonmodel-type, uri => $schema<uri>;
+    method create-record($jsonmodel-type, :$uri is copy) {
+        my $schema = schemas(:name($jsonmodel-type));
+
+        unless $uri {
+            $uri = $schema<uri>;
+            if $uri ~~ /':repo_id'/ {
+                unless %!json {
+                    self.message("Can't find a repo_id for $uri");
+                    return;
+                }
+                %!json<uri> ~~ /\/repositories\/(\d+)/;
+                my $repo_id = $0.Str;
+                $uri ~~ s/':repo_id'/$repo_id/;
+            }
+        }
+
+        my %rec = jsonmodel_type => $jsonmodel-type, uri => $uri;
 
         for $schema<properties>.kv -> $prop, %def {
             next if %def<readonly>;
@@ -429,7 +450,6 @@ class Editor {
         }
 
         self.init(%rec);
-        self.draw-page;
     }
 
     method load-record($uri) {
@@ -907,6 +927,7 @@ class Editor {
                           -> $k {
                                  if self.field.prop eq <ref> {
                                      self.create-record(ref-record-type(self.field.schema<type>));
+                                     self.draw-page;
                                  } else {
                                      self.message("Can only go to uris in ref fields");
                                  }
