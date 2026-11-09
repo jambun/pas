@@ -1205,10 +1205,14 @@ class Editor {
                                   $q.=substr(0, *-1) if $q;
                               }
                               if $q {
+                                  run <stty -echo>;
                                   %search = self.search-type($type, $q, :$page, :$page-size);
+                                  run <stty echo>;
                                   message-for-search(%search);
                                   print-at($line, $col + 8, ansi($q ~ '_', 'bold') ~ '  ' ~ %search<total_hits> ~ ' hits', :fill);
                               } else {
+                                  %search = Empty;
+                                  self.clear-message;
                                   print-at($line, $col + 8, ansi($q ~ '_', 'bold'), :fill);
                               }
                           });
