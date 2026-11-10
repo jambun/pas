@@ -415,6 +415,7 @@ class Editor {
         } elsif $previous {
             if @!record-stack {
                 my $uri = %!json<uri>;
+                my $label = label-for-json(%!json);
                 my $pop = @!record-stack.pop;
                 %!json = $pop.json;
                 $!schema = $pop.schema;
@@ -424,6 +425,7 @@ class Editor {
                 self.set-prop-width;
                 if $pop.wants-ref && $uri ~~ / \d $/ {
                     self.set-value($uri);
+                    self.field.label = $label;
                 }
                 return True;
             } else {
