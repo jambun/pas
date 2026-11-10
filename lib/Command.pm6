@@ -331,7 +331,9 @@ class Command {
             }
         } else { # new record
             if (my $type = jsonmodel-type-for-uri($!uri)) {
-                Editor.new-for-type($type, $!uri).edit-screen;
+                my $resp = Editor.new-for-type($type, $!uri).edit-screen;
+                extract_uris  '"' ~ $resp.split(/\s+/).tail ~ '"';
+                $resp;
             } else {
                 "No JSONModel found for $!uri";
             }
