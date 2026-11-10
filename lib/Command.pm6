@@ -1480,6 +1480,7 @@ sub shell_help {
       search    show search index document
        .public  show pui document
       nav       enter navigation mode
+      form      enter editor form mode
       revisions show revision history
        .restore attempt to restore revision n
        n        show revision n
