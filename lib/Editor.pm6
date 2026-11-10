@@ -750,6 +750,9 @@ class Editor {
             run <tput civis> unless $embedded;
         }
         LEAVE {
+            $!message-timer-cancel.keep;
+            print-at(term_lines(), 1, '', :clear);
+
             cursor(0, term_lines());
             run <tput cvvis> unless $embedded;
         }
@@ -757,8 +760,6 @@ class Editor {
         self.draw-page;
 
         self.push-mode(self.main-mode);
-
-        print-at(term_lines(), 1, '', :clear);
 
         "Closed form for {%!json<uri>}";
     }
