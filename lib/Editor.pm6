@@ -781,7 +781,7 @@ class Editor {
                                                             !(self.field.schema<enum> || self.field.schema<dynamic_enum>)}));
         $mode.add-sub-mode('open sub', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq 'array' && self.field.value.elems > 1 }));
 
-        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.value ~~ Iterable }));
+        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.schema<type> eq <array> }));
         $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
         $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
         $mode.add-sub-mode(<ref>, <blue>, :set(-> { self.field.prop eq <ref> }));
