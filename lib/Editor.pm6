@@ -445,7 +445,7 @@ class Editor {
                 when <array>   { %rec{$prop} = []; }
                 when <boolean> { %rec{$prop} = %def<default>; }
                 when <integer> { %rec{$prop} = %def<default>; }
-#                when <object>  { %rec{$prop} = %def<default>; }
+                when <object>  { %rec{$prop} = {}; }
             }
         }
 
