@@ -368,6 +368,24 @@ class Subrecord {
     }
 }
 
+class Editor {...}
+
+class StackedRecord {
+    has %.json;
+    has $.schema;
+    has FormField @.fields;
+    has $.selected-field-ix;
+    has $.top-field-ix;
+
+    method from(Editor $editor) {
+        self.new(:json($editor.json),
+                 :schema($editor.schema),
+                 :fields($editor.fields),
+                 :selected-field-ix($editor.selected-field-ix),
+                 :top-field-ix($editor.top-field-ix));
+    }
+}
+
 class Editor {
     has %.json; # the parsed json of the record
     has $.schema; # the JSONModel schema for the record's type
@@ -389,12 +407,19 @@ class Editor {
     method init(%json?, :$previous) {
         if %json {
             if %!json {
-                @!record-stack.push(%!json.clone);
+                @!record-stack.push(StackedRecord.from(self));
             }
             %!json = %json;
         } elsif $previous {
             if @!record-stack {
-                %!json = @!record-stack.pop;
+                my $pop = @!record-stack.pop;
+                %!json = $pop.json;
+                $!schema = $pop.schema;
+                @!fields = $pop.fields;
+                $!selected-field-ix = $pop.selected-field-ix;
+                $!top-field-ix = $pop.top-field-ix;
+                self.set-prop-width;
+                return True;
             } else {
                 self.message('No previous record to load');
                 return;
