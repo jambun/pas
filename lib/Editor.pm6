@@ -152,6 +152,8 @@ class FormField {
                     if $schema-prop<subtype> && $schema-prop<subtype> eq <ref> {
                         $val<ref> = '';
                     }
+                } elsif $prop eq 'vocabulary' {
+                    $val = '/vocabularies/1';
                 } elsif $schema-prop<type> eq <string> {
                     $val = '';
                 }
@@ -446,6 +448,10 @@ class Editor {
                 when <boolean> { %rec{$prop} = %def<default>; }
                 when <integer> { %rec{$prop} = %def<default>; }
                 when <object>  { %rec{$prop} = {}; }
+            }
+
+            if $prop eq 'vocabulary' {
+                %rec{$prop} = '/vocabularies/1';
             }
         }
 
