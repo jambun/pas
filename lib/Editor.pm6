@@ -737,7 +737,7 @@ class Editor {
     method draw-header {
         my Bool $new-record = not %!json<uri> ~~ / \d $/;
 
-        my $label = (%!json<uri>, $new-record ?? 'NEW' !! label-for-json(%!json)).join(' | ');
+        my $label = (%!json<uri>, $new-record ?? 'NEW' !! label-for-json(%!json)).grep(*.so).join(' | ');
         $label = ('.' x @!record-stack) ~ ' ' ~ $label;
 
         my $last-update = $new-record ?? '' !! '  ' ~ ansi(%!json<last_modified_by> ~ ' @ ' ~ DateTime.new(%!json<user_mtime>).local, 'cyan');
