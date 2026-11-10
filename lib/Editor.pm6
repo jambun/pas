@@ -376,13 +376,15 @@ class StackedRecord {
     has FormField @.fields;
     has $.selected-field-ix;
     has $.top-field-ix;
+    has Bool $.wants-ref;
 
-    method from(Editor $editor) {
+    method from(Editor $editor, :$wants-ref) {
         self.new(:json($editor.json),
                  :schema($editor.schema),
                  :fields($editor.fields),
                  :selected-field-ix($editor.selected-field-ix),
-                 :top-field-ix($editor.top-field-ix));
+                 :top-field-ix($editor.top-field-ix),
+                 :$wants-ref);
     }
 }
 
@@ -404,14 +406,15 @@ class Editor {
         self.init;
     }
 
-    method init(%json?, :$previous) {
+    method init(%json?, :$previous, :$for-ref) {
         if %json {
             if %!json {
-                @!record-stack.push(StackedRecord.from(self));
+                @!record-stack.push(StackedRecord.from(self, :wants-ref($for-ref.so)));
             }
             %!json = %json;
         } elsif $previous {
             if @!record-stack {
+                my $uri = %!json<uri>;
                 my $pop = @!record-stack.pop;
                 %!json = $pop.json;
                 $!schema = $pop.schema;
@@ -419,6 +422,9 @@ class Editor {
                 $!selected-field-ix = $pop.selected-field-ix;
                 $!top-field-ix = $pop.top-field-ix;
                 self.set-prop-width;
+                if $pop.wants-ref && $uri ~~ / \d $/ {
+                    self.set-value($uri);
+                }
                 return True;
             } else {
                 self.message('No previous record to load');
@@ -445,7 +451,7 @@ class Editor {
         $editor;
     }
 
-    method create-record($jsonmodel-type, :$uri is copy) {
+    method create-record($jsonmodel-type, :$uri is copy, :$for-ref) {
         my $schema = schemas(:name($jsonmodel-type));
 
         unless $uri {
@@ -480,7 +486,7 @@ class Editor {
             }
         }
 
-        self.init(%rec);
+        self.init(%rec, :$for-ref);
     }
 
     method load-record($uri) {
@@ -946,7 +952,7 @@ class Editor {
                                  self.draw-remove-subrecord;
                              });
 
-        $mode.add-sub-command('ref', 'g', 'Goto link',
+        $mode.add-sub-command('ref', 'g', 'Go to link',
                           -> $k {
                                  if self.field.prop eq <ref> {
                                      self.load-record(self.field.value);
@@ -958,7 +964,7 @@ class Editor {
         $mode.add-sub-command('ref', 'n', 'New record',
                           -> $k {
                                  if self.field.prop eq <ref> {
-                                     self.create-record(ref-record-type(self.field.schema<type>));
+                                     self.create-record(ref-record-type(self.field.schema<type>), :for-ref);
                                      self.draw-page;
                                  } else {
                                      self.message("Can only go to uris in ref fields");
