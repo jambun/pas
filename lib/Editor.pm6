@@ -53,7 +53,12 @@ class FormField {
     }
 
     method set-value($value) {
-        $!value = from-json to-json $value;
+        if $!schema<type> eq <integer> {
+            $!value = $value.Int // $value;
+        } else {
+            $!value = $value;
+        }
+#        $!value = from-json to-json $value; #jjj
         self.set-label;
         $!error = Nil;
         if $!parent {
