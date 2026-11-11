@@ -1080,6 +1080,20 @@ class Editor {
                                  }
                              });
 
+        self.add-navigation-commands-to($mode);
+
+        $mode.add-command('q', 'Quit', -> $k { last; });
+
+
+        $mode.add-command('@',
+                          -> $k {
+                                 self.push-mode(self.diagnostic-mode);
+                             });
+
+        $mode;
+	  }
+
+    method add-navigation-commands-to($mode) {
         $mode.add-command(UP_ARROW, "\c[UPWARDS ARROW] \c[DOWNWARDS ARROW]", 'Cursor',
                           -> $k {
                                  self.move-cursor(-1);
@@ -1124,16 +1138,8 @@ class Editor {
                                  }
                              });
 
-        $mode.add-command('q', 'Quit', -> $k { last; });
 
-
-        $mode.add-command('@',
-                          -> $k {
-                                 self.push-mode(self.diagnostic-mode);
-                             });
-
-        $mode;
-	  }
+    }
 
     method line-editor-mode($line, $col, :$value) {
         my $mode = CommandMode.new(:name('Editor'), :no-key);
@@ -1209,6 +1215,8 @@ class Editor {
                           -> $k {
                                  page(pretty to-json self.field.subrecords.raku);
                              });
+
+        self.add-navigation-commands-to($mode);
 
         $mode;
     }
