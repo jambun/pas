@@ -218,7 +218,7 @@ class FormField {
             $rec<jsonmodel_type> = $jsonmodel;
         }
 
-        if $!schema<type> eq <object> {
+        if $!schema<type> eq <object> || is-subrecord($!schema) {
             $!value = $rec;
             @!subrecords = $subrecord;
             $!subrecord-ix = 0;
@@ -828,7 +828,8 @@ class Editor {
                                                             !(self.field.schema<enum> || self.field.schema<dynamic_enum>)}));
         $mode.add-sub-mode('open sub', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq 'array' && self.field.value.elems > 1 }));
 
-        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.schema<type> eq <array> || self.field.schema<type> eq <object> && !self.field.value }));
+        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.schema<type> eq <array> ||
+                                                      (is-subrecord(self.field.schema) || self.field.schema<type> eq <object>) && !self.field.value }));
 
         $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
         $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
@@ -945,16 +946,14 @@ class Editor {
 
         $mode.add-sub-command('add', 'a', 'Add subrecord',
                           -> $k {
-#                                 if self.field.value ~~ Iterable {
-                                     my $types = jsonmodel-object-types-for-schema(self.field.schema);
-                                     if $types && $types ~~ Iterable {
-                                         # the subrecord can have more than one type - get the user to choose one
-                                         self.push-mode(self.new-subrecord-for-types-mode($types, self.field-display-line, $!cursor-offset + self.field.depth * 2 + 2));
-                                     } else {
-                                         self.field.new-subrecord;
-                                         self.draw-current-subrecord;
-                                     }
-#                                 }
+                                 my $types = jsonmodel-object-types-for-schema(self.field.schema);
+                                 if $types && $types ~~ Iterable {
+                                     # the subrecord can have more than one type - get the user to choose one
+                                     self.push-mode(self.new-subrecord-for-types-mode($types, self.field-display-line, $!cursor-offset + self.field.depth * 2 + 2));
+                                 } else {
+                                     self.field.new-subrecord;
+                                     self.draw-current-subrecord;
+                                 }
                              });
 
         $mode.add-sub-command('subrecord', 'c', 'Close subrecord',
