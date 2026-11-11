@@ -357,7 +357,7 @@ class FormField {
             $val ~= '  ' ~ ansi($!error, 'red');
         }
 
-        my $cursor = $selected ?? ansi('>>', 'bold green') !! '::';
+        my $cursor = $selected ?? ansi("\x25ac\x25b6", 'bold green') !! '::';
         my $prop = self.open-for-update ?? ansi($!prop, 'bold') !! $!prop;
         my $width = self.open-for-update  ?? self.prop-width + 8 !! self.prop-width;
 
