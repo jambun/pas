@@ -265,19 +265,24 @@ class FormField {
     }
 
     method delete-current-subrecord-or-all {
-        if $!subrecord-ix {
+        if $!subrecord-ix.defined {
             self.delete-subrecord($!subrecord-ix);
             'current';
         } else {
             @!subrecords = [];
             $!value = [];
+            $!subrecord-ix = Nil;
             'all';
         }
     }
 
     method delete-subrecord($ix) {
+        if $!subrecord-ix > $ix {
+            $!subrecord-ix--;
+        }
         @!subrecords.splice($ix, 1);
         $!value.splice($ix, 1);
+        $!subrecord-ix %= @!subrecords;
     }
 
     method updated {
@@ -1014,7 +1019,7 @@ class Editor {
                                          self.message("Deleted all {self.field.prop}");
                                      } else {
                                          self.message("Deleted item from {self.field.prop}");
-                                         self.draw-next-subrecord;
+                                         self.draw-current-subrecord;
                                      }
                                  } else {
                                      self.set-value('');
