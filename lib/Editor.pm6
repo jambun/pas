@@ -106,9 +106,7 @@ class FormField {
 
         @!subrecords = Empty;
 
-        my @subrecs = $!schema<type> eq 'array'
-                          ?? |$!value
-                          !! [$!value];
+        my @subrecs = ($!schema<type> eq 'array' ?? |$!value !! [$!value]).grep(*.defined);
 
         for @subrecs -> $rec {
             my @subrecord;
@@ -220,7 +218,11 @@ class FormField {
             $rec<jsonmodel_type> = $jsonmodel;
         }
 
-        if $!subrecord-ix.defined {
+        if $!schema<type> eq <object> {
+            $!value = $rec;
+            @!subrecords = $subrecord;
+            $!subrecord-ix = 0;
+        } elsif $!subrecord-ix.defined {
             @!subrecords.splice($!subrecord-ix, 0, $subrecord);
             $!value.splice($!subrecord-ix, 0, $rec);
         } else {
@@ -311,7 +313,7 @@ class FormField {
                     $val = ansi($val<ref> ~ ' | ' ~ self.label, "bold $value-style");
                 } else {
                     if (my $k = $val.keys.first({ $_ !~~ /^ '_'/ })) {
-                        $val = ansi($k ~ ': ' ~ $val{$k}, "bold $value-style");
+                        $val = ansi($k ~ ': ' ~ ($val{$k} // ''), "bold $value-style");
                     } else {
                         $val = '--';
                     }
@@ -826,7 +828,8 @@ class Editor {
                                                             !(self.field.schema<enum> || self.field.schema<dynamic_enum>)}));
         $mode.add-sub-mode('open sub', <lilac>, :set(-> { self.field.open-for-update && self.field.schema<type> eq 'array' && self.field.value.elems > 1 }));
 
-        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.schema<type> eq <array> }));
+        $mode.add-sub-mode(<add>, <yellow>, :set(-> { self.field.schema<type> eq <array> || self.field.schema<type> eq <object> && !self.field.value }));
+
         $mode.add-sub-mode(<edited>, <cyan>, :set(-> { self.field.updated }));
         $mode.add-sub-mode(<subrecord>, <orange>, :set(-> { self.field-with-open-subrecord }));
         $mode.add-sub-mode(<ref>, <blue>, :set(-> { self.field.prop eq <ref> }));
@@ -942,7 +945,7 @@ class Editor {
 
         $mode.add-sub-command('add', 'a', 'Add subrecord',
                           -> $k {
-                                 if self.field.value ~~ Iterable {
+#                                 if self.field.value ~~ Iterable {
                                      my $types = jsonmodel-object-types-for-schema(self.field.schema);
                                      if $types && $types ~~ Iterable {
                                          # the subrecord can have more than one type - get the user to choose one
@@ -951,7 +954,7 @@ class Editor {
                                          self.field.new-subrecord;
                                          self.draw-current-subrecord;
                                      }
-                                 }
+#                                 }
                              });
 
         $mode.add-sub-command('subrecord', 'c', 'Close subrecord',
