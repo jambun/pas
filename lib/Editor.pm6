@@ -314,8 +314,8 @@ class FormField {
             if $val.keys.grep({ $_ !~~ /^ '_'/ }).elems > 1 {
                 $val = ansi($!prop, "bold $value-style") ~ " {$val.elems} properties";
             } else {
-                if $val<ref> && self.label {
-                    $val = ansi($val<ref> ~ ' | ' ~ self.label, "bold $value-style");
+                if $val<ref> && (my $label = @!subrecords[0].fields.first(*.prop eq <ref>).label) {
+                    $val = ansi($val<ref> ~ ' | ' ~ $label, "bold $value-style");
                 } else {
                     if (my $k = $val.keys.first({ $_ !~~ /^ '_'/ })) {
                         $val = ansi($k ~ ': ' ~ ($val{$k} // ''), "bold $value-style");
